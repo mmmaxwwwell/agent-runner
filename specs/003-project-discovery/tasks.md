@@ -96,7 +96,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T020 [US3] Add metadata display to discovered directory cards in src/client/components/dashboard.tsx — git indicator badge, spec-kit artifact badges (spec, plan, tasks), style with visual distinction from registered cards
+- [x] T020 [US3] Add metadata display to discovered directory cards in src/client/components/dashboard.tsx — git indicator badge, spec-kit artifact badges (spec, plan, tasks), style with visual distinction from registered cards
 - [ ] T021 [US3] Handle the "no metadata" case in src/client/components/dashboard.tsx — directory with no git and no spec-kit shows only name + Onboard button
 
 **Checkpoint**: All user stories should now be independently functional

@@ -83,6 +83,9 @@ function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnbo
     }
   };
 
+  const { isGitRepo, hasSpecKit } = dir;
+  const hasBadges = isGitRepo || hasSpecKit.spec || hasSpecKit.plan || hasSpecKit.tasks;
+
   return (
     <div
       style={{
@@ -111,6 +114,30 @@ function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnbo
           {busy ? 'Onboarding...' : 'Onboard'}
         </button>
       </div>
+      {hasBadges && (
+        <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+          {isGitRepo && (
+            <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', background: '#2a3a2a', color: '#81c784', border: '1px solid #4caf5044' }}>
+              git
+            </span>
+          )}
+          {hasSpecKit.spec && (
+            <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', background: '#1a2a3a', color: '#90caf9', border: '1px solid #2196f344' }}>
+              spec
+            </span>
+          )}
+          {hasSpecKit.plan && (
+            <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', background: '#1a2a3a', color: '#90caf9', border: '1px solid #2196f344' }}>
+              plan
+            </span>
+          )}
+          {hasSpecKit.tasks && (
+            <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', background: '#1a2a3a', color: '#90caf9', border: '1px solid #2196f344' }}>
+              tasks
+            </span>
+          )}
+        </div>
+      )}
       {errMsg && (
         <div style={{ color: '#ff8a80', fontSize: '0.8rem', marginTop: '8px' }}>{errMsg}</div>
       )}
