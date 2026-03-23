@@ -241,7 +241,7 @@
 
 - [x] T062 Implement crash recovery service in src/services/recovery.ts — on server startup: scan sessions/ for meta.json with state "running" (re-spawn process from last task) or "waiting-for-input" (restore waiting state), log recovery actions per research.md §8 and spec.md FR-015
 - [x] T063 Write integration tests for crash recovery in tests/integration/recovery.test.ts — simulate crash (running session with meta.json), restart server, verify session resumes or restores waiting state
-- [ ] T064 Integrate recovery service into src/server.ts startup — call recovery.resumeAll() after data dir init, before accepting connections
+- [x] T064 Integrate recovery service into src/server.ts startup — call recovery.resumeAll() after data dir init, before accepting connections
 - [ ] T065 [P] Add CSS styling to src/client/index.html or src/client/style.css — mobile-first responsive layout, dark theme, terminal-like output styling, status badges, card components, touch-friendly tap targets
 - [ ] T065b [P] Write unit tests for disk space monitor in tests/unit/disk-monitor.test.ts — mock fs.statfs, verify warning triggers when available space falls below DISK_WARN_THRESHOLD_MB (default 8192), verify no warning above threshold, verify 60-second polling interval, verify push notification and log emission on warning per spec.md FR-017
 - [ ] T065c [P] Implement disk space monitoring in src/services/disk-monitor.ts — check available disk space in AGENT_RUNNER_DATA_DIR every 60 seconds, warn via push notification and server logs when below DISK_WARN_THRESHOLD_MB (default 8192 MB, user-configurable) per spec.md FR-017

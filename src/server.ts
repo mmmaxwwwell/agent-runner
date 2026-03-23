@@ -10,6 +10,7 @@ import { mountSessionRoutes } from './routes/sessions.js';
 import { mountPushRoutes } from './routes/push.js';
 import { mountVoiceRoutes } from './routes/voice.js';
 import { createPushService } from './services/push.js';
+import { resumeAll } from './services/recovery.js';
 import { handleSessionStream, initSessionStream } from './ws/session-stream.js';
 import { handleDashboard } from './ws/dashboard.js';
 
@@ -218,6 +219,16 @@ mountProjectRoutes(apiRoutes, config);
 mountSessionRoutes(apiRoutes, config, pushService);
 mountPushRoutes(apiRoutes, config, pushService);
 mountVoiceRoutes(apiRoutes, config);
+
+// Resume interrupted sessions before accepting connections (FR-015)
+const recoveryResult = await resumeAll(config.dataDir, pushService);
+if (recoveryResult.resumed > 0 || recoveryResult.waitingRestored > 0 || recoveryResult.failed > 0) {
+  log.info({
+    resumed: recoveryResult.resumed,
+    waitingRestored: recoveryResult.waitingRestored,
+    failed: recoveryResult.failed,
+  }, 'Session recovery completed');
+}
 
 server.listen(config.port, config.host, () => {
   log.info({
