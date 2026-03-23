@@ -103,7 +103,7 @@ function startServer(): Promise<void> {
         AGENT_RUNNER_PROJECTS_DIR: projectsDir,
         VAPID_PUBLIC_KEY: 'test-public-key',
         VAPID_PRIVATE_KEY: 'test-private-key',
-        LOG_LEVEL: 'error',
+        LOG_LEVEL: 'info',
         ALLOW_UNSANDBOXED: 'true',
       },
       stdio: ['pipe', 'pipe', 'pipe'],

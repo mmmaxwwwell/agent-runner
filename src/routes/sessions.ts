@@ -9,6 +9,7 @@ import { buildCommand, isAvailable as isSandboxAvailable } from '../services/san
 import { spawnProcess, killProcess, startTaskLoop, type ProcessHandle } from '../services/process-manager.js';
 import { createSessionLogger, readLog } from '../services/session-logger.js';
 import { parseTaskSummary } from '../services/task-parser.js';
+import { broadcastSessionState } from '../ws/session-stream.js';
 
 const log = createLogger('sessions');
 
@@ -251,6 +252,9 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
 
     // Transition to failed with exitCode -1 (manual stop)
     const updated = transitionState(cfg.dataDir, session.id, 'failed', { exitCode: -1 });
+
+    // Broadcast state change to connected WebSocket clients
+    broadcastSessionState(session.id, { state: updated.state });
 
     log.info({ sessionId: session.id }, 'Session stopped by user');
 

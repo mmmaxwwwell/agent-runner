@@ -7,7 +7,7 @@ import { createLogger, setLevel } from './lib/logger.js';
 import { mountHealthRoutes } from './routes/health.js';
 import { mountProjectRoutes } from './routes/projects.js';
 import { mountSessionRoutes } from './routes/sessions.js';
-import { handleSessionStream } from './ws/session-stream.js';
+import { handleSessionStream, initSessionStream } from './ws/session-stream.js';
 import { handleDashboard } from './ws/dashboard.js';
 
 const log = createLogger('server');
@@ -201,6 +201,7 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 await initDataDir(config);
+initSessionStream(config.dataDir);
 mountHealthRoutes(apiRoutes, config);
 mountProjectRoutes(apiRoutes, config);
 mountSessionRoutes(apiRoutes, config);
