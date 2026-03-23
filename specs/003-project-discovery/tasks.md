@@ -108,7 +108,7 @@
 **Purpose**: Edge cases, error handling, and cross-story improvements
 
 - [x] T022 [P] Handle edge case: registered project directory missing from disk — show `dirMissing` warning in dashboard card in src/client/components/dashboard.tsx
-- [ ] T023 [P] Handle edge case: projectsDir does not exist — show `discoveryError` banner in src/client/components/dashboard.tsx
+- [~] T023 [P] Handle edge case: projectsDir does not exist — show `discoveryError` banner in src/client/components/dashboard.tsx — SKIPPED: already implemented by T013 (server sends discoveryError when projectsDir missing) and T016 (dashboard renders discoveryError banner at lines 239-251)
 - [ ] T024 Run quickstart.md validation — start dev server, verify all endpoints and UI per specs/003-project-discovery/quickstart.md
 
 ---
