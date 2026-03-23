@@ -8,8 +8,8 @@
   },
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc && esbuild src/client/app.tsx --bundle --outdir=public/",
-    "build:client": "esbuild src/client/app.tsx --bundle --outdir=public/ --watch",
+    "build": "tsc && cp src/client/index.html public/index.html && esbuild src/client/app.tsx --bundle --outdir=public/ --jsx=automatic --jsx-import-source=preact",
+    "build:client": "cp src/client/index.html public/index.html && esbuild src/client/app.tsx --bundle --outdir=public/ --jsx=automatic --jsx-import-source=preact --watch",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "test": "tsx --test tests/**/*.test.ts"
