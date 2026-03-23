@@ -154,7 +154,7 @@
 - [x] T047 [US3] Implement push REST routes in src/routes/push.ts — POST /api/push/subscribe (store subscription), GET /api/push/vapid-key (return public key) per rest-api.md contracts
 - [x] T048 [US3] Wire push routes into src/server.ts — mount /api/push handlers
 - [x] T049 [US3] Integrate push notifications into session lifecycle — send notification on: task blocked (FR-009, question + project name + task ID), session completed (project name + task summary), session failed (project name + error) per spec.md FR-009
-- [ ] T050 [US3] Implement service worker in src/client/sw.ts — handle push events (display notification with title, body, data from payload), handle notificationclick (open app to relevant session/project URL), basic offline caching of static assets (cache-first for app shell)
+- [x] T050 [US3] Implement service worker in src/client/sw.ts — handle push events (display notification with title, body, data from payload), handle notificationclick (open app to relevant session/project URL), basic offline caching of static assets (cache-first for app shell)
 - [ ] T051 [US3] Add push subscription UI to session-view Preact component in src/client/components/session-view.tsx — prompt for notification permission on first visit, subscribe to push via /api/push/subscribe, show subscription status
 - [ ] T052 [US3] Add input form to session-view Preact component in src/client/components/session-view.tsx — when session state is waiting-for-input, show the question text, text input field, submit button, POST /api/sessions/:id/input on submit, show session resuming (same session transitions back to running)
 
