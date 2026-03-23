@@ -228,8 +228,8 @@
 
 - [x] T058 [P] [US6] Create web app manifest in public/manifest.json — name, short_name, start_url, display: standalone, theme_color, background_color, icons (192x192 and 512x512 PNG) per spec.md US6 acceptance criteria
 - [x] T059 [P] [US6] Create PWA icons — generate 192x192 and 512x512 PNG icons in public/icons/ (simple geometric design, can be placeholder)
-- [ ] T060 [US6] Enhance service worker in src/client/sw.ts — cache static assets on install (app shell: index.html, app.js), cache-first strategy for cached assets, network-first for API calls, cache session log responses for offline viewing per spec.md US6 acceptance §3
-- [ ] T061 [US6] Implement settings Preact component in src/client/components/settings.tsx — voice backend toggle (browser-native Web Speech API vs Google Speech-to-Text API, show availability based on /api/health cloudSttAvailable), log level display, push notification permission status, app version info
+- [~] T060 [US6] Enhance service worker in src/client/sw.ts — cache static assets on install (app shell: index.html, app.js), cache-first strategy for cached assets, network-first for API calls, cache session log responses for offline viewing per spec.md US6 acceptance §3 — Skipped: already fully implemented in T050 (src/client/sw.ts has app shell caching, cache-first, network-first, and session log caching)
+- [x] T061 [US6] Implement settings Preact component in src/client/components/settings.tsx — voice backend toggle (browser-native Web Speech API vs Google Speech-to-Text API, show availability based on /api/health cloudSttAvailable), log level display, push notification permission status, app version info
 
 **Checkpoint**: App installable on Android, push notifications work when backgrounded, cached logs viewable offline.
 

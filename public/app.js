@@ -405,6 +405,8 @@
   function parseHash(hash) {
     const h3 = hash ?? window.location.hash ?? "#/";
     const path = h3.slice(1);
+    const addFeatureMatch = path.match(/^\/projects\/([^/]+)\/add-feature$/);
+    if (addFeatureMatch) return { page: "add-feature", id: addFeatureMatch[1] };
     const projectMatch = path.match(/^\/projects\/([^/]+)$/);
     if (projectMatch) return { page: "project-detail", id: projectMatch[1] };
     const sessionMatch = path.match(/^\/sessions\/([^/]+)$/);
@@ -453,6 +455,9 @@
   }
   function post(path, body) {
     return request("POST", path, body);
+  }
+  function put(path, body) {
+    return request("PUT", path, body);
   }
 
   // src/client/lib/ws.ts
@@ -1239,6 +1244,15 @@
       stateListeners = stateListeners.filter((l3) => l3 !== listener);
     };
   }
+  function setBackend(backend) {
+    currentBackend = backend;
+  }
+  function getBackend() {
+    return currentBackend;
+  }
+  function isBrowserSpeechAvailable() {
+    return "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
+  }
   function transcribe() {
     if (currentBackend === "browser") {
       return transcribeBrowser();
@@ -1714,20 +1728,273 @@
     );
   }
 
+  // src/client/components/add-feature.tsx
+  function AddFeature({ projectId }) {
+    const [description, setDescription] = d2("");
+    const [starting, setStarting] = d2(false);
+    const [error, setError] = d2(null);
+    const [sessionId, setSessionId] = d2(null);
+    const [currentPhase, setCurrentPhase] = d2(null);
+    const [sessionState, setSessionState] = d2(null);
+    const [voiceState, setVoiceState] = d2("idle");
+    y2(() => {
+      return onVoiceStateChange(setVoiceState);
+    }, []);
+    const startWorkflow = q2(async () => {
+      if (!description.trim() || starting) return;
+      setStarting(true);
+      setError(null);
+      try {
+        const result = await post(`/projects/${projectId}/add-feature`, {
+          description: description.trim()
+        });
+        setSessionId(result.sessionId);
+        setCurrentPhase(result.phase);
+        setSessionState(result.state);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to start workflow");
+        setStarting(false);
+      }
+    }, [description, starting, projectId]);
+    const handleVoice = q2(async () => {
+      try {
+        const text = await transcribe();
+        if (text) {
+          setDescription(text);
+        }
+      } catch {
+      }
+    }, []);
+    if (!sessionId) {
+      return /* @__PURE__ */ u3("div", { children: [
+        /* @__PURE__ */ u3("h2", { style: { margin: "0 0 16px 0", fontSize: "1.2rem" }, children: "Add Feature" }),
+        error && /* @__PURE__ */ u3("div", { style: { color: "#f44336", marginBottom: "12px", fontSize: "0.85rem" }, children: error }),
+        /* @__PURE__ */ u3("div", { style: { marginBottom: "16px" }, children: [
+          /* @__PURE__ */ u3("label", { style: { display: "block", fontSize: "0.85rem", color: "#aaa", marginBottom: "4px" }, children: "Describe the feature" }),
+          /* @__PURE__ */ u3("div", { style: { position: "relative" }, children: [
+            /* @__PURE__ */ u3(
+              "textarea",
+              {
+                value: description,
+                onInput: (e3) => setDescription(e3.target.value),
+                placeholder: "Describe the feature you want to add...",
+                rows: 4,
+                style: {
+                  width: "100%",
+                  padding: "10px 12px",
+                  paddingRight: "44px",
+                  borderRadius: "4px",
+                  border: "1px solid #555",
+                  background: "#1a1a2e",
+                  color: "#ddd",
+                  fontSize: "0.9rem",
+                  outline: "none",
+                  resize: "vertical",
+                  fontFamily: "inherit",
+                  boxSizing: "border-box"
+                }
+              }
+            ),
+            /* @__PURE__ */ u3(
+              "button",
+              {
+                onClick: handleVoice,
+                disabled: voiceState !== "idle",
+                title: "Speak your feature idea",
+                style: {
+                  position: "absolute",
+                  right: "8px",
+                  top: "8px",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  border: "none",
+                  background: voiceState === "listening" ? "#f44336" : voiceState === "processing" ? "#ff9800" : "#333",
+                  color: "#fff",
+                  cursor: voiceState !== "idle" ? "default" : "pointer",
+                  fontSize: "1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                },
+                children: voiceState === "listening" ? "..." : voiceState === "processing" ? "~" : "M"
+              }
+            )
+          ] })
+        ] }),
+        /* @__PURE__ */ u3(
+          "button",
+          {
+            onClick: startWorkflow,
+            disabled: starting || !description.trim(),
+            style: {
+              padding: "10px 24px",
+              background: starting || !description.trim() ? "#555" : "#7c8dff",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: starting || !description.trim() ? "default" : "pointer",
+              fontSize: "0.9rem"
+            },
+            children: starting ? "Starting..." : "Add Feature"
+          }
+        )
+      ] });
+    }
+    return /* @__PURE__ */ u3(
+      SpecKitChat,
+      {
+        sessionId,
+        initialPhase: currentPhase ?? "specify",
+        initialState: sessionState ?? "running",
+        completionRoute: `/projects/${projectId}`
+      }
+    );
+  }
+
+  // src/client/components/settings.tsx
+  function Settings() {
+    const [voiceBackend, setVoiceBackend] = d2(getBackend());
+    const [health, setHealth] = d2(null);
+    const [logLevel, setLogLevel] = d2("info");
+    const [pushPermission, setPushPermission] = d2("default");
+    const [error, setError] = d2(null);
+    const [saving, setSaving] = d2(false);
+    y2(() => {
+      get("/health").then(setHealth).catch(() => setError("Failed to load server health"));
+      if ("Notification" in window) {
+        setPushPermission(Notification.permission);
+      }
+    }, []);
+    const handleVoiceBackendChange = (backend) => {
+      setBackend(backend);
+      setVoiceBackend(backend);
+    };
+    const handleLogLevelChange = async (level) => {
+      setSaving(true);
+      setError(null);
+      try {
+        await put("/config/log-level", { level });
+        setLogLevel(level);
+      } catch {
+        setError("Failed to update log level");
+      } finally {
+        setSaving(false);
+      }
+    };
+    const handleRequestPush = async () => {
+      if (!("Notification" in window)) return;
+      const result = await Notification.requestPermission();
+      setPushPermission(result);
+    };
+    const browserSpeechAvailable = isBrowserSpeechAvailable();
+    const cloudSttAvailable = health?.cloudSttAvailable ?? false;
+    return /* @__PURE__ */ u3("div", { children: [
+      /* @__PURE__ */ u3("h2", { style: { marginTop: 0 }, children: "Settings" }),
+      /* @__PURE__ */ u3("section", { style: { marginBottom: "24px" }, children: [
+        /* @__PURE__ */ u3("h3", { children: "Voice Backend" }),
+        /* @__PURE__ */ u3("label", { style: { display: "block", marginBottom: "8px", cursor: "pointer" }, children: [
+          /* @__PURE__ */ u3(
+            "input",
+            {
+              type: "radio",
+              name: "voice",
+              checked: voiceBackend === "browser",
+              onChange: () => handleVoiceBackendChange("browser"),
+              disabled: !browserSpeechAvailable
+            }
+          ),
+          " ",
+          "Browser (Web Speech API)",
+          !browserSpeechAvailable && /* @__PURE__ */ u3("span", { style: { color: "#f44", marginLeft: "8px" }, children: "unavailable" })
+        ] }),
+        /* @__PURE__ */ u3("label", { style: { display: "block", cursor: "pointer" }, children: [
+          /* @__PURE__ */ u3(
+            "input",
+            {
+              type: "radio",
+              name: "voice",
+              checked: voiceBackend === "cloud",
+              onChange: () => handleVoiceBackendChange("cloud"),
+              disabled: !cloudSttAvailable
+            }
+          ),
+          " ",
+          "Google Speech-to-Text (Cloud)",
+          !cloudSttAvailable && /* @__PURE__ */ u3("span", { style: { color: "#f44", marginLeft: "8px" }, children: "unavailable" })
+        ] })
+      ] }),
+      /* @__PURE__ */ u3("section", { style: { marginBottom: "24px" }, children: [
+        /* @__PURE__ */ u3("h3", { children: "Log Level" }),
+        /* @__PURE__ */ u3(
+          "select",
+          {
+            value: logLevel,
+            onChange: (e3) => handleLogLevelChange(e3.target.value),
+            disabled: saving,
+            style: { padding: "4px 8px", background: "#222", color: "#eee", border: "1px solid #555", borderRadius: "4px" },
+            children: ["debug", "info", "warn", "error", "fatal"].map((level) => /* @__PURE__ */ u3("option", { value: level, children: level }, level))
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u3("section", { style: { marginBottom: "24px" }, children: [
+        /* @__PURE__ */ u3("h3", { children: "Push Notifications" }),
+        /* @__PURE__ */ u3("p", { children: [
+          "Permission: ",
+          /* @__PURE__ */ u3("strong", { children: pushPermission })
+        ] }),
+        pushPermission === "default" && /* @__PURE__ */ u3(
+          "button",
+          {
+            onClick: handleRequestPush,
+            style: { padding: "6px 12px", background: "#335", color: "#eee", border: "1px solid #557", borderRadius: "4px", cursor: "pointer" },
+            children: "Enable Notifications"
+          }
+        ),
+        pushPermission === "denied" && /* @__PURE__ */ u3("p", { style: { color: "#f44" }, children: "Notifications are blocked. Update your browser settings to enable them." })
+      ] }),
+      /* @__PURE__ */ u3("section", { style: { marginBottom: "24px" }, children: [
+        /* @__PURE__ */ u3("h3", { children: "Server Info" }),
+        health ? /* @__PURE__ */ u3("div", { children: [
+          /* @__PURE__ */ u3("p", { children: [
+            "Status: ",
+            health.status
+          ] }),
+          /* @__PURE__ */ u3("p", { children: [
+            "Uptime: ",
+            Math.floor(health.uptime),
+            "s"
+          ] }),
+          /* @__PURE__ */ u3("p", { children: [
+            "Sandbox: ",
+            health.sandboxAvailable ? "available" : "unavailable"
+          ] })
+        ] }) : /* @__PURE__ */ u3("p", { style: { color: "#888" }, children: "Loading..." })
+      ] }),
+      /* @__PURE__ */ u3("section", { children: [
+        /* @__PURE__ */ u3("h3", { children: "About" }),
+        /* @__PURE__ */ u3("p", { children: "Agent Runner v0.1.0" })
+      ] }),
+      error && /* @__PURE__ */ u3("p", { style: { color: "#f44" }, children: error })
+    ] });
+  }
+
   // src/client/app.tsx
   function App() {
     const route = useRouter();
     return /* @__PURE__ */ u3("div", { children: [
       /* @__PURE__ */ u3("header", { style: { padding: "12px 16px", borderBottom: "1px solid #333", display: "flex", alignItems: "center", gap: "12px" }, children: [
         /* @__PURE__ */ u3("a", { href: "#/", style: { color: "#7c8dff", textDecoration: "none", fontWeight: "bold", fontSize: "1.1rem" }, children: "Agent Runner" }),
-        route.page !== "dashboard" && /* @__PURE__ */ u3("a", { href: "#/", style: { color: "#888", textDecoration: "none", fontSize: "0.85rem" }, children: "Back" })
+        route.page !== "dashboard" && /* @__PURE__ */ u3("a", { href: "#/", style: { color: "#888", textDecoration: "none", fontSize: "0.85rem" }, children: "Back" }),
+        /* @__PURE__ */ u3("div", { style: { marginLeft: "auto" }, children: /* @__PURE__ */ u3("a", { href: "#/settings", style: { color: "#888", textDecoration: "none", fontSize: "0.85rem" }, children: "Settings" }) })
       ] }),
       /* @__PURE__ */ u3("main", { style: { padding: "16px" }, children: [
         route.page === "dashboard" && /* @__PURE__ */ u3(Dashboard, {}),
         route.page === "project-detail" && /* @__PURE__ */ u3(ProjectDetail, { id: route.id }),
         route.page === "session-view" && /* @__PURE__ */ u3(SessionView, { id: route.id }),
         route.page === "new-project" && /* @__PURE__ */ u3(NewProject, {}),
-        route.page === "settings" && /* @__PURE__ */ u3("div", { children: "Settings \u2014 coming soon" })
+        route.page === "add-feature" && /* @__PURE__ */ u3(AddFeature, { projectId: route.id }),
+        route.page === "settings" && /* @__PURE__ */ u3(Settings, {})
       ] })
     ] });
   }

@@ -5,6 +5,7 @@ import { ProjectDetail } from './components/project-detail.js';
 import { SessionView } from './components/session-view.js';
 import { NewProject } from './components/new-project.js';
 import { AddFeature } from './components/add-feature.js';
+import { Settings } from './components/settings.js';
 
 function App() {
   const route = useRouter();
@@ -20,6 +21,11 @@ function App() {
             Back
           </a>
         )}
+        <div style={{ marginLeft: 'auto' }}>
+          <a href="#/settings" style={{ color: '#888', textDecoration: 'none', fontSize: '0.85rem' }}>
+            Settings
+          </a>
+        </div>
       </header>
       <main style={{ padding: '16px' }}>
         {route.page === 'dashboard' && <Dashboard />}
@@ -27,7 +33,7 @@ function App() {
         {route.page === 'session-view' && <SessionView id={route.id} />}
         {route.page === 'new-project' && <NewProject />}
         {route.page === 'add-feature' && <AddFeature projectId={route.id} />}
-        {route.page === 'settings' && <div>Settings — coming soon</div>}
+        {route.page === 'settings' && <Settings />}
       </main>
     </div>
   );
