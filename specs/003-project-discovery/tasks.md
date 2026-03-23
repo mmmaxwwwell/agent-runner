@@ -50,7 +50,7 @@
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
 - [x] T007 [P] [US1] Write unit tests for `scanProjectsDir()` in tests/unit/discovery.test.ts — cover: returns discovered dirs, skips hidden dirs, skips registered dirs, handles empty dir, handles missing projectsDir, handles permission errors, handles symlinks
-- [ ] T008 [P] [US1] Write unit tests for `detectGitRepo()` and `detectSpecKitArtifacts()` in tests/unit/discovery.test.ts
+- [x] T008 [P] [US1] Write unit tests for `detectGitRepo()` and `detectSpecKitArtifacts()` in tests/unit/discovery.test.ts
 - [ ] T009 [P] [US1] Write integration tests for extended `GET /api/projects` in tests/integration/discovery-api.test.ts — verify `{ registered, discovered, discoveryError }` response shape per contracts/discovery-api.md
 
 ### Implementation for User Story 1

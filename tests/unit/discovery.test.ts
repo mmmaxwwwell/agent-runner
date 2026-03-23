@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, symlinkSync, chmodSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { scanProjectsDir } from '../../src/services/discovery.ts';
+import { scanProjectsDir, detectGitRepo, detectSpecKitArtifacts } from '../../src/services/discovery.ts';
 
 describe('scanProjectsDir', () => {
   let tmpDir: string;
@@ -135,5 +135,120 @@ describe('scanProjectsDir', () => {
     const registeredPaths = new Set([resolve(dir1), resolve(dir2)]);
     const result = await scanProjectsDir(projectsDir, registeredPaths);
     assert.deepEqual(result, []);
+  });
+});
+
+describe('detectGitRepo', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'detect-git-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should return true when .git directory exists', async () => {
+    mkdirSync(join(tmpDir, '.git'));
+    const result = await detectGitRepo(tmpDir);
+    assert.equal(result, true);
+  });
+
+  it('should return true when .git file exists (worktree/submodule)', async () => {
+    writeFileSync(join(tmpDir, '.git'), 'gitdir: /some/other/path');
+    const result = await detectGitRepo(tmpDir);
+    assert.equal(result, true);
+  });
+
+  it('should return false when no .git exists', async () => {
+    const result = await detectGitRepo(tmpDir);
+    assert.equal(result, false);
+  });
+
+  it('should return false for non-existent directory', async () => {
+    const result = await detectGitRepo(join(tmpDir, 'nonexistent'));
+    assert.equal(result, false);
+  });
+});
+
+describe('detectSpecKitArtifacts', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'detect-speckit-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should return all false when no specs directory exists', async () => {
+    const result = await detectSpecKitArtifacts(tmpDir);
+    assert.deepEqual(result, { spec: false, plan: false, tasks: false });
+  });
+
+  it('should return all false when specs directory is empty', async () => {
+    mkdirSync(join(tmpDir, 'specs'));
+    const result = await detectSpecKitArtifacts(tmpDir);
+    assert.deepEqual(result, { spec: false, plan: false, tasks: false });
+  });
+
+  it('should detect spec.md in a specs subdirectory', async () => {
+    mkdirSync(join(tmpDir, 'specs', '001-feature'), { recursive: true });
+    writeFileSync(join(tmpDir, 'specs', '001-feature', 'spec.md'), '# Spec');
+    const result = await detectSpecKitArtifacts(tmpDir);
+    assert.equal(result.spec, true);
+    assert.equal(result.plan, false);
+    assert.equal(result.tasks, false);
+  });
+
+  it('should detect plan.md in a specs subdirectory', async () => {
+    mkdirSync(join(tmpDir, 'specs', '001-feature'), { recursive: true });
+    writeFileSync(join(tmpDir, 'specs', '001-feature', 'plan.md'), '# Plan');
+    const result = await detectSpecKitArtifacts(tmpDir);
+    assert.equal(result.spec, false);
+    assert.equal(result.plan, true);
+    assert.equal(result.tasks, false);
+  });
+
+  it('should detect tasks.md in a specs subdirectory', async () => {
+    mkdirSync(join(tmpDir, 'specs', '001-feature'), { recursive: true });
+    writeFileSync(join(tmpDir, 'specs', '001-feature', 'tasks.md'), '# Tasks');
+    const result = await detectSpecKitArtifacts(tmpDir);
+    assert.equal(result.spec, false);
+    assert.equal(result.plan, false);
+    assert.equal(result.tasks, true);
+  });
+
+  it('should detect all artifacts across multiple specs subdirectories', async () => {
+    mkdirSync(join(tmpDir, 'specs', '001-feature'), { recursive: true });
+    mkdirSync(join(tmpDir, 'specs', '002-other'), { recursive: true });
+    writeFileSync(join(tmpDir, 'specs', '001-feature', 'spec.md'), '# Spec');
+    writeFileSync(join(tmpDir, 'specs', '002-other', 'plan.md'), '# Plan');
+    writeFileSync(join(tmpDir, 'specs', '002-other', 'tasks.md'), '# Tasks');
+    const result = await detectSpecKitArtifacts(tmpDir);
+    assert.deepEqual(result, { spec: true, plan: true, tasks: true });
+  });
+
+  it('should detect all artifacts in a single specs subdirectory', async () => {
+    mkdirSync(join(tmpDir, 'specs', '001-feature'), { recursive: true });
+    writeFileSync(join(tmpDir, 'specs', '001-feature', 'spec.md'), '# Spec');
+    writeFileSync(join(tmpDir, 'specs', '001-feature', 'plan.md'), '# Plan');
+    writeFileSync(join(tmpDir, 'specs', '001-feature', 'tasks.md'), '# Tasks');
+    const result = await detectSpecKitArtifacts(tmpDir);
+    assert.deepEqual(result, { spec: true, plan: true, tasks: true });
+  });
+
+  it('should ignore files directly in specs/ (not in subdirectories)', async () => {
+    mkdirSync(join(tmpDir, 'specs'));
+    writeFileSync(join(tmpDir, 'specs', 'spec.md'), '# Spec at root');
+    const result = await detectSpecKitArtifacts(tmpDir);
+    assert.deepEqual(result, { spec: false, plan: false, tasks: false });
+  });
+
+  it('should return all false for non-existent directory', async () => {
+    const result = await detectSpecKitArtifacts(join(tmpDir, 'nonexistent'));
+    assert.deepEqual(result, { spec: false, plan: false, tasks: false });
   });
 });
