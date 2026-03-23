@@ -81,7 +81,7 @@
 
 - [x] T012 [US3] Read all client components in src/client/components/ and map every screen, route, user action, and navigation transition
 - [x] T013 [US3] Read all route handlers in src/routes/ and WebSocket handlers in src/ws/ to map every API endpoint and WebSocket path
-- [ ] T014 [US3] Create UI_FLOW.md at project root with main Mermaid `flowchart TD` diagram covering all 6 screens (#/, #/new, #/projects/:id, #/sessions/:id, #/projects/:id/add-feature, #/settings), navigation transitions, API calls, WebSocket connections, and error paths
+- [x] T014 [US3] Create UI_FLOW.md at project root with main Mermaid `flowchart TD` diagram covering all 6 screens (#/, #/new, #/projects/:id, #/sessions/:id, #/projects/:id/add-feature, #/settings), navigation transitions, API calls, WebSocket connections, and error paths
 - [ ] T015 [US3] Add screen-by-screen detail sections to UI_FLOW.md — for each screen: route, on-load API calls, user actions, field validations, real-time updates, navigation out, error states
 - [ ] T016 [US3] Add API sequence diagrams to UI_FLOW.md — Mermaid `sequenceDiagram` for: new project workflow, add feature workflow, session lifecycle, push notification subscription
 - [ ] T017 [US3] Add field validation reference table to UI_FLOW.md — markdown table listing every input field with screen name, field name, required/optional, validation rules, error message
