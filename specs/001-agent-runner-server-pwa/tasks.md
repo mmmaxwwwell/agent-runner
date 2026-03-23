@@ -177,7 +177,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T053 [US4] Implement voice input module in src/client/lib/voice.ts — Web Speech API (webkitSpeechRecognition) for browser-native transcription, Google Speech-to-Text API mode (record audio via MediaRecorder, POST to /api/voice/transcribe), toggle between modes, visual listening indicator, return transcribed text per plan.md key design §5
+- [x] T053 [US4] Implement voice input module in src/client/lib/voice.ts — Web Speech API (webkitSpeechRecognition) for browser-native transcription, Google Speech-to-Text API mode (record audio via MediaRecorder, POST to /api/voice/transcribe), toggle between modes, visual listening indicator, return transcribed text per plan.md key design §5
 - [ ] T054 [US4] Add voice transcription endpoint POST /api/voice/transcribe in src/routes/voice.ts — receive audio blob, proxy to Google Speech-to-Text API using GOOGLE_STT_API_KEY, return { text } — return 503 if no API key configured per rest-api.md contract
 - [ ] T055 [US4] Implement new-project Preact component in src/client/components/new-project.tsx — form with repo name input, "Start Project" button, mic icon for voice input, spec-kit phase chat view (agent messages as text, user input via voice or typing), connect to /ws/sessions/:id for each phase's streaming, show current phase indicator (specify → clarify → plan → tasks → analyze), on workflow complete: navigate to dashboard
 - [ ] T056 [US4] Update session creation to support interview type — POST /api/projects/:id/sessions with type "interview", spawn claude in interview mode (bidirectional stdin/stdout), forward WebSocket input messages to process stdin per websocket-api.md client→server input message
