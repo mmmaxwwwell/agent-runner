@@ -10,6 +10,7 @@ import { spawnProcess, killProcess, startTaskLoop, type ProcessHandle } from '..
 import { createSessionLogger, readLog } from '../services/session-logger.js';
 import { parseTaskSummary } from '../services/task-parser.js';
 import { broadcastSessionState } from '../ws/session-stream.js';
+import { broadcastProjectUpdate } from '../ws/dashboard.js';
 
 const log = createLogger('sessions');
 
@@ -140,6 +141,19 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
 
       log.info({ sessionId: session.id, projectId: project.id, type: sessionType }, 'Session started');
 
+      // Broadcast session start to dashboard
+      try {
+        const startSummary = parseTaskSummary(taskFilePath);
+        broadcastProjectUpdate({
+          projectId: project.id,
+          activeSession: { id: session.id, type: session.type, state: session.state },
+          taskSummary: startSummary,
+          workflow: null,
+        });
+      } catch {
+        // Task summary parse failure shouldn't block session start
+      }
+
       sendJson(res, 201, {
         id: session.id,
         projectId: session.projectId,
@@ -173,16 +187,28 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       // Handle process exit in background
       handle.waitForExit().then((result) => {
         activeProcesses.delete(session.id);
-        if (result.exitCode === 0) {
-          transitionState(cfg.dataDir, session.id, 'completed', { exitCode: 0 });
-        } else {
-          transitionState(cfg.dataDir, session.id, 'failed', { exitCode: result.exitCode });
-        }
+        const newState = result.exitCode === 0 ? 'completed' as const : 'failed' as const;
+        transitionState(cfg.dataDir, session.id, newState, { exitCode: result.exitCode });
+        broadcastSessionState(session.id, { state: newState });
+        broadcastProjectUpdate({
+          projectId: project.id,
+          activeSession: null,
+          taskSummary: null,
+          workflow: null,
+        });
       }).catch(() => {
         activeProcesses.delete(session.id);
       });
 
       log.info({ sessionId: session.id, projectId: project.id, type: sessionType, pid: handle.pid }, 'Session started');
+
+      // Broadcast session start to dashboard
+      broadcastProjectUpdate({
+        projectId: project.id,
+        activeSession: { id: session.id, type: session.type, state: session.state },
+        taskSummary: null,
+        workflow: null,
+      });
 
       sendJson(res, 201, {
         id: session.id,
@@ -255,6 +281,12 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
 
     // Broadcast state change to connected WebSocket clients
     broadcastSessionState(session.id, { state: updated.state });
+    broadcastProjectUpdate({
+      projectId: session.projectId,
+      activeSession: null,
+      taskSummary: null,
+      workflow: null,
+    });
 
     log.info({ sessionId: session.id }, 'Session stopped by user');
 
@@ -310,6 +342,15 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     // Transition session back to running
     const updated = transitionState(cfg.dataDir, session.id, 'running');
 
+    // Broadcast state change
+    broadcastSessionState(session.id, { state: 'running' });
+    broadcastProjectUpdate({
+      projectId: session.projectId,
+      activeSession: { id: session.id, type: session.type, state: 'running' },
+      taskSummary: null,
+      workflow: null,
+    });
+
     // Build sandbox command for re-spawn
     let sandboxCmd;
     try {
@@ -363,11 +404,15 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       // Handle process exit
       handle.waitForExit().then((result) => {
         activeProcesses.delete(session.id);
-        if (result.exitCode === 0) {
-          transitionState(cfg.dataDir, session.id, 'completed', { exitCode: 0 });
-        } else {
-          transitionState(cfg.dataDir, session.id, 'failed', { exitCode: result.exitCode });
-        }
+        const newState = result.exitCode === 0 ? 'completed' as const : 'failed' as const;
+        transitionState(cfg.dataDir, session.id, newState, { exitCode: result.exitCode });
+        broadcastSessionState(session.id, { state: newState });
+        broadcastProjectUpdate({
+          projectId: session.projectId,
+          activeSession: null,
+          taskSummary: null,
+          workflow: null,
+        });
       }).catch(() => {
         activeProcesses.delete(session.id);
       });

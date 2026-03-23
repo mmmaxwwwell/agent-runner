@@ -69,6 +69,11 @@ export function broadcastSessionState(sessionId: string, stateData: { state: str
   broadcastToSession(sessionId, JSON.stringify({ type: 'state', ...stateData }));
 }
 
+/** Broadcast a progress update to all clients watching a session. */
+export function broadcastSessionProgress(sessionId: string, taskSummary: { total: number; completed: number; blocked: number; skipped: number; remaining: number }): void {
+  broadcastToSession(sessionId, JSON.stringify({ type: 'progress', taskSummary }));
+}
+
 /** Broadcast a single output entry to all clients watching a session. */
 export function broadcastSessionOutput(sessionId: string, entry: SessionLogEntry): void {
   broadcastToSession(sessionId, JSON.stringify({

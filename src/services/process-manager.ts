@@ -2,8 +2,10 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { createLogger } from '../lib/logger.js';
 import { parseTasks, parseTaskSummary } from './task-parser.js';
-import { transitionState } from '../models/session.js';
+import { transitionState, getSession } from '../models/session.js';
 import type { SessionLogger } from './session-logger.js';
+import { broadcastSessionState, broadcastSessionProgress } from '../ws/session-stream.js';
+import { broadcastProjectUpdate } from '../ws/dashboard.js';
 
 const log = createLogger('process-spawner');
 
@@ -132,11 +134,26 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
   const { command, args, sessionId, projectId, taskFilePath, logger, dataDir } = options;
   let spawnCount = 0;
 
+  /** Broadcast project-update to dashboard clients with current session & task state. */
+  function emitDashboardUpdate(summary: ReturnType<typeof parseTaskSummary>, sessionState: string): void {
+    const session = getSession(dataDir, sessionId);
+    broadcastProjectUpdate({
+      projectId,
+      activeSession: session && (session.state === 'running' || session.state === 'waiting-for-input')
+        ? { id: session.id, type: session.type, state: session.state }
+        : null,
+      taskSummary: summary,
+      workflow: null,
+    });
+  }
+
   // Check before first spawn — if all tasks are already done, don't spawn at all
   const initialSummary = parseTaskSummary(taskFilePath);
   if (initialSummary.remaining === 0 && initialSummary.blocked === 0) {
     await logger.write({ stream: 'system', content: 'All tasks already completed' });
     transitionState(dataDir, sessionId, 'completed', { exitCode: 0 });
+    broadcastSessionState(sessionId, { state: 'completed' });
+    emitDashboardUpdate(initialSummary, 'completed');
     return { outcome: 'completed', spawnCount: 0 };
   }
 
@@ -161,6 +178,9 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
       log.warn({ sessionId, exitCode: exitResult.exitCode, spawnCount }, 'Task loop: process crashed');
       await logger.write({ stream: 'system', content: `Process exited with code ${exitResult.exitCode}` });
       transitionState(dataDir, sessionId, 'failed', { exitCode: exitResult.exitCode });
+      broadcastSessionState(sessionId, { state: 'failed' });
+      const failSummary = parseTaskSummary(taskFilePath);
+      emitDashboardUpdate(failSummary, 'failed');
       return { outcome: 'failed', spawnCount };
     }
 
@@ -177,6 +197,9 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
       log.info({ sessionId, taskId, question, spawnCount }, 'Task loop: blocked task detected');
       await logger.write({ stream: 'system', content: `Task ${taskId} blocked: ${question}` });
       transitionState(dataDir, sessionId, 'waiting-for-input', { question, lastTaskId: taskId ?? undefined });
+      broadcastSessionState(sessionId, { state: 'waiting-for-input', question, taskId });
+      broadcastSessionProgress(sessionId, summary);
+      emitDashboardUpdate(summary, 'waiting-for-input');
       return { outcome: 'waiting-for-input', spawnCount, question };
     }
 
@@ -185,11 +208,16 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
       log.info({ sessionId, spawnCount }, 'Task loop: all tasks completed');
       await logger.write({ stream: 'system', content: 'All tasks completed' });
       transitionState(dataDir, sessionId, 'completed', { exitCode: 0 });
+      broadcastSessionState(sessionId, { state: 'completed' });
+      broadcastSessionProgress(sessionId, summary);
+      emitDashboardUpdate(summary, 'completed');
       return { outcome: 'completed', spawnCount };
     }
 
     // Unchecked tasks remain, no blocked → loop again
     log.info({ sessionId, remaining: summary.remaining, spawnCount }, 'Task loop: unchecked tasks remain, spawning next');
     await logger.write({ stream: 'system', content: `${summary.remaining} tasks remaining, starting next run` });
+    broadcastSessionProgress(sessionId, summary);
+    emitDashboardUpdate(summary, 'running');
   }
 }
