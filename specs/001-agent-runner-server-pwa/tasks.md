@@ -146,7 +146,7 @@
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T045 [P] [US3] Write unit tests for push notification service in tests/unit/push.test.ts — VAPID key loading, subscription storage, sendNotification payload format, handle expired subscriptions per research.md §4
+- [x] T045 [P] [US3] Write unit tests for push notification service in tests/unit/push.test.ts — VAPID key loading, subscription storage, sendNotification payload format, handle expired subscriptions per research.md §4
 
 ### Implementation for User Story 3
 
