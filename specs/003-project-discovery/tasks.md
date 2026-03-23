@@ -21,7 +21,7 @@
 
 - [x] T001 Add `status` field to Project interface and default it for existing projects in src/models/project.ts
 - [x] T002 Add `DiscoveredDirectory` interface to src/models/project.ts per data-model.md
-- [ ] T003 Create discovery service scaffold with `scanProjectsDir()`, `detectGitRepo()`, `detectSpecKitArtifacts()` stubs in src/services/discovery.ts
+- [x] T003 Create discovery service scaffold with `scanProjectsDir()`, `detectGitRepo()`, `detectSpecKitArtifacts()` stubs in src/services/discovery.ts
 
 ---
 
