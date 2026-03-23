@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { useRouter } from './lib/router.js';
 import { Dashboard } from './components/dashboard.js';
+import { ProjectDetail } from './components/project-detail.js';
 
 function App() {
   const route = useRouter();
@@ -19,7 +20,7 @@ function App() {
       </header>
       <main style={{ padding: '16px' }}>
         {route.page === 'dashboard' && <Dashboard />}
-        {route.page === 'project-detail' && <div>Project: {route.id}</div>}
+        {route.page === 'project-detail' && <ProjectDetail id={route.id} />}
         {route.page === 'session-view' && <div>Session: {route.id}</div>}
         {route.page === 'new-project' && <div>New Project — coming soon</div>}
         {route.page === 'settings' && <div>Settings — coming soon</div>}
