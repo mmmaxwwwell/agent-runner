@@ -14,3 +14,6 @@ Two tests fail before any changes in this feature: `websocket-api.test.ts` (sync
 ### T018 — Integration test server setup requires LOG_LEVEL: 'info'
 The server startup detection relies on matching "Agent Runner server started" in stderr (pino output). Using `LOG_LEVEL: 'warn'` suppresses this info-level message, causing the server start detection to time out. All integration/contract tests MUST use `LOG_LEVEL: 'info'` or lower.
 
+### T019 — Voice endpoint returns 400 before 503
+The `POST /api/voice/transcribe` handler checks for audio data presence BEFORE checking for the Google STT API key. This means a request with no audio always gets 400 regardless of API key config. Tests for 503 must include valid audio in the request body. Non-multipart content types are treated as "no audio" — only `multipart/form-data` with an `audio` field is accepted.
+
