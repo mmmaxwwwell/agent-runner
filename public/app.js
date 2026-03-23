@@ -576,6 +576,8 @@
 
   // src/client/components/dashboard.tsx
   function statusBadge(project) {
+    if (project.status === "onboarding") return { label: "onboarding", color: "#2196f3" };
+    if (project.status === "error") return { label: "error", color: "#f44336" };
     if (!project.activeSession) return { label: "idle", color: "#666" };
     switch (project.activeSession.state) {
       case "running":
@@ -632,13 +634,63 @@
       }
     );
   }
+  function DiscoveredCard({ dir, onOnboarded }) {
+    const [busy, setBusy] = d2(false);
+    const [errMsg, setErrMsg] = d2(null);
+    const handleOnboard = async () => {
+      setBusy(true);
+      setErrMsg(null);
+      try {
+        const resp = await post("/projects/onboard", { name: dir.name, path: dir.path });
+        onOnboarded(dir, resp);
+      } catch (err) {
+        setErrMsg(err instanceof Error ? err.message : "Onboard failed");
+        setBusy(false);
+      }
+    };
+    return /* @__PURE__ */ u3(
+      "div",
+      {
+        style: {
+          border: "1px dashed #555",
+          borderRadius: "8px",
+          padding: "16px",
+          marginBottom: "12px",
+          background: "#12121f"
+        },
+        children: [
+          /* @__PURE__ */ u3("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [
+            /* @__PURE__ */ u3("span", { style: { fontWeight: "bold", fontSize: "1rem" }, children: dir.name }),
+            /* @__PURE__ */ u3(
+              "button",
+              {
+                onClick: handleOnboard,
+                disabled: busy,
+                style: {
+                  fontSize: "0.8rem",
+                  padding: "4px 12px",
+                  borderRadius: "4px",
+                  border: "1px solid #7c8dff",
+                  background: "transparent",
+                  color: busy ? "#555" : "#7c8dff",
+                  cursor: busy ? "default" : "pointer"
+                },
+                children: busy ? "Onboarding..." : "Onboard"
+              }
+            )
+          ] }),
+          errMsg && /* @__PURE__ */ u3("div", { style: { color: "#ff8a80", fontSize: "0.8rem", marginTop: "8px" }, children: errMsg })
+        ]
+      }
+    );
+  }
   function Dashboard() {
-    const [projects, setProjects] = d2([]);
+    const [data, setData] = d2(null);
     const [error, setError] = d2(null);
     const [loading, setLoading] = d2(true);
     y2(() => {
-      get("/projects").then((data) => {
-        setProjects(data);
+      get("/projects").then((resp) => {
+        setData(resp);
         setLoading(false);
       }).catch((err) => {
         setError(err.message);
@@ -649,23 +701,51 @@
       const client = connectDashboard((msg) => {
         if (msg.type !== "project-update") return;
         const update = msg;
-        setProjects(
-          (prev) => prev.map(
-            (p3) => p3.id === update.projectId ? {
-              ...p3,
-              taskSummary: update.taskSummary,
-              activeSession: update.activeSession
-            } : p3
-          )
-        );
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            registered: prev.registered.map(
+              (p3) => p3.id === update.projectId ? {
+                ...p3,
+                taskSummary: update.taskSummary,
+                activeSession: update.activeSession
+              } : p3
+            )
+          };
+        });
       });
       return () => client.close();
     }, []);
+    const handleOnboarded = (dir, resp) => {
+      setData((prev) => {
+        if (!prev) return prev;
+        const newRegistered = {
+          type: "registered",
+          id: resp.projectId,
+          name: resp.name,
+          dir: resp.path,
+          taskFile: "tasks.md",
+          createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+          status: "onboarding",
+          taskSummary: { total: 0, completed: 0, blocked: 0, skipped: 0, remaining: 0 },
+          activeSession: null,
+          dirMissing: false
+        };
+        return {
+          ...prev,
+          registered: [...prev.registered, newRegistered],
+          discovered: prev.discovered.filter((d3) => d3.path !== dir.path)
+        };
+      });
+    };
     if (loading) return /* @__PURE__ */ u3("div", { children: "Loading projects..." });
     if (error) return /* @__PURE__ */ u3("div", { style: { color: "#f44336" }, children: [
       "Error: ",
       error
     ] });
+    if (!data) return null;
+    const { registered, discovered, discoveryError } = data;
     return /* @__PURE__ */ u3("div", { children: [
       /* @__PURE__ */ u3("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }, children: [
         /* @__PURE__ */ u3("h2", { style: { margin: 0, fontSize: "1.2rem" }, children: "Projects" }),
@@ -682,11 +762,25 @@
           }
         )
       ] }),
-      projects.length === 0 ? /* @__PURE__ */ u3("div", { style: { color: "#888", textAlign: "center", padding: "32px 0" }, children: [
-        "No projects registered. ",
+      discoveryError && /* @__PURE__ */ u3("div", { style: {
+        background: "#2a1a1a",
+        border: "1px solid #f4433666",
+        borderRadius: "8px",
+        padding: "12px 16px",
+        marginBottom: "16px",
+        color: "#ff8a80",
+        fontSize: "0.85rem"
+      }, children: discoveryError }),
+      registered.length > 0 && /* @__PURE__ */ u3("div", { style: { marginBottom: "24px" }, children: registered.map((p3) => /* @__PURE__ */ u3(ProjectCard, { project: p3 }, p3.id)) }),
+      discovered.length > 0 && /* @__PURE__ */ u3("div", { children: [
+        /* @__PURE__ */ u3("h3", { style: { margin: "0 0 12px 0", fontSize: "1rem", color: "#aaa" }, children: "Discovered" }),
+        discovered.map((d3) => /* @__PURE__ */ u3(DiscoveredCard, { dir: d3, onOnboarded: handleOnboarded }, d3.path))
+      ] }),
+      registered.length === 0 && discovered.length === 0 && !discoveryError && /* @__PURE__ */ u3("div", { style: { color: "#888", textAlign: "center", padding: "32px 0" }, children: [
+        "No projects found. ",
         /* @__PURE__ */ u3("a", { href: "#/new", style: { color: "#7c8dff" }, children: "Create one" }),
         " or register via API."
-      ] }) : projects.map((p3) => /* @__PURE__ */ u3(ProjectCard, { project: p3 }, p3.id))
+      ] })
     ] });
   }
 
@@ -1229,8 +1323,10 @@
   }
 
   // src/client/lib/voice.ts
+  var SILENCE_TIMEOUT_MS = 5e3;
   var currentBackend = "browser";
   var stateListeners = [];
+  var interimListeners = [];
   var currentState = "idle";
   function setState(state) {
     currentState = state;
@@ -1243,6 +1339,11 @@
     return () => {
       stateListeners = stateListeners.filter((l3) => l3 !== listener);
     };
+  }
+  function emitInterimResult(text) {
+    for (const listener of interimListeners) {
+      listener(text);
+    }
   }
   function setBackend(backend) {
     currentBackend = backend;
@@ -1267,22 +1368,41 @@
         return;
       }
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.lang = "en-US";
-      recognition.onstart = () => setState("listening");
+      let finalTranscript = "";
+      let silenceTimer = null;
+      const resetSilenceTimer = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => recognition.stop(), SILENCE_TIMEOUT_MS);
+      };
+      recognition.onstart = () => {
+        setState("listening");
+        resetSilenceTimer();
+      };
       recognition.onresult = (event) => {
-        setState("processing");
-        const transcript = event.results[0][0].transcript;
-        setState("idle");
-        resolve(transcript);
+        resetSilenceTimer();
+        let interimTranscript = "";
+        for (let i3 = event.resultIndex; i3 < event.results.length; i3++) {
+          const result = event.results[i3];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+        emitInterimResult(finalTranscript + interimTranscript);
       };
       recognition.onerror = (event) => {
+        if (silenceTimer) clearTimeout(silenceTimer);
         setState("idle");
         reject(new Error(`Speech recognition error: ${event.error}`));
       };
       recognition.onend = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
         setState("idle");
+        resolve(finalTranscript);
       };
       recognition.start();
     });

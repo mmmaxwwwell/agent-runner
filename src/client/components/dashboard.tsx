@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'preact/hooks';
 import {
   get,
+  post,
   type RegisteredProject,
   type DiscoveredDirectory,
   type ProjectsResponse,
+  type OnboardResponse,
   type ActiveSession,
 } from '../lib/api.js';
 import { connectDashboard, type ProjectUpdateMessage, type ServerMessage } from '../lib/ws.js';
@@ -65,7 +67,22 @@ function ProjectCard({ project }: { project: RegisteredProject }) {
   );
 }
 
-function DiscoveredCard({ dir }: { dir: DiscoveredDirectory }) {
+function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnboarded: (dir: DiscoveredDirectory, resp: OnboardResponse) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  const handleOnboard = async () => {
+    setBusy(true);
+    setErrMsg(null);
+    try {
+      const resp = await post<OnboardResponse>('/projects/onboard', { name: dir.name, path: dir.path });
+      onOnboarded(dir, resp);
+    } catch (err: unknown) {
+      setErrMsg(err instanceof Error ? err.message : 'Onboard failed');
+      setBusy(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -79,19 +96,24 @@ function DiscoveredCard({ dir }: { dir: DiscoveredDirectory }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{dir.name}</span>
         <button
+          onClick={handleOnboard}
+          disabled={busy}
           style={{
             fontSize: '0.8rem',
             padding: '4px 12px',
             borderRadius: '4px',
             border: '1px solid #7c8dff',
             background: 'transparent',
-            color: '#7c8dff',
-            cursor: 'pointer',
+            color: busy ? '#555' : '#7c8dff',
+            cursor: busy ? 'default' : 'pointer',
           }}
         >
-          Onboard
+          {busy ? 'Onboarding...' : 'Onboard'}
         </button>
       </div>
+      {errMsg && (
+        <div style={{ color: '#ff8a80', fontSize: '0.8rem', marginTop: '8px' }}>{errMsg}</div>
+      )}
     </div>
   );
 }
@@ -136,6 +158,29 @@ export function Dashboard() {
     });
     return () => client.close();
   }, []);
+
+  const handleOnboarded = (dir: DiscoveredDirectory, resp: OnboardResponse) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const newRegistered: RegisteredProject = {
+        type: 'registered',
+        id: resp.projectId,
+        name: resp.name,
+        dir: resp.path,
+        taskFile: 'tasks.md',
+        createdAt: new Date().toISOString(),
+        status: 'onboarding',
+        taskSummary: { total: 0, completed: 0, blocked: 0, skipped: 0, remaining: 0 },
+        activeSession: null,
+        dirMissing: false,
+      };
+      return {
+        ...prev,
+        registered: [...prev.registered, newRegistered],
+        discovered: prev.discovered.filter((d) => d.path !== dir.path),
+      };
+    });
+  };
 
   if (loading) return <div>Loading projects...</div>;
   if (error) return <div style={{ color: '#f44336' }}>Error: {error}</div>;
@@ -182,7 +227,7 @@ export function Dashboard() {
       {discovered.length > 0 && (
         <div>
           <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: '#aaa' }}>Discovered</h3>
-          {discovered.map((d) => <DiscoveredCard key={d.path} dir={d} />)}
+          {discovered.map((d) => <DiscoveredCard key={d.path} dir={d} onOnboarded={handleOnboarded} />)}
         </div>
       )}
 

@@ -82,7 +82,7 @@
 ### Implementation for User Story 2
 
 - [x] T018 [US2] Add `POST /api/projects/onboard` route in src/routes/projects.ts — validate path exists + is directory + not already registered, call `registerForOnboarding()`, return 201 with `{ projectId, name, path, status }` per contract
-- [ ] T019 [US2] Wire "Onboard" button in src/client/components/dashboard.tsx — call `POST /api/projects/onboard`, on success move directory from discovered to registered section, handle errors (show message)
+- [x] T019 [US2] Wire "Onboard" button in src/client/components/dashboard.tsx — call `POST /api/projects/onboard`, on success move directory from discovered to registered section, handle errors (show message)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
