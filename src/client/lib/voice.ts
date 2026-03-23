@@ -3,6 +3,7 @@ export type VoiceBackend = 'browser' | 'cloud';
 export type VoiceState = 'idle' | 'listening' | 'processing';
 
 export type VoiceListener = (state: VoiceState) => void;
+export type InterimResultListener = (interim: string) => void;
 
 /**
  * Voice input module supporting browser-native Web Speech API
@@ -13,6 +14,7 @@ const SILENCE_TIMEOUT_MS = 5000;
 
 let currentBackend: VoiceBackend = 'browser';
 let stateListeners: VoiceListener[] = [];
+let interimListeners: InterimResultListener[] = [];
 let currentState: VoiceState = 'idle';
 
 function setState(state: VoiceState) {
@@ -31,6 +33,19 @@ export function onVoiceStateChange(listener: VoiceListener): () => void {
   return () => {
     stateListeners = stateListeners.filter((l) => l !== listener);
   };
+}
+
+export function onInterimResult(listener: InterimResultListener): () => void {
+  interimListeners.push(listener);
+  return () => {
+    interimListeners = interimListeners.filter((l) => l !== listener);
+  };
+}
+
+function emitInterimResult(text: string) {
+  for (const listener of interimListeners) {
+    listener(text);
+  }
 }
 
 export function setBackend(backend: VoiceBackend): void {
@@ -86,12 +101,16 @@ function transcribeBrowser(): Promise<string> {
 
     recognition.onresult = (event: any) => {
       resetSilenceTimer();
+      let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           finalTranscript += result[0].transcript;
+        } else {
+          interimTranscript += result[0].transcript;
         }
       }
+      emitInterimResult(finalTranscript + interimTranscript);
     };
 
     recognition.onerror = (event: any) => {
@@ -205,12 +224,16 @@ function startListeningBrowser(): Promise<string> {
 
     recognition.onresult = (event: any) => {
       resetSilenceTimer();
+      let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           finalTranscript += result[0].transcript;
+        } else {
+          interimTranscript += result[0].transcript;
         }
       }
+      emitInterimResult(finalTranscript + interimTranscript);
     };
 
     recognition.onerror = (event: any) => {
