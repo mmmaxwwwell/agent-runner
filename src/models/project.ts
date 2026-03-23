@@ -162,6 +162,17 @@ export function registerForOnboarding(dataDir: string, input: { name: string; di
   return project;
 }
 
+export function updateProjectStatus(dataDir: string, id: string, status: ProjectStatus): Project {
+  const projects = readProjects(dataDir);
+  const project = projects.find(p => p.id === id);
+  if (!project) {
+    throw new Error(`Project not found: ${id}`);
+  }
+  project.status = status;
+  writeProjects(dataDir, projects);
+  return project;
+}
+
 export function removeProject(dataDir: string, id: string): void {
   const projects = readProjects(dataDir);
   const idx = projects.findIndex(p => p.id === id);
