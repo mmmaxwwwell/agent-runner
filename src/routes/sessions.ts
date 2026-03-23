@@ -11,6 +11,7 @@ import { createSessionLogger, readLog } from '../services/session-logger.js';
 import { parseTaskSummary } from '../services/task-parser.js';
 import { broadcastSessionState } from '../ws/session-stream.js';
 import { broadcastProjectUpdate } from '../ws/dashboard.js';
+import type { PushService } from '../services/push.js';
 
 const log = createLogger('sessions');
 
@@ -43,7 +44,7 @@ function parseQueryParams(req: IncomingMessage): URLSearchParams {
   return url.searchParams;
 }
 
-export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Config): void {
+export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Config, pushService?: PushService): void {
   // POST /api/projects/:id/sessions — start a new session
   apiRoutes.set('POST /api/projects/:id/sessions', async (req, res, params) => {
     const project = getProject(cfg.dataDir, params.id!);
@@ -125,9 +126,11 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         args: sandboxCmd.args,
         sessionId: session.id,
         projectId: project.id,
+        projectName: project.name,
         taskFilePath,
         logger,
         dataDir: cfg.dataDir,
+        pushService,
       }).then((result) => {
         activeProcesses.delete(session.id);
         log.info({ sessionId: session.id, outcome: result.outcome, spawnCount: result.spawnCount }, 'Task loop finished');
@@ -196,6 +199,16 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           taskSummary: null,
           workflow: null,
         });
+        if (pushService) {
+          const title = newState === 'completed'
+            ? `Completed: ${project.name}`
+            : `Session failed: ${project.name}`;
+          const body = newState === 'completed'
+            ? 'Interview session completed'
+            : `Process exited with code ${result.exitCode}`;
+          pushService.sendToAll({ title, body, data: { projectId: project.id, sessionId: session.id } })
+            .catch(err => log.warn({ err }, 'Failed to send push notification'));
+        }
       }).catch(() => {
         activeProcesses.delete(session.id);
       });
@@ -370,9 +383,11 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         args: sandboxCmd.args,
         sessionId: session.id,
         projectId: project.id,
+        projectName: project.name,
         taskFilePath,
         logger,
         dataDir: cfg.dataDir,
+        pushService,
       }).then((result) => {
         activeProcesses.delete(session.id);
         log.info({ sessionId: session.id, outcome: result.outcome, spawnCount: result.spawnCount }, 'Task loop resumed after input');
@@ -413,6 +428,16 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           taskSummary: null,
           workflow: null,
         });
+        if (pushService) {
+          const title = newState === 'completed'
+            ? `Completed: ${project.name}`
+            : `Session failed: ${project.name}`;
+          const body = newState === 'completed'
+            ? 'Interview session completed'
+            : `Process exited with code ${result.exitCode}`;
+          pushService.sendToAll({ title, body, data: { projectId: project.id, sessionId: session.id } })
+            .catch(err => log.warn({ err }, 'Failed to send push notification'));
+        }
       }).catch(() => {
         activeProcesses.delete(session.id);
       });

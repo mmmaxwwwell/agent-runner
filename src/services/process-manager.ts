@@ -6,6 +6,7 @@ import { transitionState, getSession } from '../models/session.js';
 import type { SessionLogger } from './session-logger.js';
 import { broadcastSessionState, broadcastSessionProgress } from '../ws/session-stream.js';
 import { broadcastProjectUpdate } from '../ws/dashboard.js';
+import type { PushService } from './push.js';
 
 const log = createLogger('process-spawner');
 
@@ -109,9 +110,11 @@ export interface TaskLoopOptions {
   args: string[];
   sessionId: string;
   projectId: string;
+  projectName: string;
   taskFilePath: string;
   logger: SessionLogger;
   dataDir: string;
+  pushService?: PushService;
 }
 
 export interface TaskLoopResult {
@@ -131,7 +134,7 @@ export interface TaskLoopResult {
  *    - All tasks [x] or [~] → mark completed.
  */
 export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopResult> {
-  const { command, args, sessionId, projectId, taskFilePath, logger, dataDir } = options;
+  const { command, args, sessionId, projectId, projectName, taskFilePath, logger, dataDir, pushService } = options;
   let spawnCount = 0;
 
   /** Broadcast project-update to dashboard clients with current session & task state. */
@@ -181,6 +184,11 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
       broadcastSessionState(sessionId, { state: 'failed' });
       const failSummary = parseTaskSummary(taskFilePath);
       emitDashboardUpdate(failSummary, 'failed');
+      pushService?.sendToAll({
+        title: `Session failed: ${projectName}`,
+        body: `Process exited with code ${exitResult.exitCode}`,
+        data: { projectId, sessionId },
+      }).catch(err => log.warn({ err }, 'Failed to send push notification'));
       return { outcome: 'failed', spawnCount };
     }
 
@@ -200,6 +208,11 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
       broadcastSessionState(sessionId, { state: 'waiting-for-input', question, taskId });
       broadcastSessionProgress(sessionId, summary);
       emitDashboardUpdate(summary, 'waiting-for-input');
+      pushService?.sendToAll({
+        title: `Input needed: ${projectName}`,
+        body: `Task ${taskId}: ${question}`,
+        data: { projectId, sessionId, taskId },
+      }).catch(err => log.warn({ err }, 'Failed to send push notification'));
       return { outcome: 'waiting-for-input', spawnCount, question };
     }
 
@@ -211,6 +224,11 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
       broadcastSessionState(sessionId, { state: 'completed' });
       broadcastSessionProgress(sessionId, summary);
       emitDashboardUpdate(summary, 'completed');
+      pushService?.sendToAll({
+        title: `Completed: ${projectName}`,
+        body: `All tasks done (${summary.completed}/${summary.total})`,
+        data: { projectId, sessionId },
+      }).catch(err => log.warn({ err }, 'Failed to send push notification'));
       return { outcome: 'completed', spawnCount };
     }
 

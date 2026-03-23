@@ -214,7 +214,7 @@ const pushService = createPushService({
 
 mountHealthRoutes(apiRoutes, config);
 mountProjectRoutes(apiRoutes, config);
-mountSessionRoutes(apiRoutes, config);
+mountSessionRoutes(apiRoutes, config, pushService);
 mountPushRoutes(apiRoutes, config, pushService);
 
 server.listen(config.port, config.host, () => {
