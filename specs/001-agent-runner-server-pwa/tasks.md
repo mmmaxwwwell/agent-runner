@@ -200,7 +200,7 @@
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T070 [P] [US7] Write unit tests for add-feature workflow in tests/unit/spec-kit-add-feature.test.ts — verify orchestrator accepts existing project directory (no directory creation), passes project dir to each phase agent session, phase sequencing (specify → clarify → plan → tasks → analyze), analyze loop cap at 5 iterations with user notification on cap reached, run-tasks.sh launch against existing project dir after approval per spec.md US7 and plan.md key design §6
+- [x] T070 [P] [US7] Write unit tests for add-feature workflow in tests/unit/spec-kit-add-feature.test.ts — verify orchestrator accepts existing project directory (no directory creation), passes project dir to each phase agent session, phase sequencing (specify → clarify → plan → tasks → analyze), analyze loop cap at 5 iterations with user notification on cap reached, run-tasks.sh launch against existing project dir after approval per spec.md US7 and plan.md key design §6
 - [ ] T071 [P] [US7] Write contract tests for POST /api/projects/:id/add-feature in tests/contract/rest-api-add-feature.test.ts — returns session for specify phase, rejects when project has active session (409), rejects empty description (400), rejects unknown project (404) per rest-api.md contract
 
 ### Implementation for User Story 7
