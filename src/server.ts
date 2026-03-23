@@ -8,6 +8,7 @@ import { mountHealthRoutes } from './routes/health.js';
 import { mountProjectRoutes } from './routes/projects.js';
 import { mountSessionRoutes } from './routes/sessions.js';
 import { mountPushRoutes } from './routes/push.js';
+import { mountVoiceRoutes } from './routes/voice.js';
 import { createPushService } from './services/push.js';
 import { handleSessionStream, initSessionStream } from './ws/session-stream.js';
 import { handleDashboard } from './ws/dashboard.js';
@@ -216,6 +217,7 @@ mountHealthRoutes(apiRoutes, config);
 mountProjectRoutes(apiRoutes, config);
 mountSessionRoutes(apiRoutes, config, pushService);
 mountPushRoutes(apiRoutes, config, pushService);
+mountVoiceRoutes(apiRoutes, config);
 
 server.listen(config.port, config.host, () => {
   log.info({
