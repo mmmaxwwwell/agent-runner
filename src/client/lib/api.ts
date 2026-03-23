@@ -1,3 +1,68 @@
+// --- Domain types for GET /api/projects ---
+
+export type TaskSummary = {
+  total: number;
+  completed: number;
+  blocked: number;
+  skipped: number;
+  remaining: number;
+};
+
+export type ActiveSession = {
+  id: string;
+  type: string;
+  state: string;
+  startedAt: string;
+};
+
+export type RegisteredProject = {
+  type: 'registered';
+  id: string;
+  name: string;
+  dir: string;
+  taskFile: string;
+  createdAt: string;
+  status: 'active' | 'onboarding' | 'error';
+  taskSummary: TaskSummary;
+  activeSession: ActiveSession | null;
+  dirMissing: boolean;
+};
+
+export type DiscoveredDirectory = {
+  type: 'discovered';
+  name: string;
+  path: string;
+  isGitRepo: boolean;
+  hasNixFlake: boolean;
+  hasSpecKit: {
+    spec: boolean;
+    plan: boolean;
+    tasks: boolean;
+  };
+};
+
+export type ProjectsResponse = {
+  registered: RegisteredProject[];
+  discovered: DiscoveredDirectory[];
+  discoveryError: string | null;
+};
+
+// --- POST /api/projects/onboard ---
+
+export type OnboardRequest = {
+  name: string;
+  path: string;
+};
+
+export type OnboardResponse = {
+  projectId: string;
+  name: string;
+  path: string;
+  status: 'onboarding';
+};
+
+// --- HTTP helpers ---
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,

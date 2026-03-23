@@ -7,6 +7,7 @@ import { listProjects, getProject, createProject, removeProject, registerForOnbo
 import { createSession } from '../models/session.js';
 import { parseTasks, parseTaskSummary } from '../services/task-parser.js';
 import { scanProjectsDir } from '../services/discovery.js';
+import { ensureFlakeNix } from '../services/flake-generator.js';
 import { startAddFeatureWorkflow, startNewProjectWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
 import { buildCommand } from '../services/sandbox.js';
 import { spawnProcess } from '../services/process-manager.js';
@@ -393,6 +394,12 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     // Derive name from path basename if not provided
     const dirPath = parsed.path;
     const name = (parsed.name && typeof parsed.name === 'string') ? parsed.name.trim() : dirPath.split('/').pop() || 'unnamed';
+
+    // Ensure the project has a flake.nix so nix develop works
+    const flakeGenerated = ensureFlakeNix(dirPath);
+    if (flakeGenerated) {
+      log.info({ dir: dirPath }, 'Generated flake.nix for project');
+    }
 
     try {
       const project = registerForOnboarding(cfg.dataDir, { name, dir: dirPath });

@@ -88,8 +88,8 @@ function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnbo
     }
   };
 
-  const { isGitRepo, hasSpecKit } = dir;
-  const hasBadges = isGitRepo || hasSpecKit.spec || hasSpecKit.plan || hasSpecKit.tasks;
+  const { isGitRepo, hasNixFlake, hasSpecKit } = dir;
+  const hasBadges = isGitRepo || hasNixFlake || hasSpecKit.spec || hasSpecKit.plan || hasSpecKit.tasks;
 
   return (
     <div
@@ -124,6 +124,11 @@ function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnbo
           {isGitRepo && (
             <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', background: '#2a3a2a', color: '#81c784', border: '1px solid #4caf5044' }}>
               git
+            </span>
+          )}
+          {hasNixFlake && (
+            <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', background: '#2a2a3a', color: '#b39ddb', border: '1px solid #7c4dff44' }}>
+              nix
             </span>
           )}
           {hasSpecKit.spec && (

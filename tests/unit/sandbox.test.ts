@@ -16,10 +16,10 @@ describe('sandbox', () => {
     it('should return systemd-run command with sandbox properties when available', () => {
       const result = buildCommand('/home/user/my-project', ['--task-file', 'tasks.md'], false);
 
-      // Should start with systemd-run --user --scope
+      // Should start with systemd-run --user --pipe
       assert.equal(result.command, 'systemd-run');
       assert.ok(result.args.includes('--user'));
-      assert.ok(result.args.includes('--scope'));
+      assert.ok(result.args.includes('--pipe'));
     });
 
     it('should include ProtectHome=tmpfs property', () => {

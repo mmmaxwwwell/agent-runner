@@ -82,10 +82,7 @@ export function loadConfig(): Config {
   const dataDir = resolveDataDir();
   const vapidKeys = resolveVapidKeys(dataDir);
 
-  const projectsDir = process.env['AGENT_RUNNER_PROJECTS_DIR'];
-  if (!projectsDir) {
-    throw new Error('AGENT_RUNNER_PROJECTS_DIR environment variable is required');
-  }
+  const projectsDir = process.env['AGENT_RUNNER_PROJECTS_DIR'] ?? '~/git';
 
   const logLevel = process.env['LOG_LEVEL'] ?? 'info';
   if (!LOG_LEVELS.has(logLevel)) {

@@ -36,7 +36,7 @@ export function resetAvailabilityCache(): void {
 /**
  * Build the command array to spawn a sandboxed (or unsandboxed) agent process.
  *
- * Sandbox uses systemd-run --user --scope with filesystem isolation properties.
+ * Sandbox uses systemd-run --user --pipe with filesystem isolation properties.
  * If sandbox is unavailable, requires two gates for unsandboxed execution:
  *   1. Server env var ALLOW_UNSANDBOXED=true
  *   2. Request param allowUnsandboxed=true
@@ -55,7 +55,7 @@ export function buildCommand(
     // Use systemd-run sandbox regardless of unsandboxed gates
     const args = [
       '--user',
-      '--scope',
+      '--pipe',
       '--property=ProtectHome=tmpfs',
       `--property=BindPaths=${projectDir}`,
       '--property=ProtectSystem=strict',

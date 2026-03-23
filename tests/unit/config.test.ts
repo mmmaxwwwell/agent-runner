@@ -88,14 +88,17 @@ describe('config', () => {
     assert.equal(config.diskWarnThresholdMb, 4096);
   });
 
-  it('should throw when AGENT_RUNNER_PROJECTS_DIR is missing', async () => {
+  it('should default projectsDir to ~/git when AGENT_RUNNER_PROJECTS_DIR is missing', async () => {
     process.env['AGENT_RUNNER_DATA_DIR'] = dataDir;
     process.env['VAPID_PUBLIC_KEY'] = 'test-public-key';
     process.env['VAPID_PRIVATE_KEY'] = 'test-private-key';
     // No AGENT_RUNNER_PROJECTS_DIR set
 
     const loadConfig = await loadConfigFresh();
-    assert.throws(() => loadConfig(), /AGENT_RUNNER_PROJECTS_DIR.*required/);
+    const config = loadConfig();
+    const { homedir } = await import('node:os');
+    const { resolve } = await import('node:path');
+    assert.equal(config.projectsDir, resolve(homedir(), 'git'));
   });
 
   it('should throw on invalid LOG_LEVEL', async () => {

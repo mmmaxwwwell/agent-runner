@@ -55,9 +55,21 @@ async function api(path: string, options: { method?: string; body?: unknown } = 
   return { status: res.status, body };
 }
 
+/**
+ * Connect and immediately start buffering messages so none are lost
+ * between the 'open' event and the first waitForMessage/collectMessages call.
+ * The buffer handler is removed on the first drain call.
+ */
 function connectWs(path: string): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`${wsBaseUrl}${path}`);
+    const buffer: any[] = [];
+    const bufferHandler = (data: Buffer | string) => {
+      buffer.push(JSON.parse(data.toString()));
+    };
+    (ws as any).__earlyBuffer = buffer;
+    (ws as any).__earlyBufferHandler = bufferHandler;
+    ws.on('message', bufferHandler);
     ws.on('open', () => resolve(ws));
     ws.on('error', reject);
     const timeout = setTimeout(() => reject(new Error('WebSocket connection timeout')), 5000);
@@ -65,8 +77,31 @@ function connectWs(path: string): Promise<WebSocket> {
   });
 }
 
+/** Stop buffering early messages — call once before setting up own listeners. */
+function drainBuffer(ws: WebSocket): any[] {
+  const handler = (ws as any).__earlyBufferHandler;
+  if (handler) {
+    ws.removeListener('message', handler);
+    (ws as any).__earlyBufferHandler = null;
+  }
+  const buffer: any[] = (ws as any).__earlyBuffer || [];
+  (ws as any).__earlyBuffer = [];
+  return buffer;
+}
+
+/**
+ * Wait for a message matching predicate. Drains any buffered early messages first.
+ */
 function waitForMessage(ws: WebSocket, predicate: (msg: any) => boolean, timeoutMs = 5000): Promise<any> {
   return new Promise((resolve, reject) => {
+    // Drain and check early buffer
+    const buffer = drainBuffer(ws);
+    for (const msg of buffer) {
+      if (predicate(msg)) {
+        return resolve(msg);
+      }
+    }
+
     const timeout = setTimeout(() => reject(new Error('Timeout waiting for message')), timeoutMs);
     const handler = (data: Buffer | string) => {
       const msg = JSON.parse(data.toString());
@@ -82,7 +117,11 @@ function waitForMessage(ws: WebSocket, predicate: (msg: any) => boolean, timeout
 
 function collectMessages(ws: WebSocket, count: number, timeoutMs = 5000): Promise<any[]> {
   return new Promise((resolve, reject) => {
-    const messages: any[] = [];
+    // Drain early buffer first
+    const buffer = drainBuffer(ws);
+    const messages: any[] = buffer.slice(0, count);
+    if (messages.length >= count) return resolve(messages);
+
     const timeout = setTimeout(() => reject(new Error(`Timeout: received ${messages.length}/${count} messages`)), timeoutMs);
     const handler = (data: Buffer | string) => {
       messages.push(JSON.parse(data.toString()));
@@ -98,7 +137,7 @@ function collectMessages(ws: WebSocket, count: number, timeoutMs = 5000): Promis
 
 function collectAllMessages(ws: WebSocket, durationMs: number): Promise<any[]> {
   return new Promise((resolve) => {
-    const messages: any[] = [];
+    const messages: any[] = drainBuffer(ws);
     const handler = (data: Buffer | string) => {
       messages.push(JSON.parse(data.toString()));
     };
@@ -305,7 +344,11 @@ describe('WebSocket API Contract Tests', () => {
       const sessionId = createSessionWithLog(projectId, entries);
 
       const ws = await connectWs(`/ws/sessions/${sessionId}`);
-      const msg = await waitForMessage(ws, (m: any) => m.type === 'output');
+      // Collect both the output and sync messages to avoid race where output
+      // arrives before waitForMessage listener is attached
+      const messages = await collectMessages(ws, 2, 5000); // 1 output + 1 sync
+      const msg = messages.find((m: any) => m.type === 'output');
+      assert.ok(msg, 'Should have received an output message');
 
       assert.equal(msg.ts, 9999);
       assert.equal(msg.stream, 'stderr');

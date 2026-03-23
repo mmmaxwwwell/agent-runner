@@ -24,6 +24,7 @@ export interface DiscoveredDirectory {
   name: string;           // Directory basename
   path: string;           // Absolute path
   isGitRepo: boolean;
+  hasNixFlake: boolean;
   hasSpecKit: {
     spec: boolean;
     plan: boolean;

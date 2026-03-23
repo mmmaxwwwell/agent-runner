@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { ensureFlakeNix } from './flake-generator.js';
 
 export const SPEC_KIT_PHASES = ['specify', 'clarify', 'plan', 'tasks', 'analyze'] as const;
 
@@ -115,8 +116,9 @@ export async function startNewProjectWorkflow(options: NewProjectWorkflowOptions
   const { repoName, projectsDir, deps } = options;
   const projectDir = join(projectsDir, repoName);
 
-  // Create project directory
+  // Create project directory and ensure it has a flake.nix for nix develop
   mkdirSync(projectDir, { recursive: true });
+  ensureFlakeNix(projectDir);
 
   const result = await runWorkflow(projectDir, 'new-project', deps);
 

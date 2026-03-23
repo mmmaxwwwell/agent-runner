@@ -1,9 +1,9 @@
 import type { IncomingMessage } from 'node:http';
 import type { WebSocket } from 'ws';
-import { watch, statSync, existsSync, writeFileSync, type FSWatcher } from 'node:fs';
+import { statSync, existsSync, writeFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from '../lib/logger.js';
-import { readLog, readLogFromOffset, type SessionLogEntry } from '../services/session-logger.js';
+import { readLog, type SessionLogEntry } from '../services/session-logger.js';
 import { getSession } from '../models/session.js';
 import { getActiveProcess } from '../services/process-registry.js';
 
@@ -12,7 +12,7 @@ const log = createLogger('ws:session-stream');
 const MAX_BUFFER = 64 * 1024; // 64KB backpressure threshold
 const HEARTBEAT_INTERVAL = 30_000; // 30 seconds
 const MAX_MISSED_PONGS = 3;
-const POLL_INTERVAL = 100; // ms — fallback polling interval
+const POLL_INTERVAL = 50; // ms — polling interval for live output detection
 
 /** A connected client with a readiness flag (ready = replay complete). */
 interface ClientEntry {
@@ -26,7 +26,6 @@ const sessionClients = new Map<string, Set<ClientEntry>>();
 /** Per-session file watcher state */
 interface SessionWatchState {
   path: string;
-  watcher: FSWatcher | null;
   pollTimer: ReturnType<typeof setInterval>;
   byteOffset: number;
   reading: boolean;
@@ -100,9 +99,10 @@ export function broadcastSessionOutput(sessionId: string, entry: SessionLogEntry
 
 /**
  * Read new entries from a session's log file and broadcast them.
- * Uses a lock + re-check loop to avoid missing data.
+ * Uses synchronous I/O to avoid readline stream lifecycle issues
+ * that can cause the reading lock to hang permanently.
  */
-async function readAndBroadcast(sessionId: string, state: SessionWatchState): Promise<void> {
+function readAndBroadcast(sessionId: string, state: SessionWatchState): void {
   if (state.reading) return;
   state.reading = true;
   try {
@@ -114,23 +114,36 @@ async function readAndBroadcast(sessionId: string, state: SessionWatchState): Pr
     }
     if (fileSize <= state.byteOffset) return;
 
-    const newEntries = await readLogFromOffset(state.path, state.byteOffset);
-
-    // Re-stat after read to capture actual EOF (stream reads to current EOF)
+    // Read only the new bytes synchronously
+    const bytesToRead = fileSize - state.byteOffset;
+    const buf = Buffer.alloc(bytesToRead);
+    const fd = openSync(state.path, 'r');
     try {
-      state.byteOffset = statSync(state.path).size;
-    } catch {
-      state.byteOffset = fileSize;
+      readSync(fd, buf, 0, bytesToRead, state.byteOffset);
+    } finally {
+      closeSync(fd);
     }
 
-    for (const entry of newEntries) {
-      broadcastToSession(sessionId, JSON.stringify({
-        type: 'output',
-        seq: entry.seq,
-        ts: entry.ts,
-        stream: entry.stream,
-        content: entry.content,
-      }));
+    state.byteOffset = fileSize;
+
+    // Parse JSONL lines from the new data
+    const text = buf.toString('utf-8');
+    const lines = text.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) continue;
+      try {
+        const entry = JSON.parse(trimmed) as SessionLogEntry;
+        broadcastToSession(sessionId, JSON.stringify({
+          type: 'output',
+          seq: entry.seq,
+          ts: entry.ts,
+          stream: entry.stream,
+          content: entry.content,
+        }));
+      } catch {
+        // Skip malformed lines
+      }
     }
   } catch (err) {
     log.error({ sessionId, err }, 'Error reading new log entries');
@@ -140,8 +153,8 @@ async function readAndBroadcast(sessionId: string, state: SessionWatchState): Pr
 }
 
 /**
- * Start (or reuse) a watcher for a session's output.jsonl.
- * Uses fs.watch (inotify) for fast detection + setInterval as fallback.
+ * Start (or reuse) a poller for a session's output.jsonl.
+ * Uses setInterval polling for reliable cross-process detection.
  */
 function ensureWatcher(sessionId: string, initialOffset: number): void {
   if (sessionWatchers.has(sessionId)) {
@@ -160,27 +173,16 @@ function ensureWatcher(sessionId: string, initialOffset: number): void {
     writeFileSync(path, '', 'utf-8');
   }
 
-  const trigger = () => {
-    readAndBroadcast(sessionId, state).catch(err => {
-      log.error({ sessionId, err }, 'Error in watcher callback');
-    });
-  };
-
-  // Try inotify-based watcher for immediate detection
-  let watcher: FSWatcher | null = null;
-  try {
-    watcher = watch(path, trigger);
-  } catch {
-    log.debug({ sessionId }, 'fs.watch failed, relying on polling');
-  }
-
   const state: SessionWatchState = {
     path,
-    watcher,
-    pollTimer: setInterval(trigger, POLL_INTERVAL),
+    pollTimer: null as unknown as ReturnType<typeof setInterval>,
     byteOffset: initialOffset,
     reading: false,
   };
+
+  state.pollTimer = setInterval(() => {
+    readAndBroadcast(sessionId, state);
+  }, POLL_INTERVAL);
 
   sessionWatchers.set(sessionId, state);
 }
@@ -189,7 +191,6 @@ function ensureWatcher(sessionId: string, initialOffset: number): void {
 function cleanupWatcher(sessionId: string): void {
   const state = sessionWatchers.get(sessionId);
   if (state) {
-    state.watcher?.close();
     clearInterval(state.pollTimer);
     sessionWatchers.delete(sessionId);
   }

@@ -3,6 +3,18 @@ import { join, resolve } from 'node:path';
 import type { DiscoveredDirectory } from '../models/project.ts';
 
 /**
+ * Check whether a directory contains a Nix flake (flake.nix file).
+ */
+export async function detectNixFlake(dirPath: string): Promise<boolean> {
+  try {
+    await access(join(dirPath, 'flake.nix'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Check whether a directory is a git repository (contains .git file or directory).
  */
 export async function detectGitRepo(dirPath: string): Promise<boolean> {
@@ -81,8 +93,9 @@ export async function scanProjectsDir(
     // Skip already-registered directories
     if (registeredPaths.has(fullPath)) continue;
 
-    const [isGitRepo, hasSpecKit] = await Promise.all([
+    const [isGitRepo, hasNixFlake, hasSpecKit] = await Promise.all([
       detectGitRepo(fullPath),
+      detectNixFlake(fullPath),
       detectSpecKitArtifacts(fullPath),
     ]);
 
@@ -91,6 +104,7 @@ export async function scanProjectsDir(
       name: entry.name,
       path: fullPath,
       isGitRepo,
+      hasNixFlake,
       hasSpecKit,
     });
   }

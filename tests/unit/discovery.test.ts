@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, symlinkSync, chmodSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { scanProjectsDir, detectGitRepo, detectSpecKitArtifacts } from '../../src/services/discovery.ts';
+import { scanProjectsDir, detectGitRepo, detectNixFlake, detectSpecKitArtifacts } from '../../src/services/discovery.ts';
 
 describe('scanProjectsDir', () => {
   let tmpDir: string;
@@ -28,6 +28,7 @@ describe('scanProjectsDir', () => {
     assert.equal(result[0].name, 'my-repo');
     assert.equal(result[0].path, resolve(join(projectsDir, 'my-repo')));
     assert.equal(typeof result[0].isGitRepo, 'boolean');
+    assert.equal(typeof result[0].hasNixFlake, 'boolean');
     assert.ok(result[0].hasSpecKit);
     assert.equal(typeof result[0].hasSpecKit.spec, 'boolean');
     assert.equal(typeof result[0].hasSpecKit.plan, 'boolean');
@@ -168,6 +169,34 @@ describe('detectGitRepo', () => {
 
   it('should return false for non-existent directory', async () => {
     const result = await detectGitRepo(join(tmpDir, 'nonexistent'));
+    assert.equal(result, false);
+  });
+});
+
+describe('detectNixFlake', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'detect-nix-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should return true when flake.nix exists', async () => {
+    writeFileSync(join(tmpDir, 'flake.nix'), '{ }');
+    const result = await detectNixFlake(tmpDir);
+    assert.equal(result, true);
+  });
+
+  it('should return false when no flake.nix exists', async () => {
+    const result = await detectNixFlake(tmpDir);
+    assert.equal(result, false);
+  });
+
+  it('should return false for non-existent directory', async () => {
+    const result = await detectNixFlake(join(tmpDir, 'nonexistent'));
     assert.equal(result, false);
   });
 });

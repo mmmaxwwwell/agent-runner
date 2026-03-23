@@ -620,6 +620,7 @@
               }
             )
           ] }),
+          project.dirMissing && /* @__PURE__ */ u3("div", { style: { fontSize: "0.8rem", color: "#ff8a80", marginBottom: "4px" }, children: "Directory missing from disk" }),
           /* @__PURE__ */ u3("div", { style: { fontSize: "0.85rem", color: "#aaa" }, children: [
             taskSummary.completed,
             "/",
@@ -648,6 +649,8 @@
         setBusy(false);
       }
     };
+    const { isGitRepo, hasSpecKit } = dir;
+    const hasBadges = isGitRepo || hasSpecKit.spec || hasSpecKit.plan || hasSpecKit.tasks;
     return /* @__PURE__ */ u3(
       "div",
       {
@@ -678,6 +681,12 @@
                 children: busy ? "Onboarding..." : "Onboard"
               }
             )
+          ] }),
+          hasBadges && /* @__PURE__ */ u3("div", { style: { display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }, children: [
+            isGitRepo && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#2a3a2a", color: "#81c784", border: "1px solid #4caf5044" }, children: "git" }),
+            hasSpecKit.spec && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#1a2a3a", color: "#90caf9", border: "1px solid #2196f344" }, children: "spec" }),
+            hasSpecKit.plan && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#1a2a3a", color: "#90caf9", border: "1px solid #2196f344" }, children: "plan" }),
+            hasSpecKit.tasks && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#1a2a3a", color: "#90caf9", border: "1px solid #2196f344" }, children: "tasks" })
           ] }),
           errMsg && /* @__PURE__ */ u3("div", { style: { color: "#ff8a80", fontSize: "0.8rem", marginTop: "8px" }, children: errMsg })
         ]
