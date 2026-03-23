@@ -240,7 +240,7 @@
 **Purpose**: Cross-cutting concerns, crash recovery, and final integration
 
 - [x] T062 Implement crash recovery service in src/services/recovery.ts — on server startup: scan sessions/ for meta.json with state "running" (re-spawn process from last task) or "waiting-for-input" (restore waiting state), log recovery actions per research.md §8 and spec.md FR-015
-- [ ] T063 Write integration tests for crash recovery in tests/integration/recovery.test.ts — simulate crash (running session with meta.json), restart server, verify session resumes or restores waiting state
+- [x] T063 Write integration tests for crash recovery in tests/integration/recovery.test.ts — simulate crash (running session with meta.json), restart server, verify session resumes or restores waiting state
 - [ ] T064 Integrate recovery service into src/server.ts startup — call recovery.resumeAll() after data dir init, before accepting connections
 - [ ] T065 [P] Add CSS styling to src/client/index.html or src/client/style.css — mobile-first responsive layout, dark theme, terminal-like output styling, status badges, card components, touch-friendly tap targets
 - [ ] T065b [P] Write unit tests for disk space monitor in tests/unit/disk-monitor.test.ts — mock fs.statfs, verify warning triggers when available space falls below DISK_WARN_THRESHOLD_MB (default 8192), verify no warning above threshold, verify 60-second polling interval, verify push notification and log emission on warning per spec.md FR-017
