@@ -116,7 +116,7 @@
 
 - [x] T023 Run full test suite with `nix develop -c npm test` and fix any failures — all 426 tests pass, 0 failures
 - [x] T024 Run `nix develop -c npm run build` and verify clean build — tsc + esbuild clean, app.js 78.7kb, sw.js 3.0kb
-- [ ] T025 Run quickstart.md validation — verify all commands in specs/002-bugfixes-ui-flow-tests/quickstart.md work correctly
+- [x] T025 Run quickstart.md validation — verify all commands in specs/002-bugfixes-ui-flow-tests/quickstart.md work correctly — all 3 commands verified: `npm test` (426 pass, 0 fail), `npm run build` (clean tsc + esbuild), `npm run dev` (server starts on :3000)
 
 ---
 
