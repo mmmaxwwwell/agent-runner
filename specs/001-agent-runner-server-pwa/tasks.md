@@ -99,7 +99,7 @@
 - [x] T029 [US1] Implement session REST routes in src/routes/sessions.ts — POST /api/projects/:id/sessions (start session, validate no active session, check sandbox with two-gate override via allowUnsandboxed param), GET /api/projects/:id/sessions (list), GET /api/sessions/:id (detail), POST /api/sessions/:id/stop (kill process, mark failed), GET /api/sessions/:id/log (return JSONL as JSON array, support afterSeq param) per rest-api.md contracts
 - [x] T029b [P] [US1] Write integration tests for session stop in tests/integration/session-stop.test.ts — start a session, stop it via POST /api/sessions/:id/stop, verify process killed, session marked failed, exit code set per rest-api.md contract (FR-013)
 - [x] T030 [US1] Implement POST /api/sessions/:id/input in src/routes/sessions.ts — validate session is waiting-for-input, record answer, transition same session back to running state, re-spawn agent process with clarification context, continue appending to same output.jsonl per rest-api.md contract
-- [ ] T031 [US1] Wire session routes into src/server.ts — mount /api/sessions and /api/projects/:id/sessions handlers
+- [x] T031 [US1] Wire session routes into src/server.ts — mount /api/sessions and /api/projects/:id/sessions handlers
 
 **Checkpoint**: Can start a task run via API, see sandboxed process spawn, auto-loop continues on task completion, pauses on [?] with question, marks complete when done. All unit and integration tests pass.
 
