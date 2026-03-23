@@ -173,7 +173,7 @@
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
 - [x] T052b [P] [US4] Write unit tests for spec-kit workflow orchestrator in tests/unit/spec-kit.test.ts — phase sequencing (specify → clarify → plan → tasks → analyze), directory creation under AGENT_RUNNER_PROJECTS_DIR, phase completion detection (exit code 0 = advance, non-zero = stop and notify), analyze-remediate loop (re-run analyze after remediations until zero issues), project auto-registration after artifacts generated, run-tasks.sh launch after user approval per plan.md key design §6
-- [ ] T052c [P] [US4] Write contract tests for voice transcription endpoint in tests/contract/rest-api-voice.test.ts — POST /api/voice/transcribe with audio blob returns { text }, 503 when GOOGLE_STT_API_KEY not configured, 400 when no audio provided per rest-api.md contract
+- [x] T052c [P] [US4] Write contract tests for voice transcription endpoint in tests/contract/rest-api-voice.test.ts — POST /api/voice/transcribe with audio blob returns { text }, 503 when GOOGLE_STT_API_KEY not configured, 400 when no audio provided per rest-api.md contract
 
 ### Implementation for User Story 4
 
