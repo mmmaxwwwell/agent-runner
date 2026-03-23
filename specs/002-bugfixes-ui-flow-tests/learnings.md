@@ -29,6 +29,9 @@ Updated from T017: there are actually 4 pre-existing test failures (388 total te
 ### T021 — ESM tests cannot use require()
 Integration test files run under `tsx` in ESM mode. Using `require('node:fs')` fails with `ReferenceError: require is not defined`. Always use the ES module imports already at the top of the file instead.
 
+### T023 — Pre-existing test failures resolved
+The 4 pre-existing test failures noted in T017/T020 (websocket-api sync message, session-stop 2 tests, websocket reconnect replay) are no longer failing. The full suite runs 426 tests with 0 failures. The fixes from earlier tasks in this feature (T003-T022) likely resolved the underlying issues.
+
 ### T022 — Add-feature active session cleanup between tests
 When testing 409 conflict scenarios for add-feature, each test must use a fresh project (registered separately) rather than reusing the main test project. The first successful `add-feature` call creates a running session, and subsequent calls against the same project will get 409. Using separate projects per test avoids ordering dependencies and cleanup complexity.
 
