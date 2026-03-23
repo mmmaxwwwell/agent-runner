@@ -39,7 +39,7 @@
 - [x] T007 [P] Write unit tests for config and logger in tests/unit/config.test.ts and tests/unit/logger.test.ts, including contract test for PUT /api/config/log-level endpoint
 - [x] T008 Implement HTTP server entry point in src/server.ts — create http.createServer, serve static files from public/, mount /api routes, upgrade WebSocket connections, listen on configured host:port, log startup with pino
 - [x] T009 Implement data directory initialization in src/server.ts startup — ensure AGENT_RUNNER_DATA_DIR, sessions/ subdirectory, projects.json (empty array if missing), push-subscriptions.json (empty array if missing) exist per data-model.md filesystem layout
-- [ ] T010 [P] Add health check endpoint GET /api/health in src/routes/health.ts — return { status: "ok", uptime, sandboxAvailable, cloudSttAvailable } per rest-api.md contract
+- [x] T010 [P] Add health check endpoint GET /api/health in src/routes/health.ts — return { status: "ok", uptime, sandboxAvailable, cloudSttAvailable } per rest-api.md contract
 - [ ] T011 [P] Add PUT /api/config/log-level endpoint in src/routes/health.ts — validate level, call logger.setLevel(), return { level } per rest-api.md contract
 
 **Checkpoint**: Server starts with `npm run dev`, health endpoint responds, structured logs appear on stderr.

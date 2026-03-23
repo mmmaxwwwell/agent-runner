@@ -3,6 +3,7 @@ import { readFile, stat, mkdir, writeFile, access } from 'node:fs/promises';
 import { resolve, extname, join } from 'node:path';
 import { loadConfig, type Config } from './lib/config.js';
 import { createLogger, setLevel } from './lib/logger.js';
+import { mountHealthRoutes } from './routes/health.js';
 
 const log = createLogger('server');
 
@@ -168,6 +169,7 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 await initDataDir(config);
+mountHealthRoutes(apiRoutes, config);
 
 server.listen(config.port, config.host, () => {
   log.info({
