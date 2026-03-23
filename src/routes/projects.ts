@@ -6,10 +6,12 @@ import { createLogger } from '../lib/logger.js';
 import { listProjects, getProject, createProject, removeProject } from '../models/project.js';
 import { createSession } from '../models/session.js';
 import { parseTasks, parseTaskSummary } from '../services/task-parser.js';
-import { startAddFeatureWorkflow, type SpecKitDeps, type PhaseResult } from '../services/spec-kit.js';
+import { startAddFeatureWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
 import { buildCommand } from '../services/sandbox.js';
 import { spawnProcess } from '../services/process-manager.js';
 import { createSessionLogger } from '../services/session-logger.js';
+import { broadcastPhaseTransition } from '../ws/session-stream.js';
+import { broadcastProjectUpdate } from '../ws/dashboard.js';
 import { randomUUID } from 'node:crypto';
 
 const log = createLogger('server');
@@ -226,11 +228,36 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     // Kick off the workflow asynchronously — the first phase reuses the session we just created
     const firstSessionId = session.id;
     let sessionCounter = 0;
+    // Track the latest session ID so phase transitions broadcast to the right session-stream clients
+    let currentSessionId = firstSessionId;
     const deps: SpecKitDeps = {
       createSessionId: () => {
         sessionCounter++;
         if (sessionCounter === 1) return firstSessionId;
         return randomUUID();
+      },
+      onPhaseTransition: (event: PhaseTransitionEvent) => {
+        currentSessionId = event.sessionId;
+        // Broadcast phase message to session-stream clients watching the previous session
+        // (they'll see the transition and know to connect to the new session)
+        broadcastPhaseTransition(firstSessionId, event);
+
+        // Broadcast project-update to dashboard with workflow info
+        broadcastProjectUpdate({
+          projectId: project.id,
+          activeSession: {
+            id: event.sessionId,
+            type: 'interview',
+            state: 'running',
+          },
+          taskSummary: safeParseTaskSummary(project),
+          workflow: {
+            type: event.workflow,
+            phase: event.phase,
+            iteration: event.iteration,
+            description,
+          },
+        });
       },
       runPhase: async (phase: string, projectDir: string, sessionId: string): Promise<PhaseResult> => {
         // For the first phase, the session is already created
@@ -274,8 +301,23 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       deps,
     }).then((result) => {
       log.info({ projectId: project.id, outcome: result.outcome }, 'Add-feature workflow finished');
+
+      // Broadcast final dashboard update clearing workflow info
+      broadcastProjectUpdate({
+        projectId: project.id,
+        activeSession: result.outcome === 'completed' ? getActiveSession(cfg.dataDir, project.id) as any : null,
+        taskSummary: safeParseTaskSummary(project),
+        workflow: null,
+      });
     }).catch((err) => {
       log.error({ projectId: project.id, err }, 'Add-feature workflow error');
+
+      broadcastProjectUpdate({
+        projectId: project.id,
+        activeSession: null,
+        taskSummary: safeParseTaskSummary(project),
+        workflow: null,
+      });
     });
 
     // Return the first session info immediately

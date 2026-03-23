@@ -75,6 +75,18 @@ export function broadcastSessionProgress(sessionId: string, taskSummary: { total
   broadcastToSession(sessionId, JSON.stringify({ type: 'progress', taskSummary }));
 }
 
+/** Broadcast a phase transition to all clients watching a session. */
+export function broadcastPhaseTransition(sessionId: string, event: {
+  workflow: string;
+  phase: string;
+  previousPhase: string | null;
+  iteration: number;
+  maxIterations: number;
+  sessionId: string;
+}): void {
+  broadcastToSession(sessionId, JSON.stringify({ type: 'phase', ...event }));
+}
+
 /** Broadcast a single output entry to all clients watching a session. */
 export function broadcastSessionOutput(sessionId: string, entry: SessionLogEntry): void {
   broadcastToSession(sessionId, JSON.stringify({
