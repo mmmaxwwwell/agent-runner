@@ -8,7 +8,8 @@
   },
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && esbuild src/client/app.tsx --bundle --outdir=public/",
+    "build:client": "esbuild src/client/app.tsx --bundle --outdir=public/ --watch",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "test": "tsx --test tests/**/*.test.ts"

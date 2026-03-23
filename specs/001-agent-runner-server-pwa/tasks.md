@@ -21,7 +21,7 @@
 
 - [x] T001 Initialize Node.js project with package.json (type: module, engines: node >=22) and install dependencies: ws, web-push, pino, preact, and dev dependencies: typescript, tsx, esbuild, @types/node, @types/ws in package.json
 - [x] T002 Configure TypeScript with tsconfig.json (target ES2022, module NodeNext, outDir dist/, rootDir src/, strict mode, jsxImportSource preact)
-- [ ] T003 [P] Add npm scripts to package.json: build (tsc && esbuild src/client/app.tsx --bundle --outdir=public/), dev (tsx watch src/server.ts), build:client (esbuild src/client/app.tsx --bundle --outdir=public/ --watch), start (node dist/server.js), test (tsx --test tests/**/*.test.ts)
+- [x] T003 [P] Add npm scripts to package.json: build (tsc && esbuild src/client/app.tsx --bundle --outdir=public/), dev (tsx watch src/server.ts), build:client (esbuild src/client/app.tsx --bundle --outdir=public/ --watch), start (node dist/server.js), test (tsx --test tests/**/*.test.ts)
 - [ ] T004 [P] Create project directory structure: src/models/, src/services/, src/routes/, src/ws/, src/lib/, src/client/components/, src/client/lib/, public/, tests/unit/, tests/integration/, tests/contract/
 
 **Checkpoint**: Project compiles with `npm run build` and `npm test` runs (no tests yet).
