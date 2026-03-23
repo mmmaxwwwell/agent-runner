@@ -30,3 +30,8 @@ The onboard integration test uses the same server spawn pattern as `discovery-ap
 
 ---
 
+### T024 — Quickstart validation results
+All endpoints verified against live dev server: GET /api/projects returns correct `{ registered, discovered, discoveryError }` shape with 65 discovered directories from ~/git. POST /api/projects/onboard correctly returns 201, 400, and 409 for success, validation errors, and duplicates respectively. Discovery correctly detects git repos vs plain dirs and spec-kit artifacts. All 495 tests pass, build is clean.
+
+---
+
