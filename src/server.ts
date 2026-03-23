@@ -7,6 +7,8 @@ import { createLogger, setLevel } from './lib/logger.js';
 import { mountHealthRoutes } from './routes/health.js';
 import { mountProjectRoutes } from './routes/projects.js';
 import { mountSessionRoutes } from './routes/sessions.js';
+import { mountPushRoutes } from './routes/push.js';
+import { createPushService } from './services/push.js';
 import { handleSessionStream, initSessionStream } from './ws/session-stream.js';
 import { handleDashboard } from './ws/dashboard.js';
 
@@ -202,9 +204,18 @@ server.on('upgrade', (req, socket, head) => {
 
 await initDataDir(config);
 initSessionStream(config.dataDir);
+
+const pushService = createPushService({
+  vapidPublicKey: config.vapidPublicKey,
+  vapidPrivateKey: config.vapidPrivateKey,
+  vapidSubject: config.vapidSubject,
+  subscriptionsPath: join(config.dataDir, 'push-subscriptions.json'),
+});
+
 mountHealthRoutes(apiRoutes, config);
 mountProjectRoutes(apiRoutes, config);
 mountSessionRoutes(apiRoutes, config);
+mountPushRoutes(apiRoutes, config, pushService);
 
 server.listen(config.port, config.host, () => {
   log.info({
