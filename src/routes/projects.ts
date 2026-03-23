@@ -6,7 +6,7 @@ import { createLogger } from '../lib/logger.js';
 import { listProjects, getProject, createProject, removeProject } from '../models/project.js';
 import { createSession } from '../models/session.js';
 import { parseTasks, parseTaskSummary } from '../services/task-parser.js';
-import { startAddFeatureWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
+import { startAddFeatureWorkflow, startNewProjectWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
 import { buildCommand } from '../services/sandbox.js';
 import { spawnProcess } from '../services/process-manager.js';
 import { createSessionLogger } from '../services/session-logger.js';
@@ -408,7 +408,114 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       return;
     }
 
-    // T004 will wire the orchestrator call and return 201 here
-    sendJson(res, 501, { error: 'Not yet implemented — pending orchestrator wiring' });
+    // Create the first session (specify phase) as an interview
+    // We need a placeholder project ID since the project isn't registered yet
+    const placeholderProjectId = randomUUID();
+    let session;
+    try {
+      session = createSession(cfg.dataDir, { projectId: placeholderProjectId, type: 'interview' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      sendJson(res, 500, { error: message });
+      return;
+    }
+
+    log.info({ sessionId: session.id, name, description }, 'New-project workflow started');
+
+    // Kick off the workflow asynchronously
+    const firstSessionId = session.id;
+    let sessionCounter = 0;
+    let currentSessionId = firstSessionId;
+    const deps: SpecKitDeps = {
+      createSessionId: () => {
+        sessionCounter++;
+        if (sessionCounter === 1) return firstSessionId;
+        return randomUUID();
+      },
+      onPhaseTransition: (event: PhaseTransitionEvent) => {
+        currentSessionId = event.sessionId;
+        broadcastPhaseTransition(firstSessionId, event);
+
+        broadcastProjectUpdate({
+          projectId: placeholderProjectId,
+          activeSession: {
+            id: event.sessionId,
+            type: 'interview',
+            state: 'running',
+          },
+          taskSummary: { total: 0, completed: 0, blocked: 0, skipped: 0, remaining: 0 },
+          workflow: {
+            type: event.workflow,
+            phase: event.phase,
+            iteration: event.iteration,
+            description,
+          },
+        });
+      },
+      runPhase: async (phase: string, projectDir: string, sessionId: string): Promise<PhaseResult> => {
+        if (sessionId !== firstSessionId) {
+          createSession(cfg.dataDir, { projectId: placeholderProjectId, type: 'interview' });
+        }
+
+        const sandboxCmd = buildCommand(projectDir, [], allowUnsandboxed);
+        const logPath = join(cfg.dataDir, 'sessions', sessionId, 'output.jsonl');
+        const logger = createSessionLogger(logPath);
+        const handle = spawnProcess({
+          command: sandboxCmd.command,
+          args: sandboxCmd.args,
+          sessionId,
+          logger,
+          dataDir: cfg.dataDir,
+        });
+
+        const result = await handle.waitForExit();
+        return { exitCode: result.exitCode };
+      },
+      analyzeHasIssues: async (_projectDir: string): Promise<boolean> => {
+        return false;
+      },
+      registerProject: async (regName: string, dir: string): Promise<string> => {
+        const project = createProject(cfg.dataDir, { name: regName, dir });
+        log.info({ projectId: project.id, name: regName, dir }, 'Project auto-registered after workflow');
+        return project.id;
+      },
+      launchTaskRun: async (_projectId: string): Promise<void> => {
+        // TODO: wire up to actual task run launch
+      },
+    };
+
+    startNewProjectWorkflow({
+      repoName: name,
+      description,
+      projectsDir: cfg.projectsDir,
+      dataDir: cfg.dataDir,
+      deps,
+    }).then((result) => {
+      log.info({ name, outcome: result.outcome, projectId: result.projectId }, 'New-project workflow finished');
+
+      broadcastProjectUpdate({
+        projectId: result.projectId ?? placeholderProjectId,
+        activeSession: null,
+        taskSummary: { total: 0, completed: 0, blocked: 0, skipped: 0, remaining: 0 },
+        workflow: null,
+      });
+    }).catch((err) => {
+      log.error({ name, err }, 'New-project workflow error');
+
+      broadcastProjectUpdate({
+        projectId: placeholderProjectId,
+        activeSession: null,
+        taskSummary: { total: 0, completed: 0, blocked: 0, skipped: 0, remaining: 0 },
+        workflow: null,
+      });
+    });
+
+    // Return the first session info immediately
+    sendJson(res, 201, {
+      sessionId: session.id,
+      projectId: placeholderProjectId,
+      phase: 'specify',
+      state: session.state,
+    });
   });
 }

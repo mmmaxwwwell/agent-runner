@@ -43,7 +43,7 @@
 ### Implementation for User Story 1
 
 - [x] T003 [US1] Add `POST /api/workflows/new-project` route handler in src/routes/projects.ts — validate name (non-empty, filesystem-safe `/^[a-zA-Z0-9._-]+$/`), validate description (non-empty), check duplicate name (projects.json + filesystem), return 400/409 errors per contract
-- [ ] T004 [US1] Wire the new handler to call `startNewProjectWorkflow()` from src/services/spec-kit.ts — follow the same SpecKitDeps pattern as the existing add-feature handler, create session, return `{ sessionId, projectId, phase: "specify", state: "running" }` with status 201
+- [x] T004 [US1] Wire the new handler to call `startNewProjectWorkflow()` from src/services/spec-kit.ts — follow the same SpecKitDeps pattern as the existing add-feature handler, create session, return `{ sessionId, projectId, phase: "specify", state: "running" }` with status 201
 - [ ] T005 [US1] Register the new route in src/server.ts apiRoutes map so the route dispatcher finds it (add key `POST /api/workflows/new-project`)
 - [ ] T006 [US1] Verify the client component src/client/components/new-project.tsx already calls the correct endpoint path (`POST /api/workflows/new-project`) — read and confirm, fix if needed
 
