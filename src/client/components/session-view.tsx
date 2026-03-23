@@ -53,6 +53,9 @@ export function SessionView({ id }: { id: string }) {
   const outputRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const [pushState, setPushState] = useState<PushState>('unknown');
+  const [answer, setAnswer] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Fetch session metadata
   useEffect(() => {
@@ -151,6 +154,21 @@ export function SessionView({ id }: { id: string }) {
     }
   }, [pushState]);
 
+  const submitAnswer = useCallback(async () => {
+    if (!answer.trim() || submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const updated = await post<SessionMeta>(`/sessions/${id}/input`, { answer: answer.trim() });
+      setSession((prev) => (prev ? { ...prev, state: updated.state, pid: updated.pid, question: null } : prev));
+      setAnswer('');
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to submit answer');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [id, answer, submitting]);
+
   const handleScroll = () => {
     if (!outputRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = outputRef.current;
@@ -217,7 +235,7 @@ export function SessionView({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* Question banner for waiting-for-input */}
+      {/* Question banner and input form for waiting-for-input */}
       {session.state === 'waiting-for-input' && session.question && (
         <div
           style={{
@@ -232,7 +250,45 @@ export function SessionView({ id }: { id: string }) {
           <div style={{ fontWeight: 'bold', color: '#ff9800', marginBottom: '4px' }}>
             Input needed{session.lastTaskId ? ` (Task ${session.lastTaskId})` : ''}
           </div>
-          <div style={{ color: '#ddd' }}>{session.question}</div>
+          <div style={{ color: '#ddd', marginBottom: '10px' }}>{session.question}</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="text"
+              value={answer}
+              onInput={(e) => setAnswer((e.target as HTMLInputElement).value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAnswer(); } }}
+              placeholder="Type your answer..."
+              disabled={submitting}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '4px',
+                border: '1px solid #555',
+                background: '#1a1a2e',
+                color: '#ddd',
+                fontSize: '0.85rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={submitAnswer}
+              disabled={submitting || !answer.trim()}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '4px',
+                border: 'none',
+                background: submitting || !answer.trim() ? '#555' : '#ff9800',
+                color: '#fff',
+                fontSize: '0.85rem',
+                cursor: submitting || !answer.trim() ? 'default' : 'pointer',
+              }}
+            >
+              {submitting ? 'Sending...' : 'Submit'}
+            </button>
+          </div>
+          {submitError && (
+            <div style={{ color: '#f44336', fontSize: '0.8rem', marginTop: '6px' }}>{submitError}</div>
+          )}
         </div>
       )}
 
