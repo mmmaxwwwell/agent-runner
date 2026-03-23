@@ -23,3 +23,9 @@ The `rest-api.test.ts` contract test establishes a `preCreateSession()` helper t
 ### T020 — Pre-existing test failure count is 4, not 2
 Updated from T017: there are actually 4 pre-existing test failures (388 total tests): `websocket-api.test.ts` (sync message format), `session-stop.test.ts` (2 tests: stop + kill process), and `websocket.test.ts` (reconnect replay). All are unrelated to session-lifecycle work.
 
+### T021 — Project registration requires tasks.md to exist
+`POST /api/projects` returns 400 if the project directory doesn't contain a `tasks.md` file (or whatever `taskFile` is set to). Tests that need to register a project must always create a tasks.md in the project directory first — even if testing edge cases about empty/missing tasks, the file must exist for registration to succeed.
+
+### T021 — ESM tests cannot use require()
+Integration test files run under `tsx` in ESM mode. Using `require('node:fs')` fails with `ReferenceError: require is not defined`. Always use the ES module imports already at the top of the file instead.
+
