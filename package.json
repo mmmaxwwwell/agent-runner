@@ -1,0 +1,31 @@
+{
+  "name": "agent-runner",
+  "version": "0.1.0",
+  "description": "Server + PWA for running agent-framework projects autonomously",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "pino": "^10.3.1",
+    "preact": "^10.29.0",
+    "web-push": "^3.6.7",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.27.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
