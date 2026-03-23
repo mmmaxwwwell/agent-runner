@@ -33,7 +33,7 @@
 
 - [x] T004 Implement `registerForOnboarding(dataDir, { name, dir })` in src/models/project.ts — creates project with `status: "onboarding"`, no tasks.md requirement
 - [x] T005 Implement `updateProjectStatus(dataDir, id, status)` in src/models/project.ts
-- [ ] T006 [P] Write unit tests for `status` field defaulting, `registerForOnboarding()`, and `updateProjectStatus()` in tests/unit/project.test.ts
+- [x] T006 [P] Write unit tests for `status` field defaulting, `registerForOnboarding()`, and `updateProjectStatus()` in tests/unit/project.test.ts
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 

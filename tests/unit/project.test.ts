@@ -8,6 +8,8 @@ import {
   getProject,
   createProject,
   removeProject,
+  registerForOnboarding,
+  updateProjectStatus,
 } from '../../src/models/project.ts';
 
 describe('project model', () => {
@@ -142,6 +144,183 @@ describe('project model', () => {
       const p2 = createProject(dataDir, { name: 'proj-2', dir: secondDir });
 
       assert.notEqual(p1.id, p2.id);
+    });
+  });
+
+  describe('status field defaulting', () => {
+    it('should default status to "active" for legacy projects without status', () => {
+      // Write a project entry without a status field (simulates pre-status projects.json)
+      const legacyProject = {
+        id: 'legacy-id',
+        name: 'legacy',
+        dir: validProjectDir,
+        taskFile: 'tasks.md',
+        promptFile: '',
+        createdAt: '2024-01-01T00:00:00.000Z',
+      };
+      writeFileSync(projectsJsonPath, JSON.stringify([legacyProject], null, 2) + '\n');
+
+      const projects = listProjects(dataDir);
+      assert.equal(projects.length, 1);
+      assert.equal(projects[0].status, 'active');
+    });
+
+    it('should preserve explicit status when present', () => {
+      const projectWithStatus = {
+        id: 'status-id',
+        name: 'with-status',
+        dir: validProjectDir,
+        taskFile: 'tasks.md',
+        promptFile: '',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        status: 'onboarding',
+      };
+      writeFileSync(projectsJsonPath, JSON.stringify([projectWithStatus], null, 2) + '\n');
+
+      const projects = listProjects(dataDir);
+      assert.equal(projects[0].status, 'onboarding');
+    });
+
+    it('should set status to "active" for newly created projects', () => {
+      const project = createProject(dataDir, { name: 'new', dir: validProjectDir });
+      assert.equal(project.status, 'active');
+    });
+  });
+
+  describe('registerForOnboarding', () => {
+    it('should create a project with status "onboarding"', () => {
+      const project = registerForOnboarding(dataDir, { name: 'onboard-me', dir: validProjectDir });
+      assert.equal(project.status, 'onboarding');
+      assert.equal(project.name, 'onboard-me');
+      assert.equal(project.dir, validProjectDir);
+      assert.ok(project.id);
+      assert.ok(project.createdAt);
+    });
+
+    it('should not require tasks.md in the directory', () => {
+      const noTasksDir = join(tmpDir, 'no-tasks');
+      mkdirSync(noTasksDir, { recursive: true });
+      // No tasks.md created — should still succeed
+      const project = registerForOnboarding(dataDir, { name: 'no-tasks', dir: noTasksDir });
+      assert.equal(project.status, 'onboarding');
+    });
+
+    it('should persist the project to projects.json', () => {
+      registerForOnboarding(dataDir, { name: 'persisted', dir: validProjectDir });
+      const raw = readFileSync(projectsJsonPath, 'utf-8');
+      const stored = JSON.parse(raw);
+      assert.equal(stored.length, 1);
+      assert.equal(stored[0].status, 'onboarding');
+    });
+
+    it('should reject empty name', () => {
+      assert.throws(
+        () => registerForOnboarding(dataDir, { name: '', dir: validProjectDir }),
+        /name/i,
+      );
+    });
+
+    it('should reject name exceeding 100 characters', () => {
+      assert.throws(
+        () => registerForOnboarding(dataDir, { name: 'a'.repeat(101), dir: validProjectDir }),
+        /name/i,
+      );
+    });
+
+    it('should trim whitespace from name', () => {
+      const project = registerForOnboarding(dataDir, { name: '  trimmed  ', dir: validProjectDir });
+      assert.equal(project.name, 'trimmed');
+    });
+
+    it('should reject non-existent directory', () => {
+      assert.throws(
+        () => registerForOnboarding(dataDir, { name: 'ghost', dir: '/tmp/nonexistent-dir-99999' }),
+        /dir/i,
+      );
+    });
+
+    it('should reject duplicate directory registration', () => {
+      registerForOnboarding(dataDir, { name: 'first', dir: validProjectDir });
+      assert.throws(
+        () => registerForOnboarding(dataDir, { name: 'second', dir: validProjectDir }),
+        /already registered/i,
+      );
+    });
+
+    it('should reject directory already registered via createProject', () => {
+      createProject(dataDir, { name: 'existing', dir: validProjectDir });
+      assert.throws(
+        () => registerForOnboarding(dataDir, { name: 'duplicate', dir: validProjectDir }),
+        /already registered/i,
+      );
+    });
+
+    it('should default taskFile to tasks.md', () => {
+      const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
+      assert.equal(project.taskFile, 'tasks.md');
+    });
+  });
+
+  describe('updateProjectStatus', () => {
+    it('should update status from active to onboarding', () => {
+      const project = createProject(dataDir, { name: 'test', dir: validProjectDir });
+      assert.equal(project.status, 'active');
+
+      const updated = updateProjectStatus(dataDir, project.id, 'onboarding');
+      assert.equal(updated.status, 'onboarding');
+    });
+
+    it('should update status from onboarding to active', () => {
+      const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
+      assert.equal(project.status, 'onboarding');
+
+      const updated = updateProjectStatus(dataDir, project.id, 'active');
+      assert.equal(updated.status, 'active');
+    });
+
+    it('should update status to error', () => {
+      const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
+      const updated = updateProjectStatus(dataDir, project.id, 'error');
+      assert.equal(updated.status, 'error');
+    });
+
+    it('should persist the status change to projects.json', () => {
+      const project = createProject(dataDir, { name: 'test', dir: validProjectDir });
+      updateProjectStatus(dataDir, project.id, 'error');
+
+      const raw = readFileSync(projectsJsonPath, 'utf-8');
+      const stored = JSON.parse(raw);
+      assert.equal(stored[0].status, 'error');
+    });
+
+    it('should return the full updated project', () => {
+      const project = createProject(dataDir, { name: 'test', dir: validProjectDir });
+      const updated = updateProjectStatus(dataDir, project.id, 'onboarding');
+      assert.equal(updated.id, project.id);
+      assert.equal(updated.name, 'test');
+      assert.equal(updated.dir, validProjectDir);
+      assert.equal(updated.status, 'onboarding');
+    });
+
+    it('should throw for unknown project id', () => {
+      assert.throws(
+        () => updateProjectStatus(dataDir, 'nonexistent-id', 'active'),
+        /not found/i,
+      );
+    });
+
+    it('should not affect other projects', () => {
+      const p1 = createProject(dataDir, { name: 'keep', dir: validProjectDir });
+
+      const secondDir = join(tmpDir, 'second');
+      mkdirSync(secondDir, { recursive: true });
+      writeFileSync(join(secondDir, 'tasks.md'), '# Tasks\n\n- [ ] 1.1 Task\n');
+      const p2 = createProject(dataDir, { name: 'change', dir: secondDir });
+
+      updateProjectStatus(dataDir, p2.id, 'error');
+
+      const found = getProject(dataDir, p1.id);
+      assert.equal(found!.status, 'active');
     });
   });
 

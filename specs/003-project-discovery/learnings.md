@@ -10,3 +10,8 @@ The `readProjects()` function uses `Omit<Project, 'status'> & { status?: Project
 
 ---
 
+### T006 — Running individual test files
+`tsx` is not on PATH in nix develop; use `nix develop -c npx tsx --test --test-reporter=spec tests/unit/project.test.ts` to run a single test file. The `npm test` command runs all test files and `--test-name-pattern` is too broad for isolating a single file.
+
+---
+
