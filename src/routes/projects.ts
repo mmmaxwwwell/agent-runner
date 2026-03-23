@@ -1,11 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { Config } from '../lib/config.js';
 import { createLogger } from '../lib/logger.js';
-import { listProjects, getProject, createProject, removeProject } from '../models/project.js';
+import { listProjects, getProject, createProject, removeProject, type DiscoveredDirectory } from '../models/project.js';
 import { createSession } from '../models/session.js';
 import { parseTasks, parseTaskSummary } from '../services/task-parser.js';
+import { scanProjectsDir } from '../services/discovery.js';
 import { startAddFeatureWorkflow, startNewProjectWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
 import { buildCommand } from '../services/sandbox.js';
 import { spawnProcess } from '../services/process-manager.js';
@@ -106,15 +107,35 @@ function getActiveSession(dataDir: string, projectId: string): unknown | null {
 }
 
 export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Config): void {
-  // GET /api/projects — list all with taskSummary and activeSession
-  apiRoutes.set('GET /api/projects', (_req, res) => {
+  // GET /api/projects — list registered + discovered with taskSummary and activeSession
+  apiRoutes.set('GET /api/projects', async (_req, res) => {
     const projects = listProjects(cfg.dataDir);
-    const result = projects.map((p) => ({
+    const registered = projects.map((p) => ({
+      type: 'registered' as const,
       ...p,
       taskSummary: safeParseTaskSummary(p),
       activeSession: getActiveSession(cfg.dataDir, p.id),
+      dirMissing: !existsSync(p.dir),
     }));
-    sendJson(res, 200, result);
+
+    // Discover unregistered directories
+    let discovered: DiscoveredDirectory[] = [];
+    let discoveryError: string | null = null;
+
+    if (!existsSync(cfg.projectsDir)) {
+      discoveryError = `Projects directory does not exist: ${cfg.projectsDir}`;
+    } else {
+      try {
+        const registeredPaths = new Set(projects.map((p) => resolve(p.dir)));
+        discovered = await scanProjectsDir(cfg.projectsDir, registeredPaths);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        discoveryError = `Failed to scan projects directory: ${message}`;
+        log.error({ err }, 'Failed to scan projects directory');
+      }
+    }
+
+    sendJson(res, 200, { registered, discovered, discoveryError });
   });
 
   // POST /api/projects — register a new project

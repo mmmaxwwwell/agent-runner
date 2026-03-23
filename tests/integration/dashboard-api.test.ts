@@ -217,11 +217,11 @@ describe('Dashboard & Project Detail Integration Tests', () => {
     it('should return all registered projects with task summaries', async () => {
       const { status, body } = await api('/api/projects');
       assert.equal(status, 200);
-      assert.ok(Array.isArray(body));
-      assert.ok(body.length >= 2, `Expected at least 2 projects, got ${body.length}`);
+      assert.ok(Array.isArray(body.registered));
+      assert.ok(body.registered.length >= 2, `Expected at least 2 projects, got ${body.registered.length}`);
 
       // Find project-alpha by name
-      const alpha = body.find((p: any) => p.name === 'project-alpha');
+      const alpha = body.registered.find((p: any) => p.name === 'project-alpha');
       assert.ok(alpha, 'project-alpha should be in the list');
       assert.ok(alpha.id, 'Project should have an id');
       assert.ok(alpha.dir, 'Project should have a dir');
@@ -233,7 +233,7 @@ describe('Dashboard & Project Detail Integration Tests', () => {
       assert.equal(status, 200);
 
       // project-alpha has MIXED_TASK_FILE: 1 completed, 1 remaining, 1 skipped
-      const alpha = body.find((p: any) => p.name === 'project-alpha');
+      const alpha = body.registered.find((p: any) => p.name === 'project-alpha');
       assert.ok(alpha.taskSummary, 'Should have taskSummary');
       assert.equal(alpha.taskSummary.total, 3, 'Should count 3 total tasks');
       assert.equal(alpha.taskSummary.completed, 1, 'Should count 1 completed');
@@ -241,7 +241,7 @@ describe('Dashboard & Project Detail Integration Tests', () => {
       assert.equal(alpha.taskSummary.remaining, 1, 'Should count 1 remaining');
 
       // project-beta has TASK_FILE_CONTENT: 2 unchecked
-      const beta = body.find((p: any) => p.name === 'project-beta');
+      const beta = body.registered.find((p: any) => p.name === 'project-beta');
       assert.ok(beta.taskSummary);
       assert.equal(beta.taskSummary.total, 2, 'Should count 2 total tasks');
       assert.equal(beta.taskSummary.completed, 0, 'Should count 0 completed');
@@ -252,7 +252,7 @@ describe('Dashboard & Project Detail Integration Tests', () => {
       const { status, body } = await api('/api/projects');
       assert.equal(status, 200);
 
-      const beta = body.find((p: any) => p.name === 'project-beta');
+      const beta = body.registered.find((p: any) => p.name === 'project-beta');
       assert.equal(beta.activeSession, null, 'Should have null activeSession when none running');
     });
 
@@ -269,7 +269,7 @@ describe('Dashboard & Project Detail Integration Tests', () => {
       const { status, body } = await api('/api/projects');
       assert.equal(status, 200);
 
-      const alpha = body.find((p: any) => p.name === 'project-alpha');
+      const alpha = body.registered.find((p: any) => p.name === 'project-alpha');
       assert.ok(alpha.activeSession, 'Should have activeSession');
       assert.equal(alpha.activeSession.id, activeId);
       assert.equal(alpha.activeSession.type, 'task-run');
@@ -285,12 +285,10 @@ describe('Dashboard & Project Detail Integration Tests', () => {
       writeFileSync(metaPath, JSON.stringify(meta, null, 2) + '\n');
     });
 
-    it('should return empty array when no projects are registered', async () => {
-      // Use a separate server instance? No — instead test the empty state
-      // by verifying the endpoint returns an array (we can't easily unregister all)
+    it('should return response with registered array', async () => {
       const { status, body } = await api('/api/projects');
       assert.equal(status, 200);
-      assert.ok(Array.isArray(body));
+      assert.ok(Array.isArray(body.registered));
     });
   });
 

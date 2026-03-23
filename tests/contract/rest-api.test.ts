@@ -327,14 +327,18 @@ describe('REST API: Full Contract Validation', () => {
   // ── 3-6. Project CRUD ──
 
   describe('GET /api/projects', () => {
-    it('should return 200 with array of projects including taskSummary and activeSession', async () => {
+    it('should return 200 with registered/discovered/discoveryError shape including taskSummary and activeSession', async () => {
       const { status, body } = await api('/api/projects');
       assert.equal(status, 200);
-      assert.ok(Array.isArray(body));
-      assert.ok(body.length > 0);
+      assert.ok(!Array.isArray(body), 'Response should be an object, not an array');
+      assert.ok(Array.isArray(body.registered));
+      assert.ok(Array.isArray(body.discovered));
+      assert.ok('discoveryError' in body);
+      assert.ok(body.registered.length > 0);
 
-      const project = body.find((p: any) => p.id === registeredProjectId);
+      const project = body.registered.find((p: any) => p.id === registeredProjectId);
       assert.ok(project, 'Should contain registered project');
+      assert.equal(project.type, 'registered');
       assert.equal(project.name, 'test-project');
       assert.equal(project.dir, projectDir);
       assert.ok(project.createdAt);
@@ -350,6 +354,8 @@ describe('REST API: Full Contract Validation', () => {
 
       // activeSession field should be present (may be non-null due to pre-created sessions)
       assert.ok('activeSession' in project, 'Should have activeSession field');
+      // dirMissing field
+      assert.ok('dirMissing' in project, 'Should have dirMissing field');
     });
   });
 

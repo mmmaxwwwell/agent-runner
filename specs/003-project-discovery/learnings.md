@@ -20,3 +20,8 @@ The `discoveryError` test case (missing projectsDir) needs its own server instan
 
 ---
 
+### T013 — GET /api/projects response shape change breaks existing tests
+Changing the response from a flat array to `{ registered, discovered, discoveryError }` requires updating all test files that call `GET /api/projects` and assert on the body shape. Three test files needed updates: `tests/contract/rest-api-projects.test.ts`, `tests/contract/rest-api.test.ts`, and `tests/integration/dashboard-api.test.ts`. The client dashboard (`src/client/components/dashboard.tsx`) also consumes this endpoint and will need updating in T014/T015 — the client is knowingly broken until then.
+
+---
+

@@ -134,11 +134,14 @@ describe('REST API: Projects Contract Tests', () => {
   });
 
   describe('GET /api/projects', () => {
-    it('should return 200 with an empty array when no projects registered', async () => {
+    it('should return 200 with empty registered array when no projects registered', async () => {
       const { status, body } = await api('/api/projects');
       assert.equal(status, 200);
-      assert.ok(Array.isArray(body), 'Response should be an array');
-      assert.equal(body.length, 0);
+      assert.ok(!Array.isArray(body), 'Response should be an object, not an array');
+      assert.ok(Array.isArray(body.registered), 'Should have registered array');
+      assert.equal(body.registered.length, 0);
+      assert.ok(Array.isArray(body.discovered), 'Should have discovered array');
+      assert.ok('discoveryError' in body, 'Should have discoveryError field');
     });
   });
 
@@ -214,13 +217,14 @@ describe('REST API: Projects Contract Tests', () => {
     it('should return registered projects with taskSummary', async () => {
       const { status, body } = await api('/api/projects');
       assert.equal(status, 200);
-      assert.ok(Array.isArray(body));
-      assert.ok(body.length > 0, 'Should have at least one project');
+      assert.ok(Array.isArray(body.registered));
+      assert.ok(body.registered.length > 0, 'Should have at least one project');
 
-      const project = body[0];
+      const project = body.registered[0];
       assert.ok(project.id);
       assert.ok(project.name);
       assert.ok(project.dir);
+      assert.equal(project.type, 'registered');
       assert.ok(project.taskSummary, 'Should include taskSummary');
       assert.equal(typeof project.taskSummary.total, 'number');
       assert.equal(typeof project.taskSummary.completed, 'number');
@@ -231,7 +235,7 @@ describe('REST API: Projects Contract Tests', () => {
 
     it('should include activeSession field (null when no session)', async () => {
       const { body } = await api('/api/projects');
-      const project = body[0];
+      const project = body.registered[0];
       assert.ok('activeSession' in project, 'Should have activeSession field');
       assert.equal(project.activeSession, null);
     });
@@ -241,7 +245,7 @@ describe('REST API: Projects Contract Tests', () => {
     it('should return 200 with project detail including tasks array', async () => {
       // Get a project id from the list
       const listRes = await api('/api/projects');
-      const projectId = listRes.body[0]?.id;
+      const projectId = listRes.body.registered[0]?.id;
       assert.ok(projectId, 'Need a registered project');
 
       const { status, body } = await api(`/api/projects/${projectId}`);
@@ -269,7 +273,7 @@ describe('REST API: Projects Contract Tests', () => {
 
     it('should include sessions array', async () => {
       const listRes = await api('/api/projects');
-      const projectId = listRes.body[0]?.id;
+      const projectId = listRes.body.registered[0]?.id;
 
       const { body } = await api(`/api/projects/${projectId}`);
       assert.ok(Array.isArray(body.sessions), 'Should include sessions array');
