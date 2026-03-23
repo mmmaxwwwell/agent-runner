@@ -5,11 +5,15 @@ export type Route =
   | { page: 'project-detail'; id: string }
   | { page: 'session-view'; id: string }
   | { page: 'new-project' }
+  | { page: 'add-feature'; id: string }
   | { page: 'settings' };
 
 export function parseHash(hash?: string): Route {
   const h = hash ?? window.location.hash ?? '#/';
   const path = h.slice(1); // remove '#'
+
+  const addFeatureMatch = path.match(/^\/projects\/([^/]+)\/add-feature$/);
+  if (addFeatureMatch) return { page: 'add-feature', id: addFeatureMatch[1]! };
 
   const projectMatch = path.match(/^\/projects\/([^/]+)$/);
   if (projectMatch) return { page: 'project-detail', id: projectMatch[1]! };

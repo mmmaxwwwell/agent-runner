@@ -210,7 +210,7 @@
 - [x] T074 [US7] Implement add-feature Preact component in src/client/components/add-feature.tsx — form with feature description textarea, mic icon for voice input, reuse spec-kit phase chat view from new-project.tsx (extract shared component if not already extracted), show current phase indicator, connect to /ws/sessions/:id for streaming, display workflow phase transitions, navigate to project detail on completion
 - [x] T075 [US7] Add "Add Feature" button to project detail component in src/client/components/project-detail.tsx — show button when no active session, navigate to #/projects/:id/add-feature, pass project context to add-feature component
 - [x] T076 [US7] Emit phase transition WebSocket messages during add-feature workflow — send `phase` message type on each phase transition with workflow "add-feature", include iteration count for analyze loop, update dashboard `project-update` messages to include workflow info per websocket-api.md contract
-- [ ] T077 [US7] Update client-side hash router in src/client/lib/router.ts — add route #/projects/:id/add-feature → add-feature component
+- [x] T077 [US7] Update client-side hash router in src/client/lib/router.ts — add route #/projects/:id/add-feature → add-feature component
 
 **Checkpoint**: Can add a feature to an existing project through spec-kit workflow, analyze loops until clean (max 5), autonomous implementation starts after approval. Dashboard shows workflow phase progress.
 

@@ -4,6 +4,7 @@ import { Dashboard } from './components/dashboard.js';
 import { ProjectDetail } from './components/project-detail.js';
 import { SessionView } from './components/session-view.js';
 import { NewProject } from './components/new-project.js';
+import { AddFeature } from './components/add-feature.js';
 
 function App() {
   const route = useRouter();
@@ -25,6 +26,7 @@ function App() {
         {route.page === 'project-detail' && <ProjectDetail id={route.id} />}
         {route.page === 'session-view' && <SessionView id={route.id} />}
         {route.page === 'new-project' && <NewProject />}
+        {route.page === 'add-feature' && <AddFeature projectId={route.id} />}
         {route.page === 'settings' && <div>Settings — coming soon</div>}
       </main>
     </div>
