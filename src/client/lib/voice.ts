@@ -65,8 +65,8 @@ function transcribeBrowser(): Promise<string> {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onstart = () => setState('listening');
@@ -167,8 +167,8 @@ function startListeningBrowser(): Promise<string> {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
     activeRecognition = recognition;
 
