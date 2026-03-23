@@ -1,10 +1,17 @@
+import { access } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { DiscoveredDirectory } from '../models/project.ts';
 
 /**
  * Check whether a directory is a git repository (contains .git file or directory).
  */
-export async function detectGitRepo(_dirPath: string): Promise<boolean> {
-  throw new Error('Not implemented');
+export async function detectGitRepo(dirPath: string): Promise<boolean> {
+  try {
+    await access(join(dirPath, '.git'));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

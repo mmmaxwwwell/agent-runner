@@ -55,7 +55,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Implement `detectGitRepo(dirPath)` in src/services/discovery.ts — check for `.git` file or directory
+- [x] T010 [US1] Implement `detectGitRepo(dirPath)` in src/services/discovery.ts — check for `.git` file or directory
 - [ ] T011 [US1] Implement `detectSpecKitArtifacts(dirPath)` in src/services/discovery.ts — scan specs/*/ subdirectories for spec.md, plan.md, tasks.md
 - [ ] T012 [US1] Implement `scanProjectsDir(projectsDir, registeredPaths)` in src/services/discovery.ts — read top-level entries, filter hidden/non-dirs, skip registered, resolve symlinks, call detectGitRepo + detectSpecKitArtifacts, return DiscoveredDirectory[]
 - [ ] T013 [US1] Modify `GET /api/projects` handler in src/routes/projects.ts — change response shape from flat array to `{ registered, discovered, discoveryError }` per contract, add `type: "registered"`, `status`, and `dirMissing` fields to registered entries, call scanProjectsDir for discovered entries
