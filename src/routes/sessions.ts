@@ -262,6 +262,127 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     });
   });
 
+  // POST /api/sessions/:id/input — submit user input to a blocked session
+  apiRoutes.set('POST /api/sessions/:id/input', async (req, res, params) => {
+    const session = getSession(cfg.dataDir, params.id!);
+    if (!session) {
+      sendJson(res, 404, { error: 'Session not found' });
+      return;
+    }
+
+    if (session.state !== 'waiting-for-input') {
+      sendJson(res, 400, { error: 'Session is not in waiting-for-input state' });
+      return;
+    }
+
+    const raw = await readBody(req);
+    let parsed: { answer?: string };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      sendJson(res, 400, { error: 'Invalid JSON body' });
+      return;
+    }
+
+    if (!parsed.answer || parsed.answer.trim() === '') {
+      sendJson(res, 400, { error: 'Empty answer' });
+      return;
+    }
+
+    const answer = parsed.answer.trim();
+
+    // Get the project to rebuild the sandbox command and task file path
+    const project = getProject(cfg.dataDir, session.projectId);
+    if (!project) {
+      sendJson(res, 500, { error: 'Project not found for session' });
+      return;
+    }
+
+    // Log the user's answer to the existing session log
+    const logPath = join(cfg.dataDir, 'sessions', session.id, 'output.jsonl');
+    const logger = createSessionLogger(logPath);
+    await logger.write({ stream: 'system', content: `User answered: ${answer}` });
+
+    // Transition session back to running
+    const updated = transitionState(cfg.dataDir, session.id, 'running');
+
+    // Build sandbox command for re-spawn
+    let sandboxCmd;
+    try {
+      sandboxCmd = buildCommand(project.dir, [], false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      sendJson(res, 503, { error: message });
+      return;
+    }
+
+    if (session.type === 'task-run') {
+      const taskFilePath = join(project.dir, project.taskFile);
+
+      // Restart the task loop — it will re-parse the task file and continue
+      startTaskLoop({
+        command: sandboxCmd.command,
+        args: sandboxCmd.args,
+        sessionId: session.id,
+        projectId: project.id,
+        taskFilePath,
+        logger,
+        dataDir: cfg.dataDir,
+      }).then((result) => {
+        activeProcesses.delete(session.id);
+        log.info({ sessionId: session.id, outcome: result.outcome, spawnCount: result.spawnCount }, 'Task loop resumed after input');
+      }).catch((err) => {
+        activeProcesses.delete(session.id);
+        log.error({ sessionId: session.id, err }, 'Task loop error after input');
+      });
+    } else {
+      // Interview type — spawn a new process with stdin piped
+      const handle = spawnProcess({
+        command: sandboxCmd.command,
+        args: sandboxCmd.args,
+        sessionId: session.id,
+        logger,
+        dataDir: cfg.dataDir,
+      });
+
+      activeProcesses.set(session.id, handle);
+
+      // Update session PID
+      const sessionWithPid = getSession(cfg.dataDir, session.id)!;
+      sessionWithPid.pid = handle.pid;
+      writeFileSync(
+        join(cfg.dataDir, 'sessions', session.id, 'meta.json'),
+        JSON.stringify({ ...sessionWithPid, pid: handle.pid }, null, 2) + '\n',
+        'utf-8',
+      );
+
+      // Handle process exit
+      handle.waitForExit().then((result) => {
+        activeProcesses.delete(session.id);
+        if (result.exitCode === 0) {
+          transitionState(cfg.dataDir, session.id, 'completed', { exitCode: 0 });
+        } else {
+          transitionState(cfg.dataDir, session.id, 'failed', { exitCode: result.exitCode });
+        }
+      }).catch(() => {
+        activeProcesses.delete(session.id);
+      });
+
+      updated.pid = handle.pid;
+    }
+
+    log.info({ sessionId: session.id, projectId: project.id }, 'Session resumed after user input');
+
+    sendJson(res, 200, {
+      id: updated.id,
+      projectId: updated.projectId,
+      type: updated.type,
+      state: updated.state,
+      startedAt: updated.startedAt,
+      pid: updated.pid,
+    });
+  });
+
   // GET /api/sessions/:id/log — get session log as JSON array
   apiRoutes.set('GET /api/sessions/:id/log', async (req, res, params) => {
     const session = getSession(cfg.dataDir, params.id!);
