@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, mkdir, writeFile, access } from 'node:fs/promises';
 import { resolve, extname, join } from 'node:path';
-import { loadConfig } from './lib/config.js';
+import { loadConfig, type Config } from './lib/config.js';
 import { createLogger, setLevel } from './lib/logger.js';
 
 const log = createLogger('server');
@@ -125,6 +125,32 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   }
 }
 
+async function initDataDir(cfg: Config): Promise<void> {
+  const initLog = createLogger('server');
+
+  // Ensure data directory and sessions/ subdirectory exist
+  await mkdir(join(cfg.dataDir, 'sessions'), { recursive: true });
+  initLog.debug({ dataDir: cfg.dataDir }, 'Data directory ensured');
+
+  // Ensure projects.json exists (empty array if missing)
+  const projectsPath = join(cfg.dataDir, 'projects.json');
+  try {
+    await access(projectsPath);
+  } catch {
+    await writeFile(projectsPath, '[]\n', 'utf-8');
+    initLog.info({ path: projectsPath }, 'Created empty projects.json');
+  }
+
+  // Ensure push-subscriptions.json exists (empty array if missing)
+  const pushSubsPath = join(cfg.dataDir, 'push-subscriptions.json');
+  try {
+    await access(pushSubsPath);
+  } catch {
+    await writeFile(pushSubsPath, '[]\n', 'utf-8');
+    initLog.info({ path: pushSubsPath }, 'Created empty push-subscriptions.json');
+  }
+}
+
 const config = loadConfig();
 setLevel(config.logLevel);
 
@@ -140,6 +166,8 @@ server.on('upgrade', (req, socket, head) => {
   socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
   socket.destroy();
 });
+
+await initDataDir(config);
 
 server.listen(config.port, config.host, () => {
   log.info({
