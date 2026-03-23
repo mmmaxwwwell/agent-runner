@@ -1,5 +1,5 @@
-import { access, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, readdir, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import type { DiscoveredDirectory } from '../models/project.ts';
 
 /**
@@ -51,8 +51,49 @@ export async function detectSpecKitArtifacts(dirPath: string): Promise<Discovere
  * Returns metadata about each discovered directory including git and spec-kit status.
  */
 export async function scanProjectsDir(
-  _projectsDir: string,
-  _registeredPaths: Set<string>,
+  projectsDir: string,
+  registeredPaths: Set<string>,
 ): Promise<DiscoveredDirectory[]> {
-  throw new Error('Not implemented');
+  let entries: import('node:fs').Dirent[];
+  try {
+    entries = await readdir(projectsDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const results: DiscoveredDirectory[] = [];
+
+  for (const entry of entries) {
+    // Skip hidden directories
+    if (entry.name.startsWith('.')) continue;
+
+    const fullPath = resolve(join(projectsDir, entry.name));
+
+    // Check if it's a directory (follow symlinks via stat)
+    try {
+      const stats = await stat(fullPath);
+      if (!stats.isDirectory()) continue;
+    } catch {
+      // Broken symlink or permission error — skip
+      continue;
+    }
+
+    // Skip already-registered directories
+    if (registeredPaths.has(fullPath)) continue;
+
+    const [isGitRepo, hasSpecKit] = await Promise.all([
+      detectGitRepo(fullPath),
+      detectSpecKitArtifacts(fullPath),
+    ]);
+
+    results.push({
+      type: 'discovered',
+      name: entry.name,
+      path: fullPath,
+      isGitRepo,
+      hasSpecKit,
+    });
+  }
+
+  return results;
 }
