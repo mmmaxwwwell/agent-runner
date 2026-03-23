@@ -55,6 +55,11 @@ function ProjectCard({ project }: { project: RegisteredProject }) {
           {badge.label}
         </span>
       </div>
+      {project.dirMissing && (
+        <div style={{ fontSize: '0.8rem', color: '#ff8a80', marginBottom: '4px' }}>
+          Directory missing from disk
+        </div>
+      )}
       <div style={{ fontSize: '0.85rem', color: '#aaa' }}>
         {taskSummary.completed}/{taskSummary.total} tasks
         {taskSummary.blocked > 0 && (

@@ -97,7 +97,7 @@
 ### Implementation for User Story 3
 
 - [x] T020 [US3] Add metadata display to discovered directory cards in src/client/components/dashboard.tsx — git indicator badge, spec-kit artifact badges (spec, plan, tasks), style with visual distinction from registered cards
-- [ ] T021 [US3] Handle the "no metadata" case in src/client/components/dashboard.tsx — directory with no git and no spec-kit shows only name + Onboard button
+- [~] T021 [US3] Handle the "no metadata" case in src/client/components/dashboard.tsx — directory with no git and no spec-kit shows only name + Onboard button — SKIPPED: already handled by T020's conditional rendering (`hasBadges` guard on line 87-117 of DiscoveredCard)
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -107,7 +107,7 @@
 
 **Purpose**: Edge cases, error handling, and cross-story improvements
 
-- [ ] T022 [P] Handle edge case: registered project directory missing from disk — show `dirMissing` warning in dashboard card in src/client/components/dashboard.tsx
+- [x] T022 [P] Handle edge case: registered project directory missing from disk — show `dirMissing` warning in dashboard card in src/client/components/dashboard.tsx
 - [ ] T023 [P] Handle edge case: projectsDir does not exist — show `discoveryError` banner in src/client/components/dashboard.tsx
 - [ ] T024 Run quickstart.md validation — start dev server, verify all endpoints and UI per specs/003-project-discovery/quickstart.md
 
