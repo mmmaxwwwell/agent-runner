@@ -66,7 +66,7 @@
 
 - [x] T015 [P] [US5] Implement task file parser in src/services/task-parser.ts — parse tasks.md to Task[] and TaskSummary, regex for status markers, phase headers, nesting depth, blocked reason extraction per data-model.md Task entity and research.md §5
 - [x] T016 [US5] Implement project model in src/models/project.ts — CRUD for projects.json: list(), get(id), create({name, dir}), remove(id), taskFile defaults to tasks.md, auto-detect promptFile by scanning for spec-kit artifacts, validate dir exists and contains tasks.md per data-model.md Project entity
-- [ ] T017 [US5] Implement project REST routes in src/routes/projects.ts — GET /api/projects (list with taskSummary via task-parser), POST /api/projects (register with validation), GET /api/projects/:id (detail with full tasks[] and sessions[]), DELETE /api/projects/:id (unregister, reject if active session) per rest-api.md contracts
+- [x] T017 [US5] Implement project REST routes in src/routes/projects.ts — GET /api/projects (list with taskSummary via task-parser), POST /api/projects (register with validation), GET /api/projects/:id (detail with full tasks[] and sessions[]), DELETE /api/projects/:id (unregister, reject if active session) per rest-api.md contracts
 - [ ] T018 [US5] Wire project routes into src/server.ts — mount /api/projects handlers
 
 **Checkpoint**: Can register a project via `curl POST /api/projects`, list it, view details with parsed tasks, and delete it. All contract tests pass.
