@@ -58,7 +58,7 @@
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T012 [P] [US5] Write unit tests for task file parser in tests/unit/task-parser.test.ts — test checkbox parsing ([ ], [x], [?], [~]), phase detection, nested tasks, malformed input, missing file per research.md §5
+- [x] T012 [P] [US5] Write unit tests for task file parser in tests/unit/task-parser.test.ts — test checkbox parsing ([ ], [x], [?], [~]), phase detection, nested tasks, malformed input, missing file per research.md §5
 - [ ] T013 [P] [US5] Write contract tests for project REST endpoints in tests/contract/rest-api-projects.test.ts — GET /api/projects, POST /api/projects, GET /api/projects/:id, DELETE /api/projects/:id per rest-api.md
 - [ ] T014 [P] [US5] Write unit tests for project model in tests/unit/project.test.ts — CRUD operations, validation (dir exists, task file present, name non-empty, duplicate detection)
 
