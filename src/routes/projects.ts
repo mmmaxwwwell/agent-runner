@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { Config } from '../lib/config.js';
 import { createLogger } from '../lib/logger.js';
-import { listProjects, getProject, createProject, removeProject, type DiscoveredDirectory } from '../models/project.js';
+import { listProjects, getProject, createProject, removeProject, registerForOnboarding, type DiscoveredDirectory } from '../models/project.js';
 import { createSession } from '../models/session.js';
 import { parseTasks, parseTaskSummary } from '../services/task-parser.js';
 import { scanProjectsDir } from '../services/discovery.js';
@@ -371,6 +371,45 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       sendJson(res, 404, { error: message });
+    }
+  });
+
+  // POST /api/projects/onboard — onboard a discovered directory
+  apiRoutes.set('POST /api/projects/onboard', async (req, res) => {
+    const raw = await readBody(req);
+    let parsed: { name?: string; path?: string };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      sendJson(res, 400, { error: 'Invalid JSON body' });
+      return;
+    }
+
+    if (!parsed.path || typeof parsed.path !== 'string') {
+      sendJson(res, 400, { error: 'Missing or invalid "path" field' });
+      return;
+    }
+
+    // Derive name from path basename if not provided
+    const dirPath = parsed.path;
+    const name = (parsed.name && typeof parsed.name === 'string') ? parsed.name.trim() : dirPath.split('/').pop() || 'unnamed';
+
+    try {
+      const project = registerForOnboarding(cfg.dataDir, { name, dir: dirPath });
+      log.info({ projectId: project.id, name, dir: dirPath }, 'Project onboarded');
+      sendJson(res, 201, {
+        projectId: project.id,
+        name: project.name,
+        path: project.dir,
+        status: project.status,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('already registered')) {
+        sendJson(res, 409, { error: message });
+      } else {
+        sendJson(res, 400, { error: message });
+      }
     }
   });
 
