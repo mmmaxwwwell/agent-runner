@@ -247,7 +247,7 @@
 - [x] T065c [P] Implement disk space monitoring in src/services/disk-monitor.ts — check available disk space in AGENT_RUNNER_DATA_DIR every 60 seconds, warn via push notification and server logs when below DISK_WARN_THRESHOLD_MB (default 8192 MB, user-configurable) per spec.md FR-017
 - [x] T066 [P] Add error handling middleware to src/server.ts — catch unhandled request errors, return JSON { error } with appropriate status codes, log errors with pino
 - [x] T067 Validate all REST API contracts end-to-end in tests/contract/rest-api.test.ts — run full contract test suite against running server, verify all 12 endpoints match rest-api.md
-- [ ] T068 Validate all WebSocket contracts end-to-end in tests/contract/websocket-api.test.ts — run full contract test suite against running server, verify message formats match websocket-api.md
+- [x] T068 Validate all WebSocket contracts end-to-end in tests/contract/websocket-api.test.ts — run full contract test suite against running server, verify message formats match websocket-api.md
 - [ ] T069 Run quickstart.md validation — follow quickstart.md steps on clean checkout, verify setup, build, dev, and basic usage flow work end-to-end
 
 **Checkpoint**: Server recovers from crashes, all contracts verified, quickstart flow validated.

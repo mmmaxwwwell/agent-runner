@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { WebSocket } from 'ws';
+import { randomUUID } from 'node:crypto';
 
 const TASK_FILE_CONTENT = `# Tasks: Test Project
 
@@ -28,6 +29,10 @@ let baseUrl: string;
 let wsBaseUrl: string;
 
 const PORT = 30000 + Math.floor(Math.random() * 10000);
+
+// Valid VAPID keys for testing (pre-generated)
+const VAPID_PUBLIC_KEY = 'BEK2EYfxuvIVaN3AD8zmJySnpAbJH0d0krsfVWou2UE0OOmBv8Wuslzb_jwDureGGeoJ1guHi4HgyqAGHyAGI0I';
+const VAPID_PRIVATE_KEY = 'lyVcDma4tQXDj6SKHTHSv9MsUZB4juXzJK_JnaDyX2E';
 
 async function api(path: string, options: { method?: string; body?: unknown } = {}): Promise<{ status: number; body: any }> {
   const method = options.method ?? 'GET';
@@ -91,6 +96,20 @@ function collectMessages(ws: WebSocket, count: number, timeoutMs = 5000): Promis
   });
 }
 
+function collectAllMessages(ws: WebSocket, durationMs: number): Promise<any[]> {
+  return new Promise((resolve) => {
+    const messages: any[] = [];
+    const handler = (data: Buffer | string) => {
+      messages.push(JSON.parse(data.toString()));
+    };
+    ws.on('message', handler);
+    setTimeout(() => {
+      ws.removeListener('message', handler);
+      resolve(messages);
+    }, durationMs);
+  });
+}
+
 function startServer(): Promise<void> {
   return new Promise((resolve, reject) => {
     serverProcess = spawn('npx', ['tsx', 'src/server.ts'], {
@@ -101,8 +120,8 @@ function startServer(): Promise<void> {
         AGENT_RUNNER_PORT: String(PORT),
         AGENT_RUNNER_DATA_DIR: dataDir,
         AGENT_RUNNER_PROJECTS_DIR: projectsDir,
-        VAPID_PUBLIC_KEY: 'test-public-key',
-        VAPID_PRIVATE_KEY: 'test-private-key',
+        VAPID_PUBLIC_KEY,
+        VAPID_PRIVATE_KEY,
         LOG_LEVEL: 'info',
         ALLOW_UNSANDBOXED: 'true',
       },
@@ -158,9 +177,11 @@ function stopServer(): Promise<void> {
  * Create a session with pre-written log entries for replay testing.
  * Returns the session ID.
  */
-async function createSessionWithLog(projectId: string, entries: Array<{ ts: number; stream: string; seq: number; content: string }>): Promise<string> {
-  // Create session directory and meta.json directly
-  const { randomUUID } = await import('node:crypto');
+function createSessionWithLog(
+  projectId: string,
+  entries: Array<{ ts: number; stream: string; seq: number; content: string }>,
+  opts: { state?: string; type?: string; question?: string | null; lastTaskId?: string | null } = {},
+): string {
   const sessionId = randomUUID();
   const sessionDir = join(dataDir, 'sessions', sessionId);
   mkdirSync(sessionDir, { recursive: true });
@@ -168,27 +189,28 @@ async function createSessionWithLog(projectId: string, entries: Array<{ ts: numb
   const meta = {
     id: sessionId,
     projectId,
-    type: 'task-run',
-    state: 'running',
+    type: opts.type ?? 'task-run',
+    state: opts.state ?? 'running',
     startedAt: new Date().toISOString(),
     endedAt: null,
     pid: null,
-    lastTaskId: null,
-    question: null,
+    lastTaskId: opts.lastTaskId ?? null,
+    question: opts.question ?? null,
     exitCode: null,
   };
   writeFileSync(join(sessionDir, 'meta.json'), JSON.stringify(meta, null, 2) + '\n');
 
   // Write JSONL log entries
   const logPath = join(sessionDir, 'output.jsonl');
-  for (const entry of entries) {
-    appendFileSync(logPath, JSON.stringify(entry) + '\n');
-  }
+  const lines = entries.map(e => JSON.stringify(e)).join('\n');
+  writeFileSync(logPath, lines ? lines + '\n' : '');
 
   return sessionId;
 }
 
-describe('WebSocket API: Session Stream Contract Tests', () => {
+describe('WebSocket API Contract Tests', () => {
+  let projectId: string;
+
   before(async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'contract-ws-'));
     dataDir = join(tmpDir, 'data');
@@ -203,6 +225,14 @@ describe('WebSocket API: Session Stream Contract Tests', () => {
     baseUrl = `http://127.0.0.1:${PORT}`;
     wsBaseUrl = `ws://127.0.0.1:${PORT}`;
     await startServer();
+
+    // Register a project for use in tests
+    const res = await api('/api/projects', {
+      method: 'POST',
+      body: { name: 'ws-contract-test', dir: projectDir },
+    });
+    assert.equal(res.status, 201);
+    projectId = res.body.id;
   });
 
   after(async () => {
@@ -210,18 +240,11 @@ describe('WebSocket API: Session Stream Contract Tests', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  describe('Connection', () => {
-    it('should connect to /ws/sessions/:id for a valid session', async () => {
-      // Register a project and create a session
-      const projectRes = await api('/api/projects', {
-        method: 'POST',
-        body: { name: 'ws-test', dir: projectDir },
-      });
-      assert.equal(projectRes.status, 201);
-      const projectId = projectRes.body.id;
+  // ── Session Stream: /ws/sessions/:id ──────────────────────────────
 
-      // Create a session with pre-existing log entries
-      const sessionId = await createSessionWithLog(projectId, [
+  describe('Session Stream — Connection', () => {
+    it('should connect to /ws/sessions/:id for a valid session', async () => {
+      const sessionId = createSessionWithLog(projectId, [
         { ts: 1000, stream: 'system', seq: 1, content: 'Session started' },
       ]);
 
@@ -233,47 +256,37 @@ describe('WebSocket API: Session Stream Contract Tests', () => {
     it('should reject connection for unknown session ID', async () => {
       await assert.rejects(
         () => connectWs('/ws/sessions/nonexistent-session-id'),
-        (err: Error) => {
-          // Expect connection to fail or receive error
-          return true;
-        },
+        (err: Error) => true,
+      );
+    });
+
+    it('should reject connection for unknown WebSocket paths', async () => {
+      await assert.rejects(
+        () => connectWs('/ws/unknown-path'),
+        (err: Error) => true,
       );
     });
   });
 
-  describe('Output messages', () => {
-    it('should receive output messages with correct format (seq, ts, stream, content)', async () => {
-      // Register project if needed
-      const listRes = await api('/api/projects');
-      let projectId: string;
-      if (listRes.body.length === 0) {
-        const res = await api('/api/projects', {
-          method: 'POST',
-          body: { name: 'ws-output-test', dir: projectDir },
-        });
-        projectId = res.body.id;
-      } else {
-        projectId = listRes.body[0].id;
-      }
+  // ── Session Stream: output messages ───────────────────────────────
 
-      // Create session with log entries
+  describe('Session Stream — output message format', () => {
+    it('should have type, seq, ts, stream, and content fields per websocket-api.md', async () => {
       const entries = [
         { ts: 1000, stream: 'stdout', seq: 1, content: 'Hello from agent' },
         { ts: 1001, stream: 'stderr', seq: 2, content: 'Warning message' },
         { ts: 1002, stream: 'system', seq: 3, content: 'Task completed' },
       ];
-      const sessionId = await createSessionWithLog(projectId, entries);
+      const sessionId = createSessionWithLog(projectId, entries);
 
       const ws = await connectWs(`/ws/sessions/${sessionId}`);
-
-      // Should replay the existing entries as output messages
       const messages = await collectMessages(ws, 4, 5000); // 3 outputs + 1 sync
 
-      // Find output messages
       const outputMsgs = messages.filter((m: any) => m.type === 'output');
       assert.ok(outputMsgs.length >= 3, `Expected at least 3 output messages, got ${outputMsgs.length}`);
 
-      // Verify output message format per websocket-api.md
+      // Verify each output message matches the contract:
+      // { "type": "output", "seq": number, "ts": number, "stream": "stdout"|"stderr"|"system", "content": string }
       for (const msg of outputMsgs) {
         assert.equal(msg.type, 'output');
         assert.equal(typeof msg.seq, 'number', 'seq should be a number');
@@ -284,39 +297,63 @@ describe('WebSocket API: Session Stream Contract Tests', () => {
 
       ws.close();
     });
+
+    it('should preserve original entry data in output messages', async () => {
+      const entries = [
+        { ts: 9999, stream: 'stderr', seq: 42, content: 'specific content' },
+      ];
+      const sessionId = createSessionWithLog(projectId, entries);
+
+      const ws = await connectWs(`/ws/sessions/${sessionId}`);
+      const msg = await waitForMessage(ws, (m: any) => m.type === 'output');
+
+      assert.equal(msg.ts, 9999);
+      assert.equal(msg.stream, 'stderr');
+      assert.equal(msg.seq, 42);
+      assert.equal(msg.content, 'specific content');
+
+      ws.close();
+    });
   });
 
-  describe('Sync message', () => {
-    it('should receive sync message after replay with lastSeq', async () => {
-      const listRes = await api('/api/projects');
-      const projectId = listRes.body[0]?.id;
-      assert.ok(projectId);
+  // ── Session Stream: sync message ──────────────────────────────────
 
+  describe('Session Stream — sync message format', () => {
+    it('should send sync message with type and lastSeq after replay per websocket-api.md', async () => {
       const entries = [
         { ts: 2000, stream: 'stdout', seq: 1, content: 'Line 1' },
         { ts: 2001, stream: 'stdout', seq: 2, content: 'Line 2' },
       ];
-      const sessionId = await createSessionWithLog(projectId, entries);
+      const sessionId = createSessionWithLog(projectId, entries);
 
       const ws = await connectWs(`/ws/sessions/${sessionId}`);
 
-      // Collect messages until we see a sync
+      // { "type": "sync", "lastSeq": number }
       const syncMsg = await waitForMessage(ws, (m: any) => m.type === 'sync');
-
       assert.equal(syncMsg.type, 'sync');
       assert.equal(typeof syncMsg.lastSeq, 'number', 'sync should include lastSeq');
       assert.equal(syncMsg.lastSeq, 2, 'lastSeq should be the highest seq from replayed entries');
 
       ws.close();
     });
+
+    it('should send sync with lastSeq=0 for empty log', async () => {
+      const sessionId = createSessionWithLog(projectId, []);
+
+      const ws = await connectWs(`/ws/sessions/${sessionId}`);
+      const syncMsg = await waitForMessage(ws, (m: any) => m.type === 'sync');
+
+      assert.equal(syncMsg.type, 'sync');
+      assert.equal(syncMsg.lastSeq, 0, 'lastSeq should be 0 for empty log');
+
+      ws.close();
+    });
   });
 
-  describe('Replay with lastSeq query param', () => {
-    it('should replay only entries with seq > lastSeq when ?lastSeq is provided', async () => {
-      const listRes = await api('/api/projects');
-      const projectId = listRes.body[0]?.id;
-      assert.ok(projectId);
+  // ── Session Stream: replay with lastSeq ───────────────────────────
 
+  describe('Session Stream — replay with lastSeq query param', () => {
+    it('should replay only entries with seq > lastSeq', async () => {
       const entries = [
         { ts: 3000, stream: 'stdout', seq: 1, content: 'Entry 1' },
         { ts: 3001, stream: 'stdout', seq: 2, content: 'Entry 2' },
@@ -324,44 +361,34 @@ describe('WebSocket API: Session Stream Contract Tests', () => {
         { ts: 3003, stream: 'stderr', seq: 4, content: 'Entry 4' },
         { ts: 3004, stream: 'system', seq: 5, content: 'Entry 5' },
       ];
-      const sessionId = await createSessionWithLog(projectId, entries);
+      const sessionId = createSessionWithLog(projectId, entries);
 
       // Connect with lastSeq=2 — should only replay entries 3, 4, 5
       const ws = await connectWs(`/ws/sessions/${sessionId}?lastSeq=2`);
-
-      // Expect 3 output messages + 1 sync = 4 messages
-      const messages = await collectMessages(ws, 4, 5000);
+      const messages = await collectMessages(ws, 4, 5000); // 3 outputs + 1 sync
 
       const outputMsgs = messages.filter((m: any) => m.type === 'output');
       assert.equal(outputMsgs.length, 3, 'Should replay only entries after lastSeq=2');
 
-      // Verify replayed entries are seq 3, 4, 5
       const seqs = outputMsgs.map((m: any) => m.seq).sort((a: number, b: number) => a - b);
-      assert.deepEqual(seqs, [3, 4, 5], 'Should replay entries with seq 3, 4, 5');
+      assert.deepEqual(seqs, [3, 4, 5]);
 
-      // Verify sync message
       const syncMsg = messages.find((m: any) => m.type === 'sync');
-      assert.ok(syncMsg, 'Should receive sync message');
-      assert.equal(syncMsg.lastSeq, 5, 'Sync lastSeq should be 5');
+      assert.ok(syncMsg);
+      assert.equal(syncMsg.lastSeq, 5);
 
       ws.close();
     });
 
     it('should replay all entries when no lastSeq is provided', async () => {
-      const listRes = await api('/api/projects');
-      const projectId = listRes.body[0]?.id;
-      assert.ok(projectId);
-
       const entries = [
         { ts: 4000, stream: 'stdout', seq: 1, content: 'First' },
         { ts: 4001, stream: 'stdout', seq: 2, content: 'Second' },
       ];
-      const sessionId = await createSessionWithLog(projectId, entries);
+      const sessionId = createSessionWithLog(projectId, entries);
 
       const ws = await connectWs(`/ws/sessions/${sessionId}`);
-
-      // Expect 2 output messages + 1 sync = 3 messages
-      const messages = await collectMessages(ws, 3, 5000);
+      const messages = await collectMessages(ws, 3, 5000); // 2 outputs + 1 sync
 
       const outputMsgs = messages.filter((m: any) => m.type === 'output');
       assert.equal(outputMsgs.length, 2, 'Should replay all entries');
@@ -370,63 +397,222 @@ describe('WebSocket API: Session Stream Contract Tests', () => {
     });
 
     it('should replay nothing when lastSeq >= max seq', async () => {
-      const listRes = await api('/api/projects');
-      const projectId = listRes.body[0]?.id;
-      assert.ok(projectId);
-
       const entries = [
         { ts: 5000, stream: 'stdout', seq: 1, content: 'Only entry' },
       ];
-      const sessionId = await createSessionWithLog(projectId, entries);
+      const sessionId = createSessionWithLog(projectId, entries);
 
-      // Connect with lastSeq=1 — no entries to replay
       const ws = await connectWs(`/ws/sessions/${sessionId}?lastSeq=1`);
-
-      // Should receive just the sync message
       const syncMsg = await waitForMessage(ws, (m: any) => m.type === 'sync');
+
       assert.equal(syncMsg.type, 'sync');
-      assert.equal(syncMsg.lastSeq, 1, 'Sync lastSeq should reflect the highest seq');
+      assert.equal(syncMsg.lastSeq, 1);
 
       ws.close();
     });
   });
 
-  describe('State messages', () => {
-    it('should receive state message with correct format', async () => {
-      const listRes = await api('/api/projects');
-      const projectId = listRes.body[0]?.id;
-      assert.ok(projectId);
+  // ── Session Stream: state message ─────────────────────────────────
 
-      // Create a session in waiting-for-input state
-      const { randomUUID } = await import('node:crypto');
-      const sessionId = randomUUID();
-      const sessionDir = join(dataDir, 'sessions', sessionId);
-      mkdirSync(sessionDir, { recursive: true });
-
-      const meta = {
-        id: sessionId,
-        projectId,
-        type: 'task-run',
+  describe('Session Stream — state message format', () => {
+    it('should send state message with state, question, taskId for waiting-for-input sessions per websocket-api.md', async () => {
+      // { "type": "state", "state": "waiting-for-input", "question": "...", "taskId": "2.1" }
+      const sessionId = createSessionWithLog(projectId, [], {
         state: 'waiting-for-input',
-        startedAt: new Date().toISOString(),
-        endedAt: null,
-        pid: null,
-        lastTaskId: '2.1',
         question: 'Which API key should I use?',
-        exitCode: null,
-      };
-      writeFileSync(join(sessionDir, 'meta.json'), JSON.stringify(meta, null, 2) + '\n');
-      writeFileSync(join(sessionDir, 'output.jsonl'), '');
+        lastTaskId: '2.1',
+      });
 
       const ws = await connectWs(`/ws/sessions/${sessionId}`);
 
-      // Should receive a state message reflecting current session state
       const stateMsg = await waitForMessage(ws, (m: any) => m.type === 'state');
-
       assert.equal(stateMsg.type, 'state');
       assert.equal(stateMsg.state, 'waiting-for-input');
       assert.equal(typeof stateMsg.question, 'string', 'Should include question');
       assert.ok(stateMsg.question.length > 0, 'Question should be non-empty');
+      assert.equal(stateMsg.taskId, '2.1', 'Should include taskId');
+
+      ws.close();
+    });
+  });
+
+  // ── Session Stream: state change via session stop ─────────────────
+
+  describe('Session Stream — state change broadcast', () => {
+    it('should broadcast state change when session is stopped via REST API', async () => {
+      const sessionId = createSessionWithLog(projectId, [
+        { ts: 6000, stream: 'stdout', seq: 1, content: 'Working...' },
+      ]);
+
+      const ws = await connectWs(`/ws/sessions/${sessionId}`);
+      await waitForMessage(ws, (m: any) => m.type === 'sync');
+
+      // Set up listener BEFORE the stop API call
+      const stateMsgPromise = waitForMessage(ws, (m: any) => m.type === 'state', 5000);
+
+      // Stop the session
+      await api(`/api/sessions/${sessionId}/stop`, { method: 'POST' });
+
+      const stateMsg = await stateMsgPromise;
+      assert.equal(stateMsg.type, 'state');
+      assert.ok(stateMsg.state, 'State message should include state field');
+
+      ws.close();
+    });
+  });
+
+  // ── Session Stream: client→server input message ───────────────────
+
+  describe('Session Stream — client→server input message', () => {
+    it('should accept input messages with type and content fields per websocket-api.md', async () => {
+      // Create an interview session in running state
+      const sessionId = createSessionWithLog(projectId, [], {
+        type: 'interview',
+        state: 'running',
+      });
+
+      const ws = await connectWs(`/ws/sessions/${sessionId}`);
+      await waitForMessage(ws, (m: any) => m.type === 'sync');
+
+      // Send input message per contract: { "type": "input", "content": "..." }
+      // This should not cause an error (no process stdin to write to, but the message is accepted)
+      ws.send(JSON.stringify({ type: 'input', content: 'Test input from client' }));
+
+      // Give server time to process — should not crash
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      assert.equal(ws.readyState, WebSocket.OPEN, 'WebSocket should still be open after sending input');
+
+      ws.close();
+    });
+  });
+
+  // ── Dashboard Stream: /ws/dashboard ───────────────────────────────
+
+  describe('Dashboard Stream — Connection', () => {
+    it('should connect to /ws/dashboard', async () => {
+      const ws = await connectWs('/ws/dashboard');
+      assert.ok(ws.readyState === WebSocket.OPEN, 'Dashboard WebSocket should be open');
+      ws.close();
+    });
+  });
+
+  describe('Dashboard Stream — project-update message format', () => {
+    it('should receive project-update on session state change per websocket-api.md', async () => {
+      const ws = await connectWs('/ws/dashboard');
+
+      // Set up listener BEFORE triggering a state change
+      const updatePromise = waitForMessage(ws, (m: any) => m.type === 'project-update', 5000);
+
+      // Create and stop a session to trigger a project-update broadcast
+      const sessionId = createSessionWithLog(projectId, [
+        { ts: 7000, stream: 'stdout', seq: 1, content: 'Dashboard test' },
+      ]);
+
+      await api(`/api/sessions/${sessionId}/stop`, { method: 'POST' });
+
+      const msg = await updatePromise;
+
+      // Verify format per websocket-api.md:
+      // { "type": "project-update", "projectId": "uuid", "activeSession": {...}|null, "taskSummary": {...}|null, "workflow": {...}|null }
+      assert.equal(msg.type, 'project-update');
+      assert.equal(typeof msg.projectId, 'string', 'Should include projectId');
+
+      // activeSession should be null after stop (or an object)
+      if (msg.activeSession !== null) {
+        assert.equal(typeof msg.activeSession.id, 'string');
+        assert.equal(typeof msg.activeSession.type, 'string');
+        assert.equal(typeof msg.activeSession.state, 'string');
+      }
+
+      // taskSummary should have the expected shape
+      if (msg.taskSummary !== null) {
+        assert.equal(typeof msg.taskSummary.total, 'number');
+        assert.equal(typeof msg.taskSummary.completed, 'number');
+        assert.equal(typeof msg.taskSummary.blocked, 'number');
+        assert.equal(typeof msg.taskSummary.skipped, 'number');
+        assert.equal(typeof msg.taskSummary.remaining, 'number');
+      }
+
+      // workflow can be null or an object
+      if (msg.workflow !== null) {
+        assert.ok(['new-project', 'add-feature'].includes(msg.workflow.type));
+        assert.equal(typeof msg.workflow.phase, 'string');
+        assert.equal(typeof msg.workflow.iteration, 'number');
+        assert.equal(typeof msg.workflow.description, 'string');
+      }
+
+      ws.close();
+    });
+  });
+
+  // ── Heartbeat ─────────────────────────────────────────────────────
+
+  describe('Heartbeat', () => {
+    it('should receive ping frames from server on session stream per websocket-api.md', async () => {
+      const sessionId = createSessionWithLog(projectId, []);
+
+      const ws = await connectWs(`/ws/sessions/${sessionId}`);
+      await waitForMessage(ws, (m: any) => m.type === 'sync');
+
+      // Server sends ping every 30s per contract
+      const pingReceived = await new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 35_000);
+        ws.on('ping', () => {
+          clearTimeout(timeout);
+          resolve(true);
+        });
+      });
+
+      assert.ok(pingReceived, 'Should receive a ping frame within 35 seconds');
+
+      ws.close();
+    });
+
+    it('should receive ping frames from server on dashboard stream', async () => {
+      const ws = await connectWs('/ws/dashboard');
+
+      const pingReceived = await new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 35_000);
+        ws.on('ping', () => {
+          clearTimeout(timeout);
+          resolve(true);
+        });
+      });
+
+      assert.ok(pingReceived, 'Dashboard should receive ping frames');
+
+      ws.close();
+    });
+  });
+
+  // ── All message types are valid JSON with type field ──────────────
+
+  describe('Message envelope', () => {
+    it('all server messages should be valid JSON with a type field', async () => {
+      // Connect to a session with log entries and in waiting-for-input state
+      // to trigger multiple message types (output, sync, state)
+      const sessionId = createSessionWithLog(projectId, [
+        { ts: 8000, stream: 'stdout', seq: 1, content: 'Test' },
+      ], {
+        state: 'waiting-for-input',
+        question: 'Test question?',
+        lastTaskId: '1.2',
+      });
+
+      const ws = await connectWs(`/ws/sessions/${sessionId}`);
+      const messages = await collectAllMessages(ws, 1000);
+
+      assert.ok(messages.length > 0, 'Should receive at least one message');
+
+      for (const msg of messages) {
+        assert.equal(typeof msg, 'object', 'Message should be a parsed JSON object');
+        assert.equal(typeof msg.type, 'string', 'Every message should have a string type field');
+        assert.ok(
+          ['output', 'sync', 'state', 'progress', 'phase', 'error', 'project-update'].includes(msg.type),
+          `Message type "${msg.type}" should be one of the documented types`,
+        );
+      }
 
       ws.close();
     });
