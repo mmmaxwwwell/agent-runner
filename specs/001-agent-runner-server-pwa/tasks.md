@@ -116,7 +116,7 @@
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
 - [x] T032 [P] [US2] Write contract tests for WebSocket session stream in tests/contract/websocket-api.test.ts — connect to /ws/sessions/:id, receive output messages with seq/ts/stream/content, receive state messages, receive sync after replay, verify lastSeq replay per websocket-api.md
-- [ ] T033 [P] [US2] Write integration tests for WebSocket streaming in tests/integration/websocket.test.ts — live output delivery, reconnect with lastSeq replays missed entries, backpressure handling (drop messages when buffer >64KB), heartbeat ping/pong per websocket-api.md
+- [x] T033 [P] [US2] Write integration tests for WebSocket streaming in tests/integration/websocket.test.ts — live output delivery, reconnect with lastSeq replays missed entries, backpressure handling (drop messages when buffer >64KB), heartbeat ping/pong per websocket-api.md
 
 ### Implementation for User Story 2
 
