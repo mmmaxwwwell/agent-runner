@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from '
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+export type ProjectStatus = "active" | "onboarding" | "error";
+
 export interface Project {
   id: string;
   name: string;
@@ -9,6 +11,7 @@ export interface Project {
   taskFile: string;
   promptFile: string;
   createdAt: string;
+  status: ProjectStatus;
 }
 
 export interface CreateProjectInput {
@@ -24,7 +27,8 @@ function readProjects(dataDir: string): Project[] {
   const path = projectsJsonPath(dataDir);
   if (!existsSync(path)) return [];
   const raw = readFileSync(path, 'utf-8');
-  return JSON.parse(raw) as Project[];
+  const projects = JSON.parse(raw) as Array<Omit<Project, 'status'> & { status?: ProjectStatus }>;
+  return projects.map(p => ({ ...p, status: p.status ?? 'active' }));
 }
 
 function writeProjects(dataDir: string, projects: Project[]): void {
@@ -94,6 +98,7 @@ export function createProject(dataDir: string, input: CreateProjectInput): Proje
     taskFile: 'tasks.md',
     promptFile: detectPromptFile(absDir),
     createdAt: new Date().toISOString(),
+    status: 'active',
   };
 
   projects.push(project);
