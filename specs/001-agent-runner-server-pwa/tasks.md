@@ -87,7 +87,7 @@
 - [x] T020 [P] [US1] Write unit tests for session logger in tests/unit/session-logger.test.ts — JSONL append, read full log, read from byte offset, sequence number monotonicity per research.md §2 and data-model.md Log Entry
 - [x] T021 [P] [US1] Write unit tests for session model in tests/unit/session.test.ts — state machine transitions (running→waiting/completed/failed, waiting→running), meta.json persistence, concurrent session prevention per data-model.md Session entity
 - [x] T022 [P] [US1] Write integration tests for process manager in tests/integration/process-manager.test.ts — spawn process, capture stdout/stderr, handle exit codes, kill process per plan.md key design §1-§2
-- [ ] T023 [P] [US1] Write integration tests for task-run auto-loop in tests/integration/task-loop.test.ts — re-parse after run, spawn next if unchecked remain, stop on [?], stop on all complete per plan.md key design §2
+- [x] T023 [P] [US1] Write integration tests for task-run auto-loop in tests/integration/task-loop.test.ts — re-parse after run, spawn next if unchecked remain, stop on [?], stop on all complete per plan.md key design §2
 
 ### Implementation for User Story 1
 
