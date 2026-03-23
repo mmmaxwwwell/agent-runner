@@ -11,3 +11,6 @@ The T014/T015 implementation added not only the screen-by-screen detail sections
 ### T017 — Pre-existing test failures (2 of 331)
 Two tests fail before any changes in this feature: `websocket-api.test.ts` (sync message format) and `session-stop.test.ts` (stop running session + kill process). These are pre-existing and unrelated to the UI flow documentation work. Phase 7 (T023) should address these.
 
+### T018 — Integration test server setup requires LOG_LEVEL: 'info'
+The server startup detection relies on matching "Agent Runner server started" in stderr (pino output). Using `LOG_LEVEL: 'warn'` suppresses this info-level message, causing the server start detection to time out. All integration/contract tests MUST use `LOG_LEVEL: 'info'` or lower.
+

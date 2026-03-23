@@ -100,7 +100,7 @@
 
 ### Tests for User Story 4
 
-- [ ] T018 [P] [US4] Create tests/integration/new-project-workflow.test.ts — test valid project creation (201), empty name (400), invalid name (400), empty description (400), duplicate name (409), verify response matches contract, reference UI_FLOW.md sections
+- [x] T018 [P] [US4] Create tests/integration/new-project-workflow.test.ts — test valid project creation (201), empty name (400), invalid name (400), empty description (400), duplicate name (409), verify response matches contract, reference UI_FLOW.md sections
 - [ ] T019 [P] [US4] Create tests/integration/voice-api.test.ts — test transcription endpoint with valid audio, without API key (503), with no audio (400), reference UI_FLOW.md sections
 - [ ] T020 [P] [US4] Create tests/integration/session-lifecycle.test.ts — test full lifecycle (create → run → complete), blocked flow (waiting-for-input → input → resume), stop flow (run → stop → failed), concurrent session prevention, reference UI_FLOW.md sections
 - [ ] T021 [P] [US4] Create tests/integration/dashboard-api.test.ts — test project list with task summaries, project detail with sessions/tasks, WebSocket dashboard updates on session state change, reference UI_FLOW.md sections
