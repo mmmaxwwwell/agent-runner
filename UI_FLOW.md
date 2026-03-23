@@ -394,3 +394,252 @@ stateDiagram-v2
 **Error States**:
 - WebSocket disconnect — auto-reconnect with exponential backoff
 - Message parse errors — silently ignored
+
+---
+
+## API Sequence Diagrams
+
+### New Project Workflow
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant C as PWA Client
+    participant S as Server
+    participant SK as SpecKit Orchestrator
+    participant SB as Sandbox (systemd-run)
+    participant WS as WebSocket
+
+    U->>C: Fill name + description, click "Start Project"
+    C->>S: POST /api/workflows/new-project<br/>{ name, description }
+    S->>S: Validate name (non-empty, /^[a-zA-Z0-9._-]+$/)
+    S->>S: Validate description (non-empty)
+    S->>S: Check duplicate (projects.json + filesystem)
+    S->>S: Check sandbox availability (buildCommand)
+    S->>S: Create session (type: interview)
+    S-->>C: 201 { sessionId, projectId, phase: "specify", state: "running" }
+
+    C->>WS: Connect WS /ws/sessions/:sessionId
+    WS-->>C: sync { lastSeq }
+
+    Note over S,SK: Async — workflow runs after response
+
+    S->>SK: startNewProjectWorkflow()
+    SK->>SK: mkdirSync(projectsDir/name)
+
+    loop For each phase: specify → clarify → plan → tasks
+        SK->>SK: createSessionId()
+        SK->>WS: broadcastPhaseTransition(phase)
+        WS-->>C: { type: "phase", phase, sessionId }
+        SK->>SB: spawnProcess(sandboxCmd)
+        SB-->>SK: PhaseResult { exitCode: 0 }
+    end
+
+    loop Analyze (max 5 iterations)
+        SK->>SB: spawnProcess(analyze)
+        SB-->>SK: PhaseResult { exitCode: 0 }
+        SK->>SK: analyzeHasIssues()
+        alt No issues
+            SK-->>S: WorkflowResult { outcome: "completed" }
+        else Issues found
+            Note over SK: Loop continues (max 5)
+        end
+    end
+
+    SK->>S: registerProject(name, dir) → projectId
+    SK->>S: launchTaskRun(projectId)
+    S->>WS: broadcastProjectUpdate(workflow: null)
+    WS-->>C: { type: "phase", phase: "implementation" }
+    C->>C: Auto-navigate to Dashboard (2s delay)
+```
+
+### Add Feature Workflow
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant C as PWA Client
+    participant S as Server
+    participant SK as SpecKit Orchestrator
+    participant SB as Sandbox (systemd-run)
+    participant WS as WebSocket
+
+    U->>C: Fill description, click "Add Feature"
+    C->>S: POST /api/projects/:id/add-feature<br/>{ description }
+    S->>S: Validate project exists (getProject)
+    S->>S: Validate description (non-empty)
+    S->>S: Check no active session (409 if active)
+    S->>S: Check sandbox availability
+    S->>S: Create session (type: interview)
+    S-->>C: 201 { sessionId, projectId, phase: "specify", state: "running" }
+
+    C->>WS: Connect WS /ws/sessions/:sessionId
+    WS-->>C: sync { lastSeq }
+
+    Note over S,SK: Async — workflow runs after response
+
+    S->>SK: startAddFeatureWorkflow()
+
+    loop For each phase: specify → clarify → plan → tasks
+        SK->>SK: createSessionId()
+        SK->>WS: broadcastPhaseTransition(phase)
+        WS-->>C: { type: "phase", phase, sessionId }
+        SK->>SB: spawnProcess(sandboxCmd)
+        SB-->>SK: PhaseResult { exitCode: 0 }
+    end
+
+    loop Analyze (max 5 iterations)
+        SK->>SB: spawnProcess(analyze)
+        SB-->>SK: PhaseResult { exitCode: 0 }
+        SK->>SK: analyzeHasIssues()
+        alt No issues
+            SK-->>S: WorkflowResult { outcome: "completed" }
+        else Issues found
+            Note over SK: Loop continues (max 5)
+        end
+    end
+
+    SK->>S: launchTaskRun(projectId)
+    S->>WS: broadcastProjectUpdate(workflow: null)
+    WS-->>C: { type: "phase", phase: "implementation" }
+    C->>C: Auto-navigate to Project Detail (2s delay)
+```
+
+### Session Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant C as PWA Client
+    participant S as Server
+    participant PM as Process Manager
+    participant WS as WebSocket
+
+    Note over U,WS: === Start Session ===
+
+    U->>C: Click "Start Task Run"
+    C->>S: POST /api/projects/:id/sessions<br/>{ type: "task-run" }
+    S->>S: Validate project exists
+    S->>S: Check unchecked tasks remain (400 if none)
+    S->>S: Check sandbox (503 if unavailable)
+    S->>S: createSession (409 if active session exists)
+    S->>PM: startTaskLoop(command, args, sessionId, ...)
+    S->>WS: broadcastProjectUpdate(activeSession)
+    S-->>C: 201 { id, projectId, type, state: "running" }
+    C->>C: Navigate to #/sessions/:id
+
+    Note over U,WS: === Monitor Session ===
+
+    C->>S: GET /api/sessions/:id
+    S-->>C: 200 { session metadata }
+    C->>S: GET /api/sessions/:id/log
+    S-->>C: 200 [ log entries ]
+    C->>WS: Connect WS /ws/sessions/:id?lastSeq=N
+    WS-->>C: output (replayed entries after lastSeq)
+    WS-->>C: sync { lastSeq }
+
+    loop While session is running
+        PM->>WS: broadcastSessionOutput(entry)
+        WS-->>C: { type: "output", seq, stream, content }
+        PM->>WS: broadcastSessionProgress(taskSummary)
+        WS-->>C: { type: "progress", taskSummary }
+    end
+
+    Note over U,WS: === Waiting for Input ===
+
+    PM->>S: transitionState(waiting-for-input, question)
+    S->>WS: broadcastSessionState({ state: "waiting-for-input", question })
+    WS-->>C: { type: "state", state: "waiting-for-input", question }
+    C->>C: Show question banner + input field
+    U->>C: Type answer, press Enter
+    C->>S: POST /api/sessions/:id/input<br/>{ answer }
+    S->>S: transitionState(running)
+    S->>PM: Restart task loop / spawn process
+    S->>WS: broadcastSessionState({ state: "running" })
+    S-->>C: 200 { id, state: "running" }
+
+    Note over U,WS: === Session Complete ===
+
+    PM->>S: Process exits (code 0)
+    S->>S: transitionState(completed)
+    S->>WS: broadcastSessionState({ state: "completed" })
+    S->>WS: broadcastProjectUpdate(activeSession: null)
+    WS-->>C: { type: "state", state: "completed" }
+
+    Note over U,WS: === Stop Session (manual) ===
+
+    U->>C: Click "Stop" (on Project Detail)
+    C->>S: POST /api/sessions/:id/stop
+    S->>PM: killProcess(handle)
+    S->>S: transitionState(failed, exitCode: -1)
+    S->>WS: broadcastSessionState({ state: "failed" })
+    S->>WS: broadcastProjectUpdate(activeSession: null)
+    S-->>C: 200 { id, state: "failed", exitCode: -1 }
+```
+
+### Push Notification Subscription
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant C as PWA Client
+    participant SW as Service Worker
+    participant S as Server
+
+    U->>C: Click "Enable Notifications" (Session View)
+    C->>S: GET /api/push/vapid-key
+    S-->>C: 200 { publicKey }
+    C->>U: Notification.requestPermission()
+    U-->>C: "granted"
+    C->>SW: pushManager.subscribe({ applicationServerKey: publicKey })
+    SW-->>C: PushSubscription { endpoint, keys: { p256dh, auth } }
+    C->>S: POST /api/push/subscribe<br/>{ endpoint, keys: { p256dh, auth } }
+    S->>S: pushService.subscribe(subscription)
+    S-->>C: 201
+
+    Note over S,SW: Later — when session completes or fails
+
+    S->>SW: web-push notification { title, body, data }
+    SW->>U: Show system notification
+```
+
+---
+
+## Field Validation Reference Table
+
+Every input field in the application, with client-side and server-side validation rules.
+
+### User-Facing Input Fields
+
+| Screen | Field | Required | Client Validation | Server Validation | Error Message |
+|--------|-------|----------|-------------------|-------------------|---------------|
+| New Project | Repository name | Yes | Button disabled when empty | Non-empty after trim; must match `/^[a-zA-Z0-9._-]+$/`; no duplicate in registry or filesystem | 400: "Missing or empty name" / "Invalid project name: must contain only letters, numbers, dots, hyphens, underscores" / 409: "A project with name '{name}' already exists" |
+| New Project | Describe your idea | Yes | Button disabled when empty | Non-empty after trim | 400: "Missing or empty description" |
+| Add Feature | Describe the feature | Yes | Button disabled when empty | Non-empty after trim | 400: "Missing or empty description" |
+| Session View | Type your answer… | Yes | Button disabled when empty or submitting | Non-empty after trim; session must be in `waiting-for-input` state | 400: "Empty answer" / 400: "Session is not in waiting-for-input state" |
+| SpecKitChat | Type a message… | Yes | Send disabled when empty | Trim before WebSocket send | N/A (WebSocket, no HTTP error) |
+| Settings | Log level (dropdown) | Yes | Predefined options: debug, info, warn, error, fatal | Must be one of the LOG_LEVELS set | 400: "Invalid level. Must be one of: debug, info, warn, error, fatal" |
+| Settings | Voice backend (radio) | No | "browser" disabled if Web Speech unavailable; "cloud" disabled if `!health.cloudSttAvailable` | N/A (localStorage only) | N/A |
+
+### Server-Side Implicit Validations
+
+These are not user-typed fields but are validated on the server for each endpoint:
+
+| Endpoint | Check | Error |
+|----------|-------|-------|
+| `POST /api/workflows/new-project` | Duplicate name (registry + filesystem) | 409: "A project with name '{name}' already exists" |
+| `POST /api/workflows/new-project` | Sandbox available (`buildCommand`) | 503: sandbox error |
+| `POST /api/workflows/new-project` | `allowUnsandboxed` without server env var | 400: "allowUnsandboxed requested but server ALLOW_UNSANDBOXED env var not set" |
+| `POST /api/projects/:id/add-feature` | Project exists | 404: "Project not found" |
+| `POST /api/projects/:id/add-feature` | No active session | 409: "Project already has an active session" |
+| `POST /api/projects/:id/add-feature` | Sandbox available | 503: sandbox error |
+| `POST /api/projects/:id/sessions` | Valid type (`task-run` or `interview`) | 400: "Invalid or missing \"type\" field. Must be \"task-run\" or \"interview\"." |
+| `POST /api/projects/:id/sessions` | Unchecked tasks remain (for task-run) | 400: "No unchecked tasks remaining" |
+| `POST /api/projects/:id/sessions` | No active session | 409 (via `createSession`) |
+| `POST /api/projects/:id/sessions` | Sandbox available | 503: sandbox error |
+| `POST /api/sessions/:id/input` | Session exists | 404: "Session not found" |
+| `POST /api/sessions/:id/stop` | Session exists | 404: "Session not found" |
+| `POST /api/push/subscribe` | `endpoint` is non-empty string | 400: "Missing or invalid \"endpoint\" field" |
+| `POST /api/push/subscribe` | `keys.p256dh` and `keys.auth` are strings | 400: "Missing or invalid \"keys\" field (requires p256dh and auth)" |
+| `POST /api/projects` | `name` and `dir` are non-empty strings | 400: "Missing or invalid 'name' field" / "Missing or invalid 'dir' field" |
+| `POST /api/projects` | No duplicate project | 409: duplicate error |
