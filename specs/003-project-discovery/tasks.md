@@ -20,7 +20,7 @@
 **Purpose**: New service file and type scaffolding shared across all stories
 
 - [x] T001 Add `status` field to Project interface and default it for existing projects in src/models/project.ts
-- [ ] T002 Add `DiscoveredDirectory` interface to src/models/project.ts per data-model.md
+- [x] T002 Add `DiscoveredDirectory` interface to src/models/project.ts per data-model.md
 - [ ] T003 Create discovery service scaffold with `scanProjectsDir()`, `detectGitRepo()`, `detectSpecKitArtifacts()` stubs in src/services/discovery.ts
 
 ---

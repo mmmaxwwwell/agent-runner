@@ -19,6 +19,18 @@ export interface CreateProjectInput {
   dir: string;
 }
 
+export interface DiscoveredDirectory {
+  type: "discovered";
+  name: string;           // Directory basename
+  path: string;           // Absolute path
+  isGitRepo: boolean;
+  hasSpecKit: {
+    spec: boolean;
+    plan: boolean;
+    tasks: boolean;
+  };
+}
+
 function projectsJsonPath(dataDir: string): string {
   return join(dataDir, 'projects.json');
 }
