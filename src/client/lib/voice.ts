@@ -275,6 +275,24 @@ async function startListeningCloud(): Promise<string> {
 }
 
 /**
+ * Toggle listening on/off. If idle, starts listening and returns a promise
+ * that resolves with transcribed text. If already listening, stops recognition
+ * and the original promise resolves with accumulated text.
+ * Returns null when stopping (the start call's promise delivers the text).
+ */
+let activeTogglePromise: Promise<string> | null = null;
+
+export function toggleListening(): Promise<string> | null {
+  if (currentState === 'listening') {
+    stopListening();
+    return null;
+  }
+  activeTogglePromise = startListening();
+  activeTogglePromise.finally(() => { activeTogglePromise = null; });
+  return activeTogglePromise;
+}
+
+/**
  * Stop an active listening session. For browser mode, stops recognition.
  * For cloud mode, stops the MediaRecorder to trigger transcription.
  */
