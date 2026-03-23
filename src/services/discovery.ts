@@ -1,4 +1,4 @@
-import { access } from 'node:fs/promises';
+import { access, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DiscoveredDirectory } from '../models/project.ts';
 
@@ -17,8 +17,33 @@ export async function detectGitRepo(dirPath: string): Promise<boolean> {
 /**
  * Scan a directory for spec-kit artifacts (spec.md, plan.md, tasks.md) in specs subdirectories.
  */
-export async function detectSpecKitArtifacts(_dirPath: string): Promise<DiscoveredDirectory['hasSpecKit']> {
-  throw new Error('Not implemented');
+export async function detectSpecKitArtifacts(dirPath: string): Promise<DiscoveredDirectory['hasSpecKit']> {
+  const result = { spec: false, plan: false, tasks: false };
+  const specsDir = join(dirPath, 'specs');
+
+  let entries: import('node:fs').Dirent[];
+  try {
+    entries = await readdir(specsDir, { withFileTypes: true });
+  } catch {
+    return result;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const subDir = join(specsDir, entry.name);
+    if (!result.spec) {
+      try { await access(join(subDir, 'spec.md')); result.spec = true; } catch { /* skip */ }
+    }
+    if (!result.plan) {
+      try { await access(join(subDir, 'plan.md')); result.plan = true; } catch { /* skip */ }
+    }
+    if (!result.tasks) {
+      try { await access(join(subDir, 'tasks.md')); result.tasks = true; } catch { /* skip */ }
+    }
+    if (result.spec && result.plan && result.tasks) break;
+  }
+
+  return result;
 }
 
 /**
