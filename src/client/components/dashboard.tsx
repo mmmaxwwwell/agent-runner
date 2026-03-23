@@ -1,53 +1,13 @@
 import { useState, useEffect } from 'preact/hooks';
-import { get } from '../lib/api.js';
+import {
+  get,
+  type RegisteredProject,
+  type DiscoveredDirectory,
+  type ProjectsResponse,
+  type ActiveSession,
+} from '../lib/api.js';
 import { connectDashboard, type ProjectUpdateMessage, type ServerMessage } from '../lib/ws.js';
 import { navigate } from '../lib/router.js';
-
-type TaskSummary = {
-  total: number;
-  completed: number;
-  blocked: number;
-  skipped: number;
-  remaining: number;
-};
-
-type ActiveSession = {
-  id: string;
-  type: string;
-  state: string;
-  startedAt: string;
-};
-
-type RegisteredProject = {
-  type: 'registered';
-  id: string;
-  name: string;
-  dir: string;
-  taskFile: string;
-  createdAt: string;
-  status: 'active' | 'onboarding' | 'error';
-  taskSummary: TaskSummary;
-  activeSession: ActiveSession | null;
-  dirMissing: boolean;
-};
-
-type DiscoveredDirectory = {
-  type: 'discovered';
-  name: string;
-  path: string;
-  isGitRepo: boolean;
-  hasSpecKit: {
-    spec: boolean;
-    plan: boolean;
-    tasks: boolean;
-  };
-};
-
-type ProjectsResponse = {
-  registered: RegisteredProject[];
-  discovered: DiscoveredDirectory[];
-  discoveryError: string | null;
-};
 
 function statusBadge(project: RegisteredProject): { label: string; color: string } {
   if (project.status === 'onboarding') return { label: 'onboarding', color: '#2196f3' };
@@ -181,7 +141,7 @@ export function Dashboard() {
   if (error) return <div style={{ color: '#f44336' }}>Error: {error}</div>;
   if (!data) return null;
 
-  const { registered, discovered } = data;
+  const { registered, discovered, discoveryError } = data;
 
   return (
     <div>
@@ -199,6 +159,20 @@ export function Dashboard() {
         </a>
       </div>
 
+      {discoveryError && (
+        <div style={{
+          background: '#2a1a1a',
+          border: '1px solid #f4433666',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          color: '#ff8a80',
+          fontSize: '0.85rem',
+        }}>
+          {discoveryError}
+        </div>
+      )}
+
       {registered.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
           {registered.map((p) => <ProjectCard key={p.id} project={p} />)}
@@ -212,9 +186,9 @@ export function Dashboard() {
         </div>
       )}
 
-      {registered.length === 0 && discovered.length === 0 && (
+      {registered.length === 0 && discovered.length === 0 && !discoveryError && (
         <div style={{ color: '#888', textAlign: 'center', padding: '32px 0' }}>
-          No projects registered. <a href="#/new" style={{ color: '#7c8dff' }}>Create one</a> or register via API.
+          No projects found. <a href="#/new" style={{ color: '#7c8dff' }}>Create one</a> or register via API.
         </div>
       )}
     </div>
