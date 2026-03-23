@@ -3,6 +3,7 @@ import { useRouter } from './lib/router.js';
 import { Dashboard } from './components/dashboard.js';
 import { ProjectDetail } from './components/project-detail.js';
 import { SessionView } from './components/session-view.js';
+import { NewProject } from './components/new-project.js';
 
 function App() {
   const route = useRouter();
@@ -23,7 +24,7 @@ function App() {
         {route.page === 'dashboard' && <Dashboard />}
         {route.page === 'project-detail' && <ProjectDetail id={route.id} />}
         {route.page === 'session-view' && <SessionView id={route.id} />}
-        {route.page === 'new-project' && <div>New Project — coming soon</div>}
+        {route.page === 'new-project' && <NewProject />}
         {route.page === 'settings' && <div>Settings — coming soon</div>}
       </main>
     </div>
