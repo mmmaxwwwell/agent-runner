@@ -20,7 +20,7 @@
 **Purpose**: Verify existing project structure and contracts before implementation
 
 - [x] T001 Verify existing project structure matches plan.md — confirm src/routes/projects.ts, src/client/lib/voice.ts, src/services/spec-kit.ts, and src/server.ts exist and contain the expected exports
-- [ ] T002 Verify contract for POST /api/workflows/new-project in specs/002-bugfixes-ui-flow-tests/contracts/new-project-endpoint.md matches the existing add-feature handler pattern in src/routes/projects.ts
+- [x] T002 Verify contract for POST /api/workflows/new-project in specs/002-bugfixes-ui-flow-tests/contracts/new-project-endpoint.md matches the existing add-feature handler pattern in src/routes/projects.ts
 
 ---
 
