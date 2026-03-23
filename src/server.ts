@@ -97,40 +97,47 @@ function matchRoute(method: string, pathname: string): { handler: (req: Incoming
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
-  const method = req.method ?? 'GET';
-  const pathname = url.pathname;
+  try {
+    const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+    const method = req.method ?? 'GET';
+    const pathname = url.pathname;
 
-  // API routes
-  if (pathname.startsWith('/api/')) {
-    const route = matchRoute(method, pathname);
-    if (route) {
-      try {
-        await route.handler(req, res, route.params);
-      } catch (err) {
-        log.error({ err, method, pathname }, 'Unhandled error in API route');
-        if (!res.headersSent) {
-          sendJson(res, 500, { error: 'Internal server error' });
+    // API routes
+    if (pathname.startsWith('/api/')) {
+      const route = matchRoute(method, pathname);
+      if (route) {
+        try {
+          await route.handler(req, res, route.params);
+        } catch (err) {
+          log.error({ err, method, pathname }, 'Unhandled error in API route');
+          if (!res.headersSent) {
+            sendJson(res, 500, { error: 'Internal server error' });
+          }
         }
+        return;
       }
+      sendJson(res, 404, { error: 'Not found' });
       return;
     }
-    sendJson(res, 404, { error: 'Not found' });
-    return;
-  }
 
-  // Static files
-  const served = await serveStaticFile(req, res);
-  if (!served) {
-    // SPA fallback: serve index.html for non-API, non-file routes
-    try {
-      const indexPath = join(PUBLIC_DIR, 'index.html');
-      const content = await readFile(indexPath);
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(content);
-    } catch {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not Found');
+    // Static files
+    const served = await serveStaticFile(req, res);
+    if (!served) {
+      // SPA fallback: serve index.html for non-API, non-file routes
+      try {
+        const indexPath = join(PUBLIC_DIR, 'index.html');
+        const content = await readFile(indexPath);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(content);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+      }
+    }
+  } catch (err) {
+    log.error({ err, url: req.url, method: req.method }, 'Unhandled request error');
+    if (!res.headersSent) {
+      sendJson(res, 500, { error: 'Internal server error' });
     }
   }
 }
@@ -229,6 +236,16 @@ if (recoveryResult.resumed > 0 || recoveryResult.waitingRestored > 0 || recovery
     failed: recoveryResult.failed,
   }, 'Session recovery completed');
 }
+
+// Process-level error handlers
+process.on('uncaughtException', (err) => {
+  log.fatal({ err }, 'Uncaught exception');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  log.error({ err: reason }, 'Unhandled promise rejection');
+});
 
 server.listen(config.port, config.host, () => {
   log.info({
