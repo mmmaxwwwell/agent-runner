@@ -9,6 +9,8 @@ export type VoiceListener = (state: VoiceState) => void;
  * and Google Speech-to-Text cloud backend (via /api/voice/transcribe).
  */
 
+const SILENCE_TIMEOUT_MS = 5000;
+
 let currentBackend: VoiceBackend = 'browser';
 let stateListeners: VoiceListener[] = [];
 let currentState: VoiceState = 'idle';
@@ -70,10 +72,20 @@ function transcribeBrowser(): Promise<string> {
     recognition.lang = 'en-US';
 
     let finalTranscript = '';
+    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    recognition.onstart = () => setState('listening');
+    const resetSilenceTimer = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => recognition.stop(), SILENCE_TIMEOUT_MS);
+    };
+
+    recognition.onstart = () => {
+      setState('listening');
+      resetSilenceTimer();
+    };
 
     recognition.onresult = (event: any) => {
+      resetSilenceTimer();
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
@@ -83,11 +95,13 @@ function transcribeBrowser(): Promise<string> {
     };
 
     recognition.onerror = (event: any) => {
+      if (silenceTimer) clearTimeout(silenceTimer);
       setState('idle');
       reject(new Error(`Speech recognition error: ${event.error}`));
     };
 
     recognition.onend = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
       setState('idle');
       resolve(finalTranscript);
     };
@@ -177,10 +191,20 @@ function startListeningBrowser(): Promise<string> {
     activeRecognition = recognition;
 
     let finalTranscript = '';
+    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    recognition.onstart = () => setState('listening');
+    const resetSilenceTimer = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => recognition.stop(), SILENCE_TIMEOUT_MS);
+    };
+
+    recognition.onstart = () => {
+      setState('listening');
+      resetSilenceTimer();
+    };
 
     recognition.onresult = (event: any) => {
+      resetSilenceTimer();
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
@@ -190,12 +214,14 @@ function startListeningBrowser(): Promise<string> {
     };
 
     recognition.onerror = (event: any) => {
+      if (silenceTimer) clearTimeout(silenceTimer);
       activeRecognition = null;
       setState('idle');
       reject(new Error(`Speech recognition error: ${event.error}`));
     };
 
     recognition.onend = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
       activeRecognition = null;
       setState('idle');
       resolve(finalTranscript);
