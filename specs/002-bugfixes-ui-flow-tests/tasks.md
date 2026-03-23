@@ -60,7 +60,7 @@
 ### Implementation for User Story 2
 
 - [x] T007 [P] [US2] Modify `transcribeBrowser()` in src/client/lib/voice.ts — set `recognition.continuous = true` and `recognition.interimResults = true`
-- [ ] T008 [US2] Implement result accumulation in src/client/lib/voice.ts — iterate `event.results` from `event.resultIndex`, separate final vs interim results, accumulate confirmed text across multiple onresult events
+- [x] T008 [US2] Implement result accumulation in src/client/lib/voice.ts — iterate `event.results` from `event.resultIndex`, separate final vs interim results, accumulate confirmed text across multiple onresult events
 - [ ] T009 [US2] Add silence timeout (5000ms default) in src/client/lib/voice.ts — reset timer on each onresult event, call `recognition.stop()` when timer fires, resolve with accumulated text
 - [ ] T010 [US2] Implement toggle behavior in src/client/lib/voice.ts — first mic click starts listening, second click calls `recognition.stop()` and finalizes transcription
 - [ ] T011 [US2] Expose interim results via callback in src/client/lib/voice.ts — add `onInterimResult` callback parameter so components can display real-time partial transcription

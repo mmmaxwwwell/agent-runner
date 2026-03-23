@@ -69,13 +69,17 @@ function transcribeBrowser(): Promise<string> {
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
+    let finalTranscript = '';
+
     recognition.onstart = () => setState('listening');
 
     recognition.onresult = (event: any) => {
-      setState('processing');
-      const transcript = event.results[0][0].transcript as string;
-      setState('idle');
-      resolve(transcript);
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        }
+      }
     };
 
     recognition.onerror = (event: any) => {
@@ -84,8 +88,8 @@ function transcribeBrowser(): Promise<string> {
     };
 
     recognition.onend = () => {
-      // If we haven't resolved yet (no result received), this means silence/timeout
       setState('idle');
+      resolve(finalTranscript);
     };
 
     recognition.start();
@@ -172,14 +176,17 @@ function startListeningBrowser(): Promise<string> {
     recognition.lang = 'en-US';
     activeRecognition = recognition;
 
+    let finalTranscript = '';
+
     recognition.onstart = () => setState('listening');
 
     recognition.onresult = (event: any) => {
-      setState('processing');
-      const transcript = event.results[0][0].transcript as string;
-      activeRecognition = null;
-      setState('idle');
-      resolve(transcript);
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        }
+      }
     };
 
     recognition.onerror = (event: any) => {
@@ -191,6 +198,7 @@ function startListeningBrowser(): Promise<string> {
     recognition.onend = () => {
       activeRecognition = null;
       setState('idle');
+      resolve(finalTranscript);
     };
 
     recognition.start();
