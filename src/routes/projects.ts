@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { Config } from '../lib/config.js';
 import { createLogger } from '../lib/logger.js';
 import { listProjects, getProject, createProject, removeProject } from '../models/project.js';
@@ -351,5 +351,64 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       const message = err instanceof Error ? err.message : String(err);
       sendJson(res, 404, { error: message });
     }
+  });
+
+  // POST /api/workflows/new-project — create a new project and start spec-kit SDD workflow
+  apiRoutes.set('POST /api/workflows/new-project', async (req, res) => {
+    const raw = await readBody(req);
+    let parsed: { name?: string; description?: string; allowUnsandboxed?: boolean };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      sendJson(res, 400, { error: 'Invalid JSON body' });
+      return;
+    }
+
+    // Validate name
+    const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
+    if (!name) {
+      sendJson(res, 400, { error: 'Missing or empty name' });
+      return;
+    }
+    if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+      sendJson(res, 400, { error: 'Invalid project name: must contain only letters, numbers, dots, hyphens, underscores' });
+      return;
+    }
+
+    // Validate description
+    const description = typeof parsed.description === 'string' ? parsed.description.trim() : '';
+    if (!description) {
+      sendJson(res, 400, { error: 'Missing or empty description' });
+      return;
+    }
+
+    // Check duplicate name — registry and filesystem
+    const existingProjects = listProjects(cfg.dataDir);
+    if (existingProjects.some(p => p.name === name)) {
+      sendJson(res, 409, { error: `A project with name '${name}' already exists` });
+      return;
+    }
+    const targetDir = join(cfg.projectsDir, name);
+    if (existsSync(targetDir)) {
+      sendJson(res, 409, { error: `A project with name '${name}' already exists` });
+      return;
+    }
+
+    // Check sandbox availability
+    const allowUnsandboxed = parsed.allowUnsandboxed === true;
+    if (allowUnsandboxed && !cfg.allowUnsandboxed) {
+      sendJson(res, 400, { error: 'allowUnsandboxed requested but server ALLOW_UNSANDBOXED env var not set' });
+      return;
+    }
+    try {
+      buildCommand(targetDir, [], allowUnsandboxed);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      sendJson(res, 503, { error: message });
+      return;
+    }
+
+    // T004 will wire the orchestrator call and return 201 here
+    sendJson(res, 501, { error: 'Not yet implemented — pending orchestrator wiring' });
   });
 }
