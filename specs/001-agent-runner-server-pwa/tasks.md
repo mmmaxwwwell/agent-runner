@@ -120,7 +120,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] Implement WebSocket upgrade handling in src/server.ts — parse URL path, route /ws/sessions/:id to session-stream handler, route /ws/dashboard to dashboard handler, reject unknown paths
+- [x] T034 [US2] Implement WebSocket upgrade handling in src/server.ts — parse URL path, route /ws/sessions/:id to session-stream handler, route /ws/dashboard to dashboard handler, reject unknown paths
 - [ ] T035 [US2] Implement session stream WebSocket handler in src/ws/session-stream.ts — on connect: parse lastSeq from query, replay from JSONL log (entries with seq > lastSeq), send sync message, add client to session broadcast set (Map<sessionId, Set<WebSocket>>), forward live output/state/progress/error messages, check bufferedAmount <64KB before send, heartbeat ping every 30s, remove on close per websocket-api.md
 - [ ] T036 [US2] Implement dashboard WebSocket handler in src/ws/dashboard.ts — maintain Set<WebSocket> of dashboard clients, broadcast project-update messages (projectId, activeSession, taskSummary) on session state changes, heartbeat ping every 30s per websocket-api.md
 - [ ] T037 [US2] Integrate WebSocket broadcasting into process-manager and session model — emit output events to session-stream clients, emit state/progress events to both session-stream and dashboard clients

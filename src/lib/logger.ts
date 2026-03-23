@@ -18,7 +18,9 @@ export type ComponentName =
   | 'recovery'
   | 'disk-monitor'
   | 'spec-kit'
-  | 'sessions';
+  | 'sessions'
+  | 'ws:session-stream'
+  | 'ws:dashboard';
 
 /**
  * Set the runtime log level for the root logger and all child loggers.

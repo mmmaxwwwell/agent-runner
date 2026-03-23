@@ -1,11 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile, stat, mkdir, writeFile, access } from 'node:fs/promises';
 import { resolve, extname, join } from 'node:path';
+import { WebSocketServer } from 'ws';
 import { loadConfig, type Config } from './lib/config.js';
 import { createLogger, setLevel } from './lib/logger.js';
 import { mountHealthRoutes } from './routes/health.js';
 import { mountProjectRoutes } from './routes/projects.js';
 import { mountSessionRoutes } from './routes/sessions.js';
+import { handleSessionStream } from './ws/session-stream.js';
+import { handleDashboard } from './ws/dashboard.js';
 
 const log = createLogger('server');
 
@@ -159,13 +162,40 @@ setLevel(config.logLevel);
 
 const server = createServer(handleRequest);
 
-// WebSocket upgrade handling — handlers registered in later tasks
+// WebSocket server (noServer mode — we handle upgrades manually)
+const wss = new WebSocketServer({ noServer: true });
+
+// Session stream path pattern: /ws/sessions/:id
+const WS_SESSION_RE = /^\/ws\/sessions\/([a-f0-9-]+)$/;
+
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
-  log.debug({ pathname: url.pathname }, 'WebSocket upgrade request');
+  const pathname = url.pathname;
+  log.debug({ pathname }, 'WebSocket upgrade request');
 
-  // WebSocket handlers will be wired in Phase 5 (US2)
-  // For now, reject all upgrade requests
+  // Route: /ws/sessions/:id
+  const sessionMatch = pathname.match(WS_SESSION_RE);
+  if (sessionMatch) {
+    const sessionId = sessionMatch[1]!;
+    const lastSeqParam = url.searchParams.get('lastSeq');
+    const lastSeq = lastSeqParam !== null ? parseInt(lastSeqParam, 10) : null;
+
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      handleSessionStream(ws, req, sessionId, Number.isNaN(lastSeq) ? null : lastSeq);
+    });
+    return;
+  }
+
+  // Route: /ws/dashboard
+  if (pathname === '/ws/dashboard') {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      handleDashboard(ws, req);
+    });
+    return;
+  }
+
+  // Unknown WebSocket path — reject
+  log.warn({ pathname }, 'Unknown WebSocket path, rejecting upgrade');
   socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
   socket.destroy();
 });
