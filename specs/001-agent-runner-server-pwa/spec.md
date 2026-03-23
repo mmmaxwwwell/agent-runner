@@ -70,8 +70,8 @@ A user starts a new project from their phone by tapping "New Project," providing
 
 1. **Given** the user taps "New Project," **When** they provide a repo name and describe their idea, **Then** a project directory is created under `AGENT_RUNNER_PROJECTS_DIR/<repo-name>/` and the spec-kit specify phase begins.
 2. **Given** an active spec-kit phase session, **When** the agent responds with a question, **Then** the response is displayed as text and the user can reply by voice or typing.
-3. **Given** a completed spec-kit phase, **When** the phase produces its artifacts, **Then** the system automatically starts the next phase in a new agent session (specify → clarify → plan → tasks → analyze).
-4. **Given** a completed analyze phase, **When** issues are found, **Then** the system interviews the user to resolve them and applies remediations before proceeding.
+3. **Given** a completed spec-kit phase (agent process exits with code 0), **When** the phase produces its artifacts, **Then** the system automatically starts the next phase in a new agent session (specify → clarify → plan → tasks → analyze). If the agent process exits with a non-zero code, the system notifies the user and does not auto-advance.
+4. **Given** a completed analyze phase, **When** issues are found, **Then** the system interviews the user to resolve them, applies remediations, and re-runs the analyze phase. This loop repeats until the analyze phase finds zero issues, capped at 5 iterations. If issues persist after 5 loops, the system notifies the user and pauses for manual intervention.
 5. **Given** all planning phases are complete, **When** the user approves, **Then** the system kicks off `run-tasks.sh` for autonomous implementation and the project appears on the dashboard.
 6. **Given** a voice input attempt, **When** the microphone is active, **Then** a visual indicator shows the system is listening and displays the transcribed text before sending.
 
@@ -109,6 +109,24 @@ The monitoring interface is installable as a standalone app on Android. Once ins
 
 ---
 
+### User Story 7 - Add Feature to Existing Project via Spec-Kit Workflow (Priority: P2)
+
+From the project detail screen, the user taps "Add Feature," describes the new feature via voice or text, and the system runs the full spec-kit SDD workflow (specify → clarify → plan → tasks → analyze) as sequential interactive agent sessions against the existing project directory. Each phase is a separate agent session where the user participates via voice or text — reusing the same session infrastructure from US4. The analyze phase loops until zero issues are found. After the user approves the generated plan and tasks, the system kicks off `run-tasks.sh` for autonomous implementation of the new feature.
+
+**Why this priority**: Adding features to existing projects is the natural follow-on to creating new projects (US4). Once users have a running project, they need to evolve it. This leverages the same interactive session and SDD workflow infrastructure, extending the system's value without requiring a new project for every feature.
+
+**Independent Test**: Can be tested by registering a project, tapping "Add Feature," describing a feature via text, verifying each spec-kit phase runs as an interactive session, confirming analyze loops until clean, approving the plan, and verifying `run-tasks.sh` starts against the existing project directory.
+
+**Acceptance Scenarios**:
+
+1. **Given** a registered project on the detail screen, **When** the user taps "Add Feature" and describes the feature via voice or text, **Then** the system starts the spec-kit specify phase as an interactive agent session against the existing project directory.
+2. **Given** a completed spec-kit phase for an add-feature workflow, **When** the phase produces its artifacts, **Then** the system automatically starts the next phase in a new agent session (specify → clarify → plan → tasks → analyze). If the agent process exits with a non-zero code, the system notifies the user and does not auto-advance.
+3. **Given** a completed analyze phase for an add-feature workflow, **When** issues are found, **Then** the system interviews the user to resolve them, applies remediations, and re-runs the analyze phase. This loop repeats until the analyze phase finds zero issues.
+4. **Given** all planning phases are complete for the new feature, **When** the user approves, **Then** the system kicks off `run-tasks.sh` for autonomous implementation against the existing project directory and the project appears on the dashboard with updated task progress.
+5. **Given** an add-feature workflow in progress, **When** the user views the project on the dashboard, **Then** the project status reflects the current spec-kit phase (e.g., "Adding feature: clarify phase").
+
+---
+
 ## Clarifications
 
 ### Session 2026-03-22
@@ -128,8 +146,10 @@ The monitoring interface is installable as a standalone app on Android. Once ins
 - What happens when the sandboxing mechanism is unavailable? The system refuses to start sessions unless the server was started with `ALLOW_UNSANDBOXED=true` AND the session start request includes `allowUnsandboxed: true`. Both gates are required. Unsandboxed execution produces a visible warning in server logs and session output.
 - What happens when the user's device loses network connectivity during a live stream? The server continues running and logging; the client resumes from the log on reconnect.
 - What happens when voice recognition fails or is unsupported by the browser? The system should fall back to text input and inform the user. If browser-native speech recognition is unavailable, the system should suggest switching to the Google Speech-to-Text backend.
-- What happens when disk space is running low? The system should monitor available disk space and warn the user when it falls below a configurable threshold, rather than silently failing when logs can no longer be written.
-- What happens when disk space runs out for session logs? See low disk space edge case above.
+- What happens when disk space is running low or runs out for session logs? The system monitors available disk space every 60 seconds and warns the user (via push notification and server logs) when it falls below `DISK_WARN_THRESHOLD_MB` (default 8192 MB), rather than silently failing when logs can no longer be written.
+- What happens when the user starts an add-feature workflow on a project that already has a running session? The system prevents it — only one active session per project (FR-012 applies). The user must wait for the current session to complete or stop it first.
+- What happens when the analyze phase keeps finding issues after multiple loops? The system caps the analyze loop at 5 iterations. If issues persist after 5 loops, the system notifies the user and pauses for manual intervention rather than looping indefinitely.
+- What happens when the user abandons an add-feature workflow mid-phase? The current session can be stopped like any other session (FR-013). Partial spec-kit artifacts remain in the project directory for the user to resume or clean up manually.
 
 ## Requirements *(mandatory)*
 
@@ -151,8 +171,9 @@ The monitoring interface is installable as a standalone app on Android. Once ins
 - **FR-014**: System MUST run agent processes via `nix develop <project-dir> --command` to inherit the project's Nix flake toolchain.
 - **FR-015**: System MUST persist session state to disk and, on server startup, automatically resume any sessions that were running or waiting-for-input when the server last stopped.
 - **FR-016**: System MUST emit structured JSON logs to stderr across all components (server lifecycle, session management, process spawning, sandboxing, streaming, push notifications, voice transcription, task parsing) using 5 log levels (debug, info, warn, error, fatal). The active log level MUST be configurable at runtime via environment variable or API.
-- **FR-017**: System MUST monitor available disk space and warn the user (via push notification and server logs) when it falls below a threshold, before session logs fail to write.
-- **FR-018**: System MUST orchestrate the spec-kit SDD workflow for new projects — running specify, clarify, plan, tasks, and analyze phases as separate interactive agent sessions, then launching `run-tasks.sh` for autonomous implementation after user approval.
+- **FR-017**: System MUST monitor available disk space in `AGENT_RUNNER_DATA_DIR` every 60 seconds and warn the user (via push notification and server logs) when it falls below `DISK_WARN_THRESHOLD_MB` (default 8192 MB, user-configurable via environment variable), before session logs fail to write.
+- **FR-018**: System MUST orchestrate the spec-kit SDD workflow for new projects — running specify, clarify, plan, tasks, and analyze phases as separate interactive agent sessions, with the analyze phase looping until zero issues are found (capped at 5 iterations), then launching `run-tasks.sh` for autonomous implementation after user approval.
+- **FR-019**: System MUST support adding a new feature to an existing registered project by running the full spec-kit SDD workflow (specify → clarify → plan → tasks → analyze) as sequential interactive agent sessions against the existing project directory, reusing the same session infrastructure as FR-018. The analyze phase MUST loop until zero issues are found, capped at 5 iterations. After user approval, the system launches `run-tasks.sh` for autonomous implementation.
 
 ### Key Entities
 
@@ -172,6 +193,7 @@ The monitoring interface is installable as a standalone app on Android. Once ins
 - **SC-005**: Agent processes cannot read or write files outside their assigned project directory.
 - **SC-006**: Voice input is transcribed and delivered to the agent within 5 seconds of the user finishing speaking.
 - **SC-007**: A new project can be created through the spec-kit workflow, with autonomous implementation kicked off after user approval.
+- **SC-008**: A new feature can be added to an existing project through the spec-kit workflow, with the analyze phase looping until clean and autonomous implementation kicked off after user approval.
 
 ## Assumptions
 

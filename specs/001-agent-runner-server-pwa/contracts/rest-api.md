@@ -132,6 +132,42 @@ Unregister a project. Does not delete project files.
 
 ---
 
+## Spec-Kit Workflow
+
+### `POST /api/projects/:id/add-feature`
+
+Start the spec-kit SDD workflow to add a new feature to an existing project. This triggers the same workflow orchestration as new project creation (specify → clarify → plan → tasks → analyze loop), but operates on the existing project directory.
+
+**Request**:
+```json
+{
+  "description": "Add user authentication with OAuth2 support",
+  "allowUnsandboxed": false
+}
+```
+
+`description` is the natural-language feature description (text or transcribed voice). `allowUnsandboxed` follows the same rules as session creation.
+
+**Response** `201`:
+```json
+{
+  "sessionId": "uuid",
+  "projectId": "uuid",
+  "phase": "specify",
+  "state": "running"
+}
+```
+
+The response returns the first session (specify phase). Subsequent phases auto-advance on completion — the client tracks progress via the dashboard WebSocket or by polling sessions.
+
+**Errors**:
+- `404` — Project not found
+- `409` — Project already has an active session
+- `400` — Empty description
+- `503` — Sandboxing unavailable and not overridden
+
+---
+
 ## Sessions
 
 ### `POST /api/projects/:id/sessions`

@@ -21,7 +21,7 @@
 
 - [ ] T001 Initialize Node.js project with package.json (type: module, engines: node >=22) and install dependencies: ws, web-push, pino, preact, and dev dependencies: typescript, tsx, esbuild, @types/node, @types/ws in package.json
 - [ ] T002 Configure TypeScript with tsconfig.json (target ES2022, module NodeNext, outDir dist/, rootDir src/, strict mode, jsxImportSource preact)
-- [ ] T003 [P] Add npm scripts to package.json: build (tsc && esbuild src/client/app.tsx --bundle --outdir=public/), dev (tsx watch src/server.ts), build:client (esbuild src/client/app.tsx --bundle --outdir=public/ --watch), start (node dist/server.js), test (node --test tests/**/*.test.ts)
+- [ ] T003 [P] Add npm scripts to package.json: build (tsc && esbuild src/client/app.tsx --bundle --outdir=public/), dev (tsx watch src/server.ts), build:client (esbuild src/client/app.tsx --bundle --outdir=public/ --watch), start (node dist/server.js), test (tsx --test tests/**/*.test.ts)
 - [ ] T004 [P] Create project directory structure: src/models/, src/services/, src/routes/, src/ws/, src/lib/, src/client/components/, src/client/lib/, public/, tests/unit/, tests/integration/, tests/contract/
 
 **Checkpoint**: Project compiles with `npm run build` and `npm test` runs (no tests yet).
@@ -34,7 +34,7 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement environment config loader in src/lib/config.ts — read AGENT_RUNNER_HOST (default 127.0.0.1), AGENT_RUNNER_PORT (default 3000), AGENT_RUNNER_DATA_DIR (default ~/.agent-runner), AGENT_RUNNER_PROJECTS_DIR (required), LOG_LEVEL (default info), VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, ALLOW_UNSANDBOXED (default false), GOOGLE_STT_API_KEY (optional) per data-model.md env vars table. VAPID keys: env vars override vapid-keys.json; if neither exists, auto-generate to vapid-keys.json on first startup
+- [ ] T005 Implement environment config loader in src/lib/config.ts — read AGENT_RUNNER_HOST (default 127.0.0.1), AGENT_RUNNER_PORT (default 3000), AGENT_RUNNER_DATA_DIR (default ~/.agent-runner), AGENT_RUNNER_PROJECTS_DIR (required), LOG_LEVEL (default info), VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, ALLOW_UNSANDBOXED (default false), GOOGLE_STT_API_KEY (optional), DISK_WARN_THRESHOLD_MB (default 8192) per data-model.md env vars table. VAPID keys: env vars override vapid-keys.json; if neither exists, auto-generate to vapid-keys.json on first startup
 - [ ] T006 [P] Implement Pino structured logger in src/lib/logger.ts — JSON to stderr, child loggers with component field, runtime level change via setLevel(), levels: debug/info/warn/error/fatal per research.md §6
 - [ ] T007 [P] Write unit tests for config and logger in tests/unit/config.test.ts and tests/unit/logger.test.ts, including contract test for PUT /api/config/log-level endpoint
 - [ ] T008 Implement HTTP server entry point in src/server.ts — create http.createServer, serve static files from public/, mount /api routes, upgrade WebSocket connections, listen on configured host:port, log startup with pino
@@ -168,20 +168,57 @@
 
 **Independent Test**: Tap New Project, provide repo name and idea, go through spec-kit phases, verify artifacts generated, confirm project appears on dashboard and autonomous implementation starts.
 
+### Tests for User Story 4
+
+> **Write these tests FIRST, ensure they FAIL before implementation**
+
+- [ ] T052b [P] [US4] Write unit tests for spec-kit workflow orchestrator in tests/unit/spec-kit.test.ts — phase sequencing (specify → clarify → plan → tasks → analyze), directory creation under AGENT_RUNNER_PROJECTS_DIR, phase completion detection (exit code 0 = advance, non-zero = stop and notify), analyze-remediate loop (re-run analyze after remediations until zero issues), project auto-registration after artifacts generated, run-tasks.sh launch after user approval per plan.md key design §6
+- [ ] T052c [P] [US4] Write contract tests for voice transcription endpoint in tests/contract/rest-api-voice.test.ts — POST /api/voice/transcribe with audio blob returns { text }, 503 when GOOGLE_STT_API_KEY not configured, 400 when no audio provided per rest-api.md contract
+
 ### Implementation for User Story 4
 
 - [ ] T053 [US4] Implement voice input module in src/client/lib/voice.ts — Web Speech API (webkitSpeechRecognition) for browser-native transcription, Google Speech-to-Text API mode (record audio via MediaRecorder, POST to /api/voice/transcribe), toggle between modes, visual listening indicator, return transcribed text per plan.md key design §5
 - [ ] T054 [US4] Add voice transcription endpoint POST /api/voice/transcribe in src/routes/voice.ts — receive audio blob, proxy to Google Speech-to-Text API using GOOGLE_STT_API_KEY, return { text } — return 503 if no API key configured per rest-api.md contract
 - [ ] T055 [US4] Implement new-project Preact component in src/client/components/new-project.tsx — form with repo name input, "Start Project" button, mic icon for voice input, spec-kit phase chat view (agent messages as text, user input via voice or typing), connect to /ws/sessions/:id for each phase's streaming, show current phase indicator (specify → clarify → plan → tasks → analyze), on workflow complete: navigate to dashboard
 - [ ] T056 [US4] Update session creation to support interview type — POST /api/projects/:id/sessions with type "interview", spawn claude in interview mode (bidirectional stdin/stdout), forward WebSocket input messages to process stdin per websocket-api.md client→server input message
-- [ ] T057 [US4] Implement spec-kit workflow orchestrator in src/services/spec-kit.ts — create project directory under AGENT_RUNNER_PROJECTS_DIR/<repo-name>/, run spec-kit phases (specify, clarify, plan, tasks, analyze) as sequential interactive agent sessions using the spec-kit SKILL.md prompts, each phase in a new agent session (own context window), auto-register project after artifacts are generated, launch run-tasks.sh for autonomous implementation after user approval per plan.md key design §6
+- [ ] T057 [US4] Implement spec-kit workflow orchestrator in src/services/spec-kit.ts — create project directory under AGENT_RUNNER_PROJECTS_DIR/<repo-name>/, run spec-kit phases (specify, clarify, plan, tasks, analyze) as sequential interactive agent sessions using the spec-kit SKILL.md prompts, each phase in a new agent session (own context window). After analyze: if issues found, interview user for remediations, apply them, and re-run analyze — loop until zero issues. Auto-register project after artifacts are generated, launch run-tasks.sh for autonomous implementation after user approval per plan.md key design §6
 - [ ] T057b [US4] Wire voice routes into src/server.ts — mount /api/voice handlers
 
 **Checkpoint**: Can create a project through spec-kit workflow with voice/text input, project appears on dashboard, autonomous implementation starts after approval.
 
 ---
 
-## Phase 8: User Story 6 — Installable Mobile App (Priority: P3)
+## Phase 8: User Story 7 — Add Feature to Existing Project via Spec-Kit Workflow (Priority: P2)
+
+**Goal**: Users add a new feature to an existing registered project by tapping "Add Feature" on the project detail screen, describing the feature via voice or text, and running the full spec-kit SDD workflow (specify → clarify → plan → tasks → analyze) as sequential interactive agent sessions against the existing project directory. The analyze phase loops until zero issues are found (capped at 5 iterations). After user approval, `run-tasks.sh` kicks off autonomous implementation.
+
+**Independent Test**: Register a project, tap "Add Feature," describe a feature via text, verify each spec-kit phase runs as an interactive session, confirm analyze loops until clean, approve the plan, verify `run-tasks.sh` starts against the existing project directory.
+
+**Dependencies**: Depends on US4 (reuses spec-kit workflow orchestrator and interactive session infrastructure) + US2 (needs session view and dashboard).
+
+### Tests for User Story 7
+
+> **Write these tests FIRST, ensure they FAIL before implementation**
+
+- [ ] T070 [P] [US7] Write unit tests for add-feature workflow in tests/unit/spec-kit-add-feature.test.ts — verify orchestrator accepts existing project directory (no directory creation), passes project dir to each phase agent session, phase sequencing (specify → clarify → plan → tasks → analyze), analyze loop cap at 5 iterations with user notification on cap reached, run-tasks.sh launch against existing project dir after approval per spec.md US7 and plan.md key design §6
+- [ ] T071 [P] [US7] Write contract tests for POST /api/projects/:id/add-feature in tests/contract/rest-api-add-feature.test.ts — returns session for specify phase, rejects when project has active session (409), rejects empty description (400), rejects unknown project (404) per rest-api.md contract
+
+### Implementation for User Story 7
+
+- [ ] T072 [US7] Extend spec-kit workflow orchestrator in src/services/spec-kit.ts — add startAddFeatureWorkflow(projectId, description) method that runs the same phase sequence as new-project but skips directory creation, uses existing project's dir from the project registry, passes feature description to the specify phase agent session per plan.md key design §6
+- [ ] T073 [US7] Add REST endpoint POST /api/projects/:id/add-feature in src/routes/projects.ts — validate project exists, no active session, non-empty description, call spec-kit orchestrator startAddFeatureWorkflow(), return first session info with phase "specify" per rest-api.md contract
+- [ ] T074 [US7] Implement add-feature Preact component in src/client/components/add-feature.tsx — form with feature description textarea, mic icon for voice input, reuse spec-kit phase chat view from new-project.tsx (extract shared component if not already extracted), show current phase indicator, connect to /ws/sessions/:id for streaming, display workflow phase transitions, navigate to project detail on completion
+- [ ] T075 [US7] Add "Add Feature" button to project detail component in src/client/components/project-detail.tsx — show button when no active session, navigate to #/projects/:id/add-feature, pass project context to add-feature component
+- [ ] T076 [US7] Emit phase transition WebSocket messages during add-feature workflow — send `phase` message type on each phase transition with workflow "add-feature", include iteration count for analyze loop, update dashboard `project-update` messages to include workflow info per websocket-api.md contract
+- [ ] T077 [US7] Update client-side hash router in src/client/lib/router.ts — add route #/projects/:id/add-feature → add-feature component
+
+**Checkpoint**: Can add a feature to an existing project through spec-kit workflow, analyze loops until clean (max 5), autonomous implementation starts after approval. Dashboard shows workflow phase progress.
+
+---
+
+## Phase 9: User Story 6 — Installable Mobile App (Priority: P3)
+
+> **Note**: Renumbered from Phase 8 to Phase 9 to accommodate US7.
 
 **Goal**: PWA installable on Android with home screen icon, system push notifications when backgrounded, offline log viewing.
 
@@ -198,7 +235,7 @@
 
 ---
 
-## Phase 9: Crash Recovery & Polish
+## Phase 10: Crash Recovery & Polish
 
 **Purpose**: Cross-cutting concerns, crash recovery, and final integration
 
@@ -206,7 +243,8 @@
 - [ ] T063 Write integration tests for crash recovery in tests/integration/recovery.test.ts — simulate crash (running session with meta.json), restart server, verify session resumes or restores waiting state
 - [ ] T064 Integrate recovery service into src/server.ts startup — call recovery.resumeAll() after data dir init, before accepting connections
 - [ ] T065 [P] Add CSS styling to src/client/index.html or src/client/style.css — mobile-first responsive layout, dark theme, terminal-like output styling, status badges, card components, touch-friendly tap targets
-- [ ] T065b [P] Implement disk space monitoring in src/services/disk-monitor.ts — periodically check available disk space in AGENT_RUNNER_DATA_DIR, warn via push notification and server logs when below threshold (FR-017)
+- [ ] T065b [P] Write unit tests for disk space monitor in tests/unit/disk-monitor.test.ts — mock fs.statfs, verify warning triggers when available space falls below DISK_WARN_THRESHOLD_MB (default 8192), verify no warning above threshold, verify 60-second polling interval, verify push notification and log emission on warning per spec.md FR-017
+- [ ] T065c [P] Implement disk space monitoring in src/services/disk-monitor.ts — check available disk space in AGENT_RUNNER_DATA_DIR every 60 seconds, warn via push notification and server logs when below DISK_WARN_THRESHOLD_MB (default 8192 MB, user-configurable) per spec.md FR-017
 - [ ] T066 [P] Add error handling middleware to src/server.ts — catch unhandled request errors, return JSON { error } with appropriate status codes, log errors with pino
 - [ ] T067 Validate all REST API contracts end-to-end in tests/contract/rest-api.test.ts — run full contract test suite against running server, verify all 12 endpoints match rest-api.md
 - [ ] T068 Validate all WebSocket contracts end-to-end in tests/contract/websocket-api.test.ts — run full contract test suite against running server, verify message formats match websocket-api.md
@@ -227,8 +265,9 @@
 - **US2 Monitoring (Phase 5)**: Depends on US1 (needs running sessions to stream)
 - **US3 Blocked Tasks (Phase 6)**: Depends on US1 (needs waiting-for-input state) + US2 (needs session view)
 - **US4 Spec-Kit Workflow (Phase 7)**: Depends on US5 (needs project registration) + US2 (needs session view)
-- **US6 Installable App (Phase 8)**: Depends on US2 (needs working PWA)
-- **Polish (Phase 9)**: Depends on US1 + US2 at minimum
+- **US7 Add Feature (Phase 8)**: Depends on US4 (reuses spec-kit orchestrator) + US2 (needs session view + dashboard)
+- **US6 Installable App (Phase 9)**: Depends on US2 (needs working PWA)
+- **Polish (Phase 10)**: Depends on US1 + US2 at minimum
 
 ### User Story Dependencies
 
@@ -237,6 +276,7 @@
 - **US2 (P1)**: Can start after US1 — needs sessions to exist for streaming
 - **US3 (P2)**: Can start after US2 — needs session view for answer UI
 - **US4 (P2)**: Can start after US5 + US2 — needs project registration + session view + spec-kit orchestration
+- **US7 (P2)**: Can start after US4 — reuses spec-kit orchestrator + session infrastructure
 - **US6 (P3)**: Can start after US2 — needs working PWA to make installable
 
 ### Within Each User Story
@@ -255,7 +295,10 @@
 - Phase 4: T019-T023 can all run in parallel (tests); T024, T025 can run in parallel
 - Phase 5: T032, T033 in parallel; T039, T040, T041 in parallel
 - Phase 6: T045 independent
-- Phase 8: T058, T059 in parallel
+- Phase 7: T052b, T052c in parallel (tests)
+- Phase 8: T070, T071 in parallel (tests)
+- Phase 9: T058, T059 in parallel
+- Phase 10: T065b, T065c in parallel (after T065b tests written)
 
 ---
 
@@ -295,8 +338,9 @@ Task: "Implement JSONL session logger in src/services/session-logger.ts"
 4. Add US2 → Can monitor via PWA dashboard and live streaming
 5. Add US3 → Can answer blocked tasks via push notifications
 6. Add US4 → Can create projects via spec-kit workflow with voice/text input
-7. Add US6 → Installable mobile app with offline support
-8. Polish → Crash recovery, contract validation, quickstart check
+7. Add US7 → Can add features to existing projects via spec-kit workflow
+8. Add US6 → Installable mobile app with offline support
+9. Polish → Crash recovery, contract validation, quickstart check
 
 ### Parallel Team Strategy
 

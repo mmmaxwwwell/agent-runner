@@ -46,7 +46,7 @@ A single agent process execution tied to a project.
 | `pid` | `number \| null` | OS process ID of the agent, null when not running |
 | `lastTaskId` | `string \| null` | Task ID the agent was working on (for crash recovery) |
 | `question` | `string \| null` | Blocked-task question (set when state is `waiting-for-input`) |
-| `exitCode` | `number \| null` | Agent process exit code (set on completion/failure) |
+| `exitCode` | `number \| null` | Agent process exit code (set on completion/failure). `-1` indicates the session was manually stopped by the user via POST /api/sessions/:id/stop. |
 
 **State machine** (`SessionState`):
 
@@ -193,5 +193,6 @@ A Web Push subscription for a connected client.
 | `VAPID_SUBJECT` | `mailto:agent-runner@localhost` | VAPID subject for Web Push |
 | `ALLOW_UNSANDBOXED` | `false` | Server-level gate for unsandboxed execution |
 | `GOOGLE_STT_API_KEY` | *(none)* | Google Speech-to-Text API key (enables cloud voice transcription) |
+| `DISK_WARN_THRESHOLD_MB` | `8192` | Warn when available disk space in AGENT_RUNNER_DATA_DIR falls below this value (MB). Checked every 60 seconds. |
 
 **VAPID key resolution**: If `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` env vars are set, they take precedence. Otherwise, the server reads from `~/.agent-runner/vapid-keys.json`. If neither exists, keys are auto-generated and written to `vapid-keys.json` on first startup.

@@ -12,7 +12,7 @@ Build a Node.js server that manages sandboxed `claude` CLI processes for autonom
 **Language/Version**: TypeScript on Node.js 22 (via Nix flake, compiled with `tsc`, dev with `tsx`)
 **Primary Dependencies**: `ws` (WebSocket), `web-push` (push notifications), `pino` (structured logging), `tsx` (dev), `preact` (UI), `esbuild` (client build)
 **Storage**: Filesystem only — `~/.agent-runner/projects.json`, per-session `meta.json` + `output.jsonl`
-**Testing**: Node.js built-in test runner (`node:test`) + `node:assert`
+**Testing**: Node.js built-in test runner (`node:test`) via `tsx --test` + `node:assert`
 **Target Platform**: NixOS (Linux), accessed via local network PWA
 **Project Type**: Web service (server) + PWA (client)
 **Performance Goals**: Voice delivered <5s, notifications <30s
@@ -69,6 +69,7 @@ src/
 │   ├── session-logger.ts  # JSONL log writer + reader (byte-offset replay)
 │   ├── push.ts            # Web Push notification sender
 │   ├── recovery.ts        # Startup crash recovery (resume sessions)
+│   ├── disk-monitor.ts    # Disk space monitoring (FR-017)
 │   └── spec-kit.ts        # Spec-kit SDD workflow orchestrator
 ├── routes/
 │   ├── projects.ts        # /api/projects endpoints
@@ -90,6 +91,7 @@ src/client/
 │   ├── project-detail.tsx # Project detail + full task list
 │   ├── session-view.tsx   # Live terminal output view
 │   ├── new-project.tsx    # New project form / spec-kit workflow view
+│   ├── add-feature.tsx    # Add feature form + spec-kit workflow view (reuses new-project.tsx internals)
 │   └── settings.tsx       # Settings (voice backend, log level)
 └── lib/
     ├── api.ts             # REST API client wrapper
@@ -179,22 +181,34 @@ Each loop iteration is a separate process spawn (not a long-running process). Th
 
 ### 6. Spec-Kit Workflow Orchestration
 
-New projects are created through the full spec-kit SDD workflow:
+The spec-kit SDD workflow is used for both **new project creation** (US4) and **adding features to existing projects** (US7). The orchestration is identical — only the entry point and initial setup differ.
 
+**New project (US4)**:
 ```
 User provides repo name + idea description →
   create $AGENT_RUNNER_PROJECTS_DIR/<repo-name>/ →
-  specify (interactive session) →
-  clarify (interactive session) →
-  plan (interactive session) →
-  tasks (interactive session) →
-  analyze (interactive session — resolve issues) →
-  apply remediations →
-  user approves →
-  launch run-tasks.sh (autonomous implementation)
+  specify → clarify → plan → tasks → analyze (loop until clean) →
+  user approves → launch run-tasks.sh
 ```
 
+**Add feature to existing project (US7)**:
+```
+User taps "Add Feature" on project detail screen →
+  describe feature via voice or text →
+  specify → clarify → plan → tasks → analyze (loop until clean) →
+  user approves → launch run-tasks.sh against existing project dir
+```
+
+Both flows reuse the same `spec-kit.ts` orchestrator — the difference is:
+- US4 creates the project directory first, then starts the workflow
+- US7 uses the existing project's directory directly (no directory creation)
+- Both pass the project directory to each agent session as the working directory
+
 Each phase runs as a separate agent session (own context window) to avoid context overload. The user participates interactively in all planning phases. Only the final implementation via `run-tasks.sh` is autonomous.
+
+**Phase completion detection**: A phase is considered complete when the agent process exits with code 0. A non-zero exit code means the phase failed — the system notifies the user and does not auto-advance to the next phase.
+
+**Analyze loop cap**: The analyze phase loops until zero issues are found, capped at 5 iterations. If issues persist after 5 iterations, the system notifies the user and pauses for manual intervention.
 
 The spec-kit skill at `/home/max/git/agent-framework/.claude/skills/spec-kit/SKILL.md` provides the phase prompts. The `run-tasks.sh` script at `/home/max/git/agent-framework/.claude/skills/spec-kit/run-tasks.sh` handles autonomous implementation.
 

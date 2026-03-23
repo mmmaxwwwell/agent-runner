@@ -88,6 +88,29 @@ Replay complete, switching to live streaming.
 
 Sent after all replay entries have been delivered. Client can use `lastSeq` to verify continuity.
 
+### `phase`
+
+Spec-kit workflow phase transition (emitted during new-project and add-feature workflows).
+
+```json
+{
+  "type": "phase",
+  "workflow": "add-feature",
+  "phase": "clarify",
+  "previousPhase": "specify",
+  "iteration": 1,
+  "maxIterations": 5,
+  "sessionId": "uuid"
+}
+```
+
+- `workflow`: `"new-project"` or `"add-feature"`
+- `phase`: Current phase — `"specify"`, `"clarify"`, `"plan"`, `"tasks"`, `"analyze"`, `"implementation"`
+- `previousPhase`: The phase that just completed (null for the first phase)
+- `iteration`: For the analyze phase, the current loop iteration (1-5). For other phases, always 1.
+- `maxIterations`: For the analyze phase, the maximum iterations (5). For other phases, always 1.
+- `sessionId`: The new session ID for the current phase
+
 ### `error`
 
 Server-side error related to this session.
@@ -114,7 +137,7 @@ Submit user input to an interview session.
 }
 ```
 
-Only valid for `interview` type sessions in `running` state. For `task-run` sessions waiting for input, use the REST endpoint `POST /api/sessions/:id/input` instead (which spawns a new session).
+Only valid for `interview` type sessions in `running` state. For `task-run` sessions waiting for input, use the REST endpoint `POST /api/sessions/:id/input` instead (which resumes the same session with a new agent process).
 
 ---
 
@@ -134,7 +157,7 @@ Emitted when any project's state changes.
   "projectId": "uuid",
   "activeSession": {
     "id": "uuid",
-    "type": "task-run",
+    "type": "interview",
     "state": "running"
   },
   "taskSummary": {
@@ -143,11 +166,17 @@ Emitted when any project's state changes.
     "blocked": 0,
     "skipped": 0,
     "remaining": 3
+  },
+  "workflow": {
+    "type": "add-feature",
+    "phase": "clarify",
+    "iteration": 1,
+    "description": "Add user authentication with OAuth2"
   }
 }
 ```
 
-`activeSession` is `null` when no session is active.
+`activeSession` is `null` when no session is active. `workflow` is `null` when no spec-kit workflow is in progress. When present, `workflow.type` is `"new-project"` or `"add-feature"`, `workflow.phase` is the current SDD phase, and `workflow.description` is the feature description provided by the user.
 
 ---
 
