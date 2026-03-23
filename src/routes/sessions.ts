@@ -6,7 +6,8 @@ import { createLogger } from '../lib/logger.js';
 import { getProject } from '../models/project.js';
 import { createSession, getSession, listSessionsByProject, transitionState } from '../models/session.js';
 import { buildCommand, isAvailable as isSandboxAvailable } from '../services/sandbox.js';
-import { spawnProcess, killProcess, startTaskLoop, type ProcessHandle } from '../services/process-manager.js';
+import { spawnProcess, killProcess, startTaskLoop } from '../services/process-manager.js';
+import { registerProcess, unregisterProcess, getActiveProcess } from '../services/process-registry.js';
 import { createSessionLogger, readLog } from '../services/session-logger.js';
 import { parseTaskSummary } from '../services/task-parser.js';
 import { broadcastSessionState } from '../ws/session-stream.js';
@@ -16,13 +17,6 @@ import type { PushService } from '../services/push.js';
 const log = createLogger('sessions');
 
 type RouteHandler = (req: IncomingMessage, res: ServerResponse, params: Record<string, string>) => void | Promise<void>;
-
-/** In-memory registry of active process handles by session ID */
-const activeProcesses = new Map<string, ProcessHandle>();
-
-export function getActiveProcess(sessionId: string): ProcessHandle | undefined {
-  return activeProcesses.get(sessionId);
-}
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
@@ -132,10 +126,10 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         dataDir: cfg.dataDir,
         pushService,
       }).then((result) => {
-        activeProcesses.delete(session.id);
+        unregisterProcess(session.id);
         log.info({ sessionId: session.id, outcome: result.outcome, spawnCount: result.spawnCount }, 'Task loop finished');
       }).catch((err) => {
-        activeProcesses.delete(session.id);
+        unregisterProcess(session.id);
         log.error({ sessionId: session.id, err }, 'Task loop error');
       });
 
@@ -175,7 +169,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         dataDir: cfg.dataDir,
       });
 
-      activeProcesses.set(session.id, handle);
+      registerProcess(session.id, handle);
 
       // Update session with PID
       const updated = getSession(cfg.dataDir, session.id)!;
@@ -189,7 +183,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
 
       // Handle process exit in background
       handle.waitForExit().then((result) => {
-        activeProcesses.delete(session.id);
+        unregisterProcess(session.id);
         const newState = result.exitCode === 0 ? 'completed' as const : 'failed' as const;
         transitionState(cfg.dataDir, session.id, newState, { exitCode: result.exitCode });
         broadcastSessionState(session.id, { state: newState });
@@ -210,7 +204,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
             .catch(err => log.warn({ err }, 'Failed to send push notification'));
         }
       }).catch(() => {
-        activeProcesses.delete(session.id);
+        unregisterProcess(session.id);
       });
 
       log.info({ sessionId: session.id, projectId: project.id, type: sessionType, pid: handle.pid }, 'Session started');
@@ -283,10 +277,10 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     }
 
     // Kill the process if we have a handle
-    const handle = activeProcesses.get(session.id);
+    const handle = getActiveProcess(session.id);
     if (handle) {
       killProcess(handle);
-      activeProcesses.delete(session.id);
+      unregisterProcess(session.id);
     }
 
     // Transition to failed with exitCode -1 (manual stop)
@@ -389,10 +383,10 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         dataDir: cfg.dataDir,
         pushService,
       }).then((result) => {
-        activeProcesses.delete(session.id);
+        unregisterProcess(session.id);
         log.info({ sessionId: session.id, outcome: result.outcome, spawnCount: result.spawnCount }, 'Task loop resumed after input');
       }).catch((err) => {
-        activeProcesses.delete(session.id);
+        unregisterProcess(session.id);
         log.error({ sessionId: session.id, err }, 'Task loop error after input');
       });
     } else {
@@ -405,7 +399,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         dataDir: cfg.dataDir,
       });
 
-      activeProcesses.set(session.id, handle);
+      registerProcess(session.id, handle);
 
       // Update session PID
       const sessionWithPid = getSession(cfg.dataDir, session.id)!;
@@ -418,7 +412,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
 
       // Handle process exit
       handle.waitForExit().then((result) => {
-        activeProcesses.delete(session.id);
+        unregisterProcess(session.id);
         const newState = result.exitCode === 0 ? 'completed' as const : 'failed' as const;
         transitionState(cfg.dataDir, session.id, newState, { exitCode: result.exitCode });
         broadcastSessionState(session.id, { state: newState });
@@ -439,7 +433,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
             .catch(err => log.warn({ err }, 'Failed to send push notification'));
         }
       }).catch(() => {
-        activeProcesses.delete(session.id);
+        unregisterProcess(session.id);
       });
 
       updated.pid = handle.pid;

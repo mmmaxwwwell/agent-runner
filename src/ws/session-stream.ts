@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createLogger } from '../lib/logger.js';
 import { readLog, readLogFromOffset, type SessionLogEntry } from '../services/session-logger.js';
 import { getSession } from '../models/session.js';
+import { getActiveProcess } from '../services/process-registry.js';
 
 const log = createLogger('ws:session-stream');
 
@@ -283,6 +284,29 @@ export function handleSessionStream(ws: WebSocket, _req: IncomingMessage, sessio
 
   ws.on('pong', () => {
     missedPongs = 0;
+  });
+
+  // Handle client→server messages (input for interview sessions)
+  ws.on('message', (data) => {
+    try {
+      const msg = JSON.parse(String(data)) as { type?: string; content?: string };
+      if (msg.type === 'input' && typeof msg.content === 'string') {
+        const currentSession = getSession(dataDir, sessionId);
+        if (!currentSession || currentSession.type !== 'interview' || currentSession.state !== 'running') {
+          log.debug({ sessionId, state: currentSession?.state, type: currentSession?.type }, 'Ignoring input: session not an active interview');
+          return;
+        }
+        const handle = getActiveProcess(sessionId);
+        if (handle && handle.process.stdin && !handle.process.stdin.destroyed) {
+          handle.process.stdin.write(msg.content + '\n');
+          log.debug({ sessionId }, 'Forwarded input to process stdin');
+        } else {
+          log.warn({ sessionId }, 'No active process stdin to write to');
+        }
+      }
+    } catch {
+      log.debug({ sessionId }, 'Ignoring unparseable WebSocket message');
+    }
   });
 
   ws.on('error', (err) => {
