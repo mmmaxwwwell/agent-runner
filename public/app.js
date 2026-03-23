@@ -897,24 +897,42 @@
             children: stopping ? "Stopping..." : "Stop"
           }
         )
-      ] }) : /* @__PURE__ */ u3(
-        "button",
-        {
-          onClick: startSession,
-          disabled: starting || taskSummary.remaining === 0,
-          style: {
-            padding: "6px 16px",
-            background: taskSummary.remaining === 0 ? "#666" : "#4caf50",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: taskSummary.remaining === 0 ? "default" : "pointer",
-            fontSize: "0.85rem",
-            opacity: starting ? 0.6 : 1
-          },
-          children: starting ? "Starting..." : taskSummary.remaining === 0 ? "All Tasks Done" : "Start Task Run"
-        }
-      ) }),
+      ] }) : /* @__PURE__ */ u3(k, { children: [
+        /* @__PURE__ */ u3(
+          "button",
+          {
+            onClick: startSession,
+            disabled: starting || taskSummary.remaining === 0,
+            style: {
+              padding: "6px 16px",
+              background: taskSummary.remaining === 0 ? "#666" : "#4caf50",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: taskSummary.remaining === 0 ? "default" : "pointer",
+              fontSize: "0.85rem",
+              opacity: starting ? 0.6 : 1
+            },
+            children: starting ? "Starting..." : taskSummary.remaining === 0 ? "All Tasks Done" : "Start Task Run"
+          }
+        ),
+        /* @__PURE__ */ u3(
+          "button",
+          {
+            onClick: () => navigate(`/projects/${id}/add-feature`),
+            style: {
+              padding: "6px 16px",
+              background: "#7c8dff",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "0.85rem"
+            },
+            children: "Add Feature"
+          }
+        )
+      ] }) }),
       /* @__PURE__ */ u3("div", { style: { marginBottom: "16px" }, children: [
         /* @__PURE__ */ u3("h3", { style: { margin: "0 0 8px 0", fontSize: "1rem" }, children: "Tasks" }),
         Array.from(phases.entries()).map(([phaseName, phaseTasks]) => /* @__PURE__ */ u3("div", { style: { marginBottom: "12px" }, children: [
@@ -1205,6 +1223,497 @@
     ] });
   }
 
+  // src/client/lib/voice.ts
+  var currentBackend = "browser";
+  var stateListeners = [];
+  var currentState = "idle";
+  function setState(state) {
+    currentState = state;
+    for (const listener of stateListeners) {
+      listener(state);
+    }
+  }
+  function onVoiceStateChange(listener) {
+    stateListeners.push(listener);
+    return () => {
+      stateListeners = stateListeners.filter((l3) => l3 !== listener);
+    };
+  }
+  function transcribe() {
+    if (currentBackend === "browser") {
+      return transcribeBrowser();
+    }
+    return transcribeCloud();
+  }
+  function transcribeBrowser() {
+    return new Promise((resolve, reject) => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        reject(new Error("Browser speech recognition is not available"));
+        return;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+      recognition.onstart = () => setState("listening");
+      recognition.onresult = (event) => {
+        setState("processing");
+        const transcript = event.results[0][0].transcript;
+        setState("idle");
+        resolve(transcript);
+      };
+      recognition.onerror = (event) => {
+        setState("idle");
+        reject(new Error(`Speech recognition error: ${event.error}`));
+      };
+      recognition.onend = () => {
+        setState("idle");
+      };
+      recognition.start();
+    });
+  }
+  async function transcribeCloud() {
+    setState("listening");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    const chunks = [];
+    const audioBlob = await new Promise((resolve) => {
+      mediaRecorder.ondataavailable = (e3) => {
+        if (e3.data.size > 0) chunks.push(e3.data);
+      };
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        resolve(new Blob(chunks, { type: mediaRecorder.mimeType }));
+      };
+      mediaRecorder.start();
+      setTimeout(() => {
+        if (mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+        }
+      }, 3e4);
+    });
+    setState("processing");
+    const formData = new FormData();
+    formData.append("audio", audioBlob, "recording.webm");
+    const res = await fetch("/api/voice/transcribe", {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) {
+      setState("idle");
+      const data2 = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(data2.error ?? "Voice transcription failed");
+    }
+    const data = await res.json();
+    setState("idle");
+    return data.text;
+  }
+
+  // src/client/components/spec-kit-chat.tsx
+  var PHASES = ["specify", "clarify", "plan", "tasks", "analyze"];
+  var phaseLabel = {
+    specify: "Specify",
+    clarify: "Clarify",
+    plan: "Plan",
+    tasks: "Tasks",
+    analyze: "Analyze",
+    implementation: "Implementing"
+  };
+  function SpecKitChat({ sessionId: initialSessionId, initialPhase, initialState, completionRoute }) {
+    const [sessionId, setSessionId] = d2(initialSessionId);
+    const [currentPhase, setCurrentPhase] = d2(initialPhase);
+    const [sessionState, setSessionState] = d2(initialState);
+    const [lines, setLines] = d2([]);
+    const [question, setQuestion] = d2(null);
+    const [userInput, setUserInput] = d2("");
+    const [voiceState, setVoiceState] = d2("idle");
+    const outputRef = A2(null);
+    const autoScrollRef = A2(true);
+    const wsRef = A2(null);
+    y2(() => {
+      return onVoiceStateChange(setVoiceState);
+    }, []);
+    y2(() => {
+      if (autoScrollRef.current && outputRef.current) {
+        outputRef.current.scrollTop = outputRef.current.scrollHeight;
+      }
+    }, [lines]);
+    y2(() => {
+      if (!sessionId) return;
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      const client = connectSession(sessionId, (msg) => {
+        if (msg.type === "output") {
+          const out = msg;
+          setLines((prev) => {
+            if (prev.length > 0 && prev[prev.length - 1].seq >= out.seq) return prev;
+            return [...prev, { ts: out.ts, stream: out.stream, seq: out.seq, content: out.content }];
+          });
+        } else if (msg.type === "state") {
+          const state = msg;
+          setSessionState(state.state);
+          if (state.state === "waiting-for-input" && state.question) {
+            setQuestion(state.question);
+          } else {
+            setQuestion(null);
+          }
+        } else if (msg.type === "phase") {
+          const phase = msg;
+          setCurrentPhase(phase.phase);
+          if (phase.phase === "implementation") {
+            setTimeout(() => navigate(completionRoute), 2e3);
+          }
+          if (phase.sessionId !== sessionId) {
+            setSessionId(phase.sessionId);
+          }
+        }
+      });
+      wsRef.current = client;
+      return () => client.close();
+    }, [sessionId, completionRoute]);
+    const sendInput = q2(() => {
+      if (!userInput.trim() || !wsRef.current) return;
+      wsRef.current.send({ type: "input", content: userInput.trim() });
+      setLines((prev) => [
+        ...prev,
+        { ts: Date.now(), stream: "system", seq: prev.length + 1e4, content: `> ${userInput.trim()}` }
+      ]);
+      setUserInput("");
+      setQuestion(null);
+    }, [userInput]);
+    const handleVoice = q2(async () => {
+      try {
+        const text = await transcribe();
+        if (text) {
+          setUserInput(text);
+        }
+      } catch {
+      }
+    }, []);
+    const handleScroll = () => {
+      if (!outputRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = outputRef.current;
+      autoScrollRef.current = scrollHeight - scrollTop - clientHeight < 40;
+    };
+    const phaseIndex = currentPhase ? PHASES.indexOf(currentPhase) : -1;
+    return /* @__PURE__ */ u3("div", { style: { display: "flex", flexDirection: "column", height: "calc(100vh - 100px)" }, children: [
+      /* @__PURE__ */ u3("div", { style: { display: "flex", gap: "4px", marginBottom: "12px", alignItems: "center", flexWrap: "wrap" }, children: [
+        PHASES.map((phase, i3) => {
+          const isActive = phase === currentPhase;
+          const isDone = phaseIndex > i3;
+          return /* @__PURE__ */ u3("div", { style: { display: "flex", alignItems: "center", gap: "4px" }, children: [
+            i3 > 0 && /* @__PURE__ */ u3("span", { style: { color: "#555", fontSize: "0.7rem" }, children: "\u2192" }),
+            /* @__PURE__ */ u3(
+              "span",
+              {
+                style: {
+                  fontSize: "0.75rem",
+                  padding: "2px 8px",
+                  borderRadius: "4px",
+                  background: isActive ? "#7c8dff" : isDone ? "#4caf50" : "#333",
+                  color: isActive || isDone ? "#fff" : "#888",
+                  fontWeight: isActive ? "bold" : "normal"
+                },
+                children: phaseLabel[phase] ?? phase
+              }
+            )
+          ] }, phase);
+        }),
+        currentPhase === "implementation" && /* @__PURE__ */ u3("div", { style: { display: "flex", alignItems: "center", gap: "4px" }, children: [
+          /* @__PURE__ */ u3("span", { style: { color: "#555", fontSize: "0.7rem" }, children: "\u2192" }),
+          /* @__PURE__ */ u3(
+            "span",
+            {
+              style: {
+                fontSize: "0.75rem",
+                padding: "2px 8px",
+                borderRadius: "4px",
+                background: "#4caf50",
+                color: "#fff",
+                fontWeight: "bold"
+              },
+              children: "Implementing"
+            }
+          )
+        ] })
+      ] }),
+      sessionState && /* @__PURE__ */ u3("div", { style: { fontSize: "0.8rem", color: "#888", marginBottom: "8px" }, children: [
+        "Phase: ",
+        phaseLabel[currentPhase ?? ""] ?? currentPhase,
+        " \u2014 ",
+        sessionState
+      ] }),
+      /* @__PURE__ */ u3(
+        "div",
+        {
+          ref: outputRef,
+          onScroll: handleScroll,
+          style: {
+            flex: 1,
+            overflow: "auto",
+            background: "#0d0d1a",
+            borderRadius: "8px",
+            border: "1px solid #333",
+            padding: "8px 12px",
+            fontFamily: "monospace",
+            fontSize: "0.8rem",
+            lineHeight: "1.5",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word"
+          },
+          children: [
+            lines.map((entry) => /* @__PURE__ */ u3(
+              "div",
+              {
+                style: {
+                  color: entry.stream === "stderr" ? "#f44336" : entry.stream === "system" ? "#7c8dff" : "#ccc"
+                },
+                children: entry.stream === "system" ? /* @__PURE__ */ u3("span", { style: { fontStyle: "italic" }, children: entry.content }) : entry.content
+              },
+              entry.seq
+            )),
+            lines.length === 0 && /* @__PURE__ */ u3("div", { style: { color: "#666" }, children: "Waiting for output..." })
+          ]
+        }
+      ),
+      /* @__PURE__ */ u3("div", { style: { marginTop: "8px", display: "flex", gap: "8px" }, children: [
+        /* @__PURE__ */ u3(
+          "input",
+          {
+            type: "text",
+            value: userInput,
+            onInput: (e3) => setUserInput(e3.target.value),
+            onKeyDown: (e3) => {
+              if (e3.key === "Enter" && !e3.shiftKey) {
+                e3.preventDefault();
+                sendInput();
+              }
+            },
+            placeholder: question ? "Type your answer..." : "Type a message...",
+            style: {
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: "4px",
+              border: "1px solid #555",
+              background: "#1a1a2e",
+              color: "#ddd",
+              fontSize: "0.85rem",
+              outline: "none"
+            }
+          }
+        ),
+        /* @__PURE__ */ u3(
+          "button",
+          {
+            onClick: handleVoice,
+            disabled: voiceState !== "idle",
+            title: "Voice input",
+            style: {
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              border: "none",
+              background: voiceState === "listening" ? "#f44336" : voiceState === "processing" ? "#ff9800" : "#333",
+              color: "#fff",
+              cursor: voiceState !== "idle" ? "default" : "pointer",
+              fontSize: "1rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0
+            },
+            children: voiceState === "listening" ? "..." : voiceState === "processing" ? "~" : "M"
+          }
+        ),
+        /* @__PURE__ */ u3(
+          "button",
+          {
+            onClick: sendInput,
+            disabled: !userInput.trim(),
+            style: {
+              padding: "10px 16px",
+              borderRadius: "4px",
+              border: "none",
+              background: !userInput.trim() ? "#555" : "#7c8dff",
+              color: "#fff",
+              cursor: !userInput.trim() ? "default" : "pointer",
+              fontSize: "0.85rem",
+              flexShrink: 0
+            },
+            children: "Send"
+          }
+        )
+      ] }),
+      question && /* @__PURE__ */ u3(
+        "div",
+        {
+          style: {
+            marginTop: "8px",
+            padding: "8px 12px",
+            background: "#332800",
+            border: "1px solid #ff9800",
+            borderRadius: "4px",
+            fontSize: "0.85rem",
+            color: "#ff9800"
+          },
+          children: question
+        }
+      )
+    ] });
+  }
+
+  // src/client/components/new-project.tsx
+  function NewProject() {
+    const [name, setName] = d2("");
+    const [description, setDescription] = d2("");
+    const [starting, setStarting] = d2(false);
+    const [error, setError] = d2(null);
+    const [sessionId, setSessionId] = d2(null);
+    const [currentPhase, setCurrentPhase] = d2(null);
+    const [sessionState, setSessionState] = d2(null);
+    const [voiceState, setVoiceState] = d2("idle");
+    y2(() => {
+      return onVoiceStateChange(setVoiceState);
+    }, []);
+    const startWorkflow = q2(async () => {
+      if (!name.trim() || !description.trim() || starting) return;
+      setStarting(true);
+      setError(null);
+      try {
+        const result = await post("/workflows/new-project", {
+          name: name.trim(),
+          description: description.trim()
+        });
+        setSessionId(result.sessionId);
+        setCurrentPhase(result.phase);
+        setSessionState(result.state);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to start workflow");
+        setStarting(false);
+      }
+    }, [name, description, starting]);
+    const handleVoice = q2(async () => {
+      try {
+        const text = await transcribe();
+        if (text) {
+          setDescription(text);
+        }
+      } catch {
+      }
+    }, []);
+    if (!sessionId) {
+      return /* @__PURE__ */ u3("div", { children: [
+        /* @__PURE__ */ u3("h2", { style: { margin: "0 0 16px 0", fontSize: "1.2rem" }, children: "New Project" }),
+        error && /* @__PURE__ */ u3("div", { style: { color: "#f44336", marginBottom: "12px", fontSize: "0.85rem" }, children: error }),
+        /* @__PURE__ */ u3("div", { style: { marginBottom: "12px" }, children: [
+          /* @__PURE__ */ u3("label", { style: { display: "block", fontSize: "0.85rem", color: "#aaa", marginBottom: "4px" }, children: "Repository name" }),
+          /* @__PURE__ */ u3(
+            "input",
+            {
+              type: "text",
+              value: name,
+              onInput: (e3) => setName(e3.target.value),
+              placeholder: "my-project",
+              style: {
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "4px",
+                border: "1px solid #555",
+                background: "#1a1a2e",
+                color: "#ddd",
+                fontSize: "0.9rem",
+                outline: "none",
+                boxSizing: "border-box"
+              }
+            }
+          )
+        ] }),
+        /* @__PURE__ */ u3("div", { style: { marginBottom: "16px" }, children: [
+          /* @__PURE__ */ u3("label", { style: { display: "block", fontSize: "0.85rem", color: "#aaa", marginBottom: "4px" }, children: "Describe your idea" }),
+          /* @__PURE__ */ u3("div", { style: { position: "relative" }, children: [
+            /* @__PURE__ */ u3(
+              "textarea",
+              {
+                value: description,
+                onInput: (e3) => setDescription(e3.target.value),
+                placeholder: "Describe what you want to build...",
+                rows: 4,
+                style: {
+                  width: "100%",
+                  padding: "10px 12px",
+                  paddingRight: "44px",
+                  borderRadius: "4px",
+                  border: "1px solid #555",
+                  background: "#1a1a2e",
+                  color: "#ddd",
+                  fontSize: "0.9rem",
+                  outline: "none",
+                  resize: "vertical",
+                  fontFamily: "inherit",
+                  boxSizing: "border-box"
+                }
+              }
+            ),
+            /* @__PURE__ */ u3(
+              "button",
+              {
+                onClick: handleVoice,
+                disabled: voiceState !== "idle",
+                title: "Speak your idea",
+                style: {
+                  position: "absolute",
+                  right: "8px",
+                  top: "8px",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  border: "none",
+                  background: voiceState === "listening" ? "#f44336" : voiceState === "processing" ? "#ff9800" : "#333",
+                  color: "#fff",
+                  cursor: voiceState !== "idle" ? "default" : "pointer",
+                  fontSize: "1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                },
+                children: voiceState === "listening" ? "..." : voiceState === "processing" ? "~" : "M"
+              }
+            )
+          ] })
+        ] }),
+        /* @__PURE__ */ u3(
+          "button",
+          {
+            onClick: startWorkflow,
+            disabled: starting || !name.trim() || !description.trim(),
+            style: {
+              padding: "10px 24px",
+              background: starting || !name.trim() || !description.trim() ? "#555" : "#7c8dff",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: starting || !name.trim() || !description.trim() ? "default" : "pointer",
+              fontSize: "0.9rem"
+            },
+            children: starting ? "Starting..." : "Start Project"
+          }
+        )
+      ] });
+    }
+    return /* @__PURE__ */ u3(
+      SpecKitChat,
+      {
+        sessionId,
+        initialPhase: currentPhase ?? "specify",
+        initialState: sessionState ?? "running",
+        completionRoute: "/"
+      }
+    );
+  }
+
   // src/client/app.tsx
   function App() {
     const route = useRouter();
@@ -1217,7 +1726,7 @@
         route.page === "dashboard" && /* @__PURE__ */ u3(Dashboard, {}),
         route.page === "project-detail" && /* @__PURE__ */ u3(ProjectDetail, { id: route.id }),
         route.page === "session-view" && /* @__PURE__ */ u3(SessionView, { id: route.id }),
-        route.page === "new-project" && /* @__PURE__ */ u3("div", { children: "New Project \u2014 coming soon" }),
+        route.page === "new-project" && /* @__PURE__ */ u3(NewProject, {}),
         route.page === "settings" && /* @__PURE__ */ u3("div", { children: "Settings \u2014 coming soon" })
       ] })
     ] });

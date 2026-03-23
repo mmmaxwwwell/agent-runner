@@ -284,22 +284,38 @@ export function ProjectDetail({ id }: { id: string }) {
             )}
           </>
         ) : (
-          <button
-            onClick={startSession}
-            disabled={starting || taskSummary.remaining === 0}
-            style={{
-              padding: '6px 16px',
-              background: taskSummary.remaining === 0 ? '#666' : '#4caf50',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: taskSummary.remaining === 0 ? 'default' : 'pointer',
-              fontSize: '0.85rem',
-              opacity: starting ? 0.6 : 1,
-            }}
-          >
-            {starting ? 'Starting...' : taskSummary.remaining === 0 ? 'All Tasks Done' : 'Start Task Run'}
-          </button>
+          <>
+            <button
+              onClick={startSession}
+              disabled={starting || taskSummary.remaining === 0}
+              style={{
+                padding: '6px 16px',
+                background: taskSummary.remaining === 0 ? '#666' : '#4caf50',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: taskSummary.remaining === 0 ? 'default' : 'pointer',
+                fontSize: '0.85rem',
+                opacity: starting ? 0.6 : 1,
+              }}
+            >
+              {starting ? 'Starting...' : taskSummary.remaining === 0 ? 'All Tasks Done' : 'Start Task Run'}
+            </button>
+            <button
+              onClick={() => navigate(`/projects/${id}/add-feature`)}
+              style={{
+                padding: '6px 16px',
+                background: '#7c8dff',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+              }}
+            >
+              Add Feature
+            </button>
+          </>
         )}
       </div>
 
