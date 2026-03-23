@@ -77,7 +77,7 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T017 [P] [US2] Write integration tests for `POST /api/projects/onboard` in tests/integration/onboard-api.test.ts — cover: successful onboard returns 201, missing path returns 400, non-directory returns 400, already registered returns 409, project persists in projects.json
+- [x] T017 [P] [US2] Write integration tests for `POST /api/projects/onboard` in tests/integration/onboard-api.test.ts — cover: successful onboard returns 201, missing path returns 400, non-directory returns 400, already registered returns 409, project persists in projects.json
 
 ### Implementation for User Story 2
 

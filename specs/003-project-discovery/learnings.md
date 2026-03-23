@@ -25,3 +25,8 @@ Changing the response from a flat array to `{ registered, discovered, discoveryE
 
 ---
 
+### T017 — Onboard API test pattern follows discovery-api.test.ts
+The onboard integration test uses the same server spawn pattern as `discovery-api.test.ts`. The test pre-registers a project via `POST /api/projects` to test the 409 (already registered) case. The "persist in projects.json" test reads the data file directly to verify persistence. All 8 tests correctly fail with 404 since the route doesn't exist yet — T018 will implement it.
+
+---
+
