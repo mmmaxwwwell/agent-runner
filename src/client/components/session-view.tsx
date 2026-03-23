@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
-import { get } from '../lib/api.js';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { get, post } from '../lib/api.js';
 import { connectSession, type ServerMessage, type OutputMessage, type StateMessage } from '../lib/ws.js';
 
 type SessionMeta = {
@@ -34,6 +34,17 @@ const stateColor: Record<string, string> = {
   failed: '#f44336',
 };
 
+type PushState = 'unknown' | 'unsupported' | 'denied' | 'prompt' | 'subscribed' | 'subscribing' | 'error';
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
 export function SessionView({ id }: { id: string }) {
   const [session, setSession] = useState<SessionMeta | null>(null);
   const [lines, setLines] = useState<LogEntry[]>([]);
@@ -41,6 +52,7 @@ export function SessionView({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const outputRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
+  const [pushState, setPushState] = useState<PushState>('unknown');
 
   // Fetch session metadata
   useEffect(() => {
@@ -95,6 +107,50 @@ export function SessionView({ id }: { id: string }) {
     }
   }, [lines]);
 
+  // Check push notification state
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setPushState('unsupported');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      setPushState('denied');
+      return;
+    }
+
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.pushManager.getSubscription().then((sub) => {
+        setPushState(sub ? 'subscribed' : 'prompt');
+      });
+    });
+  }, []);
+
+  const subscribePush = useCallback(async () => {
+    if (pushState !== 'prompt') return;
+    setPushState('subscribing');
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        setPushState('denied');
+        return;
+      }
+      const { publicKey } = await get<{ publicKey: string }>('/push/vapid-key');
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+      });
+      const json = sub.toJSON();
+      await post('/push/subscribe', {
+        endpoint: json.endpoint,
+        keys: json.keys,
+      });
+      setPushState('subscribed');
+    } catch {
+      setPushState('error');
+    }
+  }, [pushState]);
+
   const handleScroll = () => {
     if (!outputRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = outputRef.current;
@@ -126,9 +182,39 @@ export function SessionView({ id }: { id: string }) {
             {session.state}
           </span>
         </div>
-        <span style={{ fontSize: '0.8rem', color: '#666' }}>
-          {new Date(session.startedAt).toLocaleString()}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.8rem', color: '#666' }}>
+            {new Date(session.startedAt).toLocaleString()}
+          </span>
+          {pushState === 'prompt' && (
+            <button
+              onClick={subscribePush}
+              style={{
+                fontSize: '0.75rem',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: '1px solid #7c8dff',
+                background: 'transparent',
+                color: '#7c8dff',
+                cursor: 'pointer',
+              }}
+            >
+              Enable notifications
+            </button>
+          )}
+          {pushState === 'subscribing' && (
+            <span style={{ fontSize: '0.75rem', color: '#888' }}>Subscribing...</span>
+          )}
+          {pushState === 'subscribed' && (
+            <span style={{ fontSize: '0.75rem', color: '#4caf50' }}>Notifications on</span>
+          )}
+          {pushState === 'denied' && (
+            <span style={{ fontSize: '0.75rem', color: '#f44336' }}>Notifications blocked</span>
+          )}
+          {pushState === 'error' && (
+            <span style={{ fontSize: '0.75rem', color: '#f44336' }}>Notification error</span>
+          )}
+        </div>
       </div>
 
       {/* Question banner for waiting-for-input */}
