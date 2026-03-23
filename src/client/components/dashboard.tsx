@@ -18,17 +18,40 @@ type ActiveSession = {
   startedAt: string;
 };
 
-type Project = {
+type RegisteredProject = {
+  type: 'registered';
   id: string;
   name: string;
   dir: string;
   taskFile: string;
   createdAt: string;
+  status: 'active' | 'onboarding' | 'error';
   taskSummary: TaskSummary;
   activeSession: ActiveSession | null;
+  dirMissing: boolean;
 };
 
-function statusBadge(project: Project): { label: string; color: string } {
+type DiscoveredDirectory = {
+  type: 'discovered';
+  name: string;
+  path: string;
+  isGitRepo: boolean;
+  hasSpecKit: {
+    spec: boolean;
+    plan: boolean;
+    tasks: boolean;
+  };
+};
+
+type ProjectsResponse = {
+  registered: RegisteredProject[];
+  discovered: DiscoveredDirectory[];
+  discoveryError: string | null;
+};
+
+function statusBadge(project: RegisteredProject): { label: string; color: string } {
+  if (project.status === 'onboarding') return { label: 'onboarding', color: '#2196f3' };
+  if (project.status === 'error') return { label: 'error', color: '#f44336' };
   if (!project.activeSession) return { label: 'idle', color: '#666' };
   switch (project.activeSession.state) {
     case 'running':
@@ -40,7 +63,7 @@ function statusBadge(project: Project): { label: string; color: string } {
   }
 }
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project }: { project: RegisteredProject }) {
   const badge = statusBadge(project);
   const { taskSummary } = project;
 
@@ -82,15 +105,46 @@ function ProjectCard({ project }: { project: Project }) {
   );
 }
 
+function DiscoveredCard({ dir }: { dir: DiscoveredDirectory }) {
+  return (
+    <div
+      style={{
+        border: '1px dashed #555',
+        borderRadius: '8px',
+        padding: '16px',
+        marginBottom: '12px',
+        background: '#12121f',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{dir.name}</span>
+        <button
+          style={{
+            fontSize: '0.8rem',
+            padding: '4px 12px',
+            borderRadius: '4px',
+            border: '1px solid #7c8dff',
+            background: 'transparent',
+            color: '#7c8dff',
+            cursor: 'pointer',
+          }}
+        >
+          Onboard
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [data, setData] = useState<ProjectsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    get<Project[]>('/projects')
-      .then((data) => {
-        setProjects(data);
+    get<ProjectsResponse>('/projects')
+      .then((resp) => {
+        setData(resp);
         setLoading(false);
       })
       .catch((err) => {
@@ -104,23 +158,30 @@ export function Dashboard() {
     const client = connectDashboard((msg: ServerMessage) => {
       if (msg.type !== 'project-update') return;
       const update = msg as ProjectUpdateMessage;
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.id === update.projectId
-            ? {
-                ...p,
-                taskSummary: update.taskSummary,
-                activeSession: update.activeSession as ActiveSession | null,
-              }
-            : p,
-        ),
-      );
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          registered: prev.registered.map((p) =>
+            p.id === update.projectId
+              ? {
+                  ...p,
+                  taskSummary: update.taskSummary,
+                  activeSession: update.activeSession as ActiveSession | null,
+                }
+              : p,
+          ),
+        };
+      });
     });
     return () => client.close();
   }, []);
 
   if (loading) return <div>Loading projects...</div>;
   if (error) return <div style={{ color: '#f44336' }}>Error: {error}</div>;
+  if (!data) return null;
+
+  const { registered, discovered } = data;
 
   return (
     <div>
@@ -137,12 +198,24 @@ export function Dashboard() {
           + New Project
         </a>
       </div>
-      {projects.length === 0 ? (
+
+      {registered.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          {registered.map((p) => <ProjectCard key={p.id} project={p} />)}
+        </div>
+      )}
+
+      {discovered.length > 0 && (
+        <div>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: '#aaa' }}>Discovered</h3>
+          {discovered.map((d) => <DiscoveredCard key={d.path} dir={d} />)}
+        </div>
+      )}
+
+      {registered.length === 0 && discovered.length === 0 && (
         <div style={{ color: '#888', textAlign: 'center', padding: '32px 0' }}>
           No projects registered. <a href="#/new" style={{ color: '#7c8dff' }}>Create one</a> or register via API.
         </div>
-      ) : (
-        projects.map((p) => <ProjectCard key={p.id} project={p} />)
       )}
     </div>
   );

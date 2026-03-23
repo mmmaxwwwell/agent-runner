@@ -59,7 +59,7 @@
 - [x] T011 [US1] Implement `detectSpecKitArtifacts(dirPath)` in src/services/discovery.ts — scan specs/*/ subdirectories for spec.md, plan.md, tasks.md
 - [x] T012 [US1] Implement `scanProjectsDir(projectsDir, registeredPaths)` in src/services/discovery.ts — read top-level entries, filter hidden/non-dirs, skip registered, resolve symlinks, call detectGitRepo + detectSpecKitArtifacts, return DiscoveredDirectory[]
 - [x] T013 [US1] Modify `GET /api/projects` handler in src/routes/projects.ts — change response shape from flat array to `{ registered, discovered, discoveryError }` per contract, add `type: "registered"`, `status`, and `dirMissing` fields to registered entries, call scanProjectsDir for discovered entries
-- [ ] T014 [US1] Update dashboard component in src/client/components/dashboard.tsx — parse new response shape, render registered projects section (existing cards + status badge for onboarding/error), render discovered directories section with name, and "Onboard" placeholder button
+- [x] T014 [US1] Update dashboard component in src/client/components/dashboard.tsx — parse new response shape, render registered projects section (existing cards + status badge for onboarding/error), render discovered directories section with name, and "Onboard" placeholder button
 - [ ] T015 [US1] Update client API types in src/client/lib/api.ts to match new `GET /api/projects` response shape
 - [ ] T016 [US1] Handle empty states in src/client/components/dashboard.tsx — no projects at all, only registered, only discovered, discoveryError message
 
