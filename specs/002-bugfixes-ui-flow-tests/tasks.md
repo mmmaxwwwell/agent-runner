@@ -115,7 +115,7 @@
 **Purpose**: Final validation and cleanup
 
 - [x] T023 Run full test suite with `nix develop -c npm test` and fix any failures — all 426 tests pass, 0 failures
-- [ ] T024 Run `nix develop -c npm run build` and verify clean build
+- [x] T024 Run `nix develop -c npm run build` and verify clean build — tsc + esbuild clean, app.js 78.7kb, sw.js 3.0kb
 - [ ] T025 Run quickstart.md validation — verify all commands in specs/002-bugfixes-ui-flow-tests/quickstart.md work correctly
 
 ---
