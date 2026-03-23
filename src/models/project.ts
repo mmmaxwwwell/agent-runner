@@ -119,6 +119,49 @@ export function createProject(dataDir: string, input: CreateProjectInput): Proje
   return project;
 }
 
+export function registerForOnboarding(dataDir: string, input: { name: string; dir: string }): Project {
+  const { name, dir } = input;
+
+  // Validate name
+  if (!name || name.trim().length === 0) {
+    throw new Error('Project name must be non-empty');
+  }
+  if (name.length > 100) {
+    throw new Error('Project name must be 100 characters or fewer');
+  }
+
+  // Validate dir exists and is a directory
+  const absDir = resolve(dir);
+  if (!existsSync(absDir)) {
+    throw new Error(`Directory does not exist: ${dir}`);
+  }
+  const stat = statSync(absDir);
+  if (!stat.isDirectory()) {
+    throw new Error(`Path is not a directory: ${dir}`);
+  }
+
+  // Check for duplicate directory
+  const projects = readProjects(dataDir);
+  if (projects.some(p => resolve(p.dir) === absDir)) {
+    throw new Error(`A project with this directory is already registered: ${dir}`);
+  }
+
+  const project: Project = {
+    id: randomUUID(),
+    name: name.trim(),
+    dir: absDir,
+    taskFile: 'tasks.md',
+    promptFile: detectPromptFile(absDir),
+    createdAt: new Date().toISOString(),
+    status: 'onboarding',
+  };
+
+  projects.push(project);
+  writeProjects(dataDir, projects);
+
+  return project;
+}
+
 export function removeProject(dataDir: string, id: string): void {
   const projects = readProjects(dataDir);
   const idx = projects.findIndex(p => p.id === id);
