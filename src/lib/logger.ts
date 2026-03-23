@@ -17,7 +17,8 @@ export type ComponentName =
   | 'task-parser'
   | 'recovery'
   | 'disk-monitor'
-  | 'spec-kit';
+  | 'spec-kit'
+  | 'sessions';
 
 /**
  * Set the runtime log level for the root logger and all child loggers.
