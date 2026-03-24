@@ -11,6 +11,7 @@ import { mountPushRoutes } from './routes/push.js';
 import { mountVoiceRoutes } from './routes/voice.js';
 import { createPushService } from './services/push.js';
 import { resumeAll } from './services/recovery.js';
+import { ensureAgentFramework } from './services/agent-framework.js';
 import { handleSessionStream, initSessionStream } from './ws/session-stream.js';
 import { handleDashboard } from './ws/dashboard.js';
 
@@ -212,6 +213,15 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 await initDataDir(config);
+
+// Ensure agent-framework repo is cloned/updated before accepting connections
+try {
+  ensureAgentFramework(config.dataDir);
+  log.info('Agent framework ready');
+} catch (err) {
+  log.error({ err }, 'Failed to ensure agent framework — sessions may fail');
+}
+
 initSessionStream(config.dataDir);
 
 const pushService = createPushService({

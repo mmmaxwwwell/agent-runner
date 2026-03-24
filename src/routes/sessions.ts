@@ -6,6 +6,7 @@ import { createLogger } from '../lib/logger.js';
 import { getProject } from '../models/project.js';
 import { createSession, getSession, listSessionsByProject, transitionState } from '../models/session.js';
 import { buildCommand, type SessionType } from '../services/sandbox.js';
+import { ensureAgentFramework } from '../services/agent-framework.js';
 import { spawnProcess, killProcess, startTaskLoop } from '../services/process-manager.js';
 import { registerProcess, unregisterProcess, getActiveProcess } from '../services/process-registry.js';
 import { createSessionLogger, readLog } from '../services/session-logger.js';
@@ -77,6 +78,15 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         sendJson(res, 400, { error: `Failed to parse task file: ${err instanceof Error ? err.message : String(err)}` });
         return;
       }
+    }
+
+    // Ensure agent framework is up-to-date before each session (FR-004)
+    try {
+      ensureAgentFramework(cfg.dataDir);
+    } catch (err) {
+      log.error({ err }, 'Failed to ensure agent framework');
+      sendJson(res, 503, { error: 'Failed to prepare agent framework' });
+      return;
     }
 
     // Build sandbox command — may throw if sandbox unavailable and gates not satisfied

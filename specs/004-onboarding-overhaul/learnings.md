@@ -51,3 +51,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Used `git fetch` + `git merge --ff-only @{u}` instead of `git pull --ff-only` because `git pull` fails on repos cloned from empty bare repos (no ref to merge). The fetch+merge approach gracefully handles repos with no upstream branch configured.
 - Clone cleanup on failure uses `rmSync(agentFwDir, { recursive: true, force: true })` to avoid leaving partial clones.
 
+### T011 — Wiring ensureAgentFramework to startup and session launch
+- Server startup call is non-fatal (try/catch with log.error) so the server still starts even if git clone fails (e.g., no network). Session-level calls in `sessions.ts` are fatal (return 503) since sessions can't run without the framework.
+- The `runPhase()` callbacks in `projects.ts` let the error propagate — the workflow orchestrator already handles phase failures.
+- `ensureAgentFramework()` is synchronous (`execFileSync`), so no need for `await`. This is fine for the startup path and the per-session pull (fast for existing clones), but could block the event loop briefly.
+

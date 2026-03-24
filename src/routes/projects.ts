@@ -10,6 +10,7 @@ import { scanProjectsDir } from '../services/discovery.js';
 import { ensureFlakeNix } from '../services/flake-generator.js';
 import { startAddFeatureWorkflow, startNewProjectWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
 import { buildCommand } from '../services/sandbox.js';
+import { ensureAgentFramework } from '../services/agent-framework.js';
 import { spawnProcess } from '../services/process-manager.js';
 import { createSessionLogger } from '../services/session-logger.js';
 import { broadcastPhaseTransition } from '../ws/session-stream.js';
@@ -291,6 +292,9 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           createSession(cfg.dataDir, { projectId: project.id, type: 'interview' });
         }
 
+        // Ensure agent framework is up-to-date before each session (FR-004)
+        ensureAgentFramework(cfg.dataDir);
+
         const sandboxCmd = buildCommand(projectDir, 'interview', {
           agentFrameworkDir: cfg.agentFrameworkDir,
           allowUnsandboxed,
@@ -533,6 +537,9 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         if (sessionId !== firstSessionId) {
           createSession(cfg.dataDir, { projectId: placeholderProjectId, type: 'interview' });
         }
+
+        // Ensure agent framework is up-to-date before each session (FR-004)
+        ensureAgentFramework(cfg.dataDir);
 
         const sandboxCmd = buildCommand(projectDir, 'interview', {
           agentFrameworkDir: cfg.agentFrameworkDir,
