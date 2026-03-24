@@ -33,6 +33,7 @@ export interface SpawnOptions {
   sessionId: string;
   logger: SessionLogger;
   dataDir: string;
+  env?: Record<string, string>;
   onEvent?: (event: ProcessEvent) => void;
 }
 
@@ -41,12 +42,13 @@ export interface SpawnOptions {
  * and handle process exit.
  */
 export function spawnProcess(options: SpawnOptions): ProcessHandle {
-  const { command, args, sessionId, logger, onEvent } = options;
+  const { command, args, sessionId, logger, env, onEvent } = options;
 
   log.info({ sessionId, command, args }, 'Spawning process');
 
   const child = spawn(command, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
+    env: env ? { ...process.env, ...env } : undefined,
   });
 
   const pid = child.pid!;
@@ -114,6 +116,7 @@ export interface TaskLoopOptions {
   taskFilePath: string;
   logger: SessionLogger;
   dataDir: string;
+  env?: Record<string, string>;
   pushService?: PushService;
 }
 
@@ -134,7 +137,7 @@ export interface TaskLoopResult {
  *    - All tasks [x] or [~] → mark completed.
  */
 export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopResult> {
-  const { command, args, sessionId, projectId, projectName, taskFilePath, logger, dataDir, pushService } = options;
+  const { command, args, sessionId, projectId, projectName, taskFilePath, logger, dataDir, env, pushService } = options;
   let spawnCount = 0;
 
   /** Broadcast project-update to dashboard clients with current session & task state. */
@@ -168,6 +171,7 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
       sessionId,
       logger,
       dataDir,
+      env,
     });
     spawnCount++;
 

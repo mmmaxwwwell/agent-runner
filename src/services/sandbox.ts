@@ -7,6 +7,7 @@ export interface SandboxCommand {
   command: string;
   args: string[];
   unsandboxed: boolean;
+  env?: Record<string, string>;
 }
 
 export interface BuildCommandOptions {

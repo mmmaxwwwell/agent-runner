@@ -40,6 +40,13 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Tests cover: REQUEST_IDENTITIES round-trip, SIGN_REQUEST round-trip, cancel → FAILURE, non-whitelisted type → FAILURE without onRequest.
 - The `handleResponse` data parameter includes the type byte + payload (the full message body excluding the 4-byte length prefix). T013 must wrap it with the length prefix before writing to the socket.
 
+### T014 — Env var plumbing for SandboxCommand and spawnProcess
+- `SandboxCommand.env` is an optional `Record<string, string>` that callers populate after `buildCommand()`.
+- `spawnProcess()` merges `env` into `process.env` via `spawn()` options. When `env` is undefined, `spawn()` inherits the parent env by default.
+- `TaskLoopOptions` also has `env` which is passed through to each `spawnProcess()` call in the loop.
+- **Important for T015/T016**: When sandboxed (`systemd-run`), env vars set via `spawn({ env })` only affect `systemd-run` itself, NOT the sandboxed child. For sandboxed processes, `SSH_AUTH_SOCK` must also be injected as `--setenv=SSH_AUTH_SOCK=<path>` in the args array. Additionally, the socket path must be added to `BindPaths` so the sandboxed process can access it.
+- Pre-existing build errors in `ssh-agent-bridge.ts` (TS5097 import extension, TS2345 Buffer type) — not related to T014.
+
 ### T013 — Bridge implementation patterns
 - `createBridge` uses closure-based state (pendingRequests map, server) rather than a class — keeps the public interface minimal (just the SSHAgentBridge interface methods).
 - Stale socket removal uses `unlink` with ENOENT suppression before `server.listen()`.
