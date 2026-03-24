@@ -109,21 +109,58 @@ src/
 tests/
 ├── unit/                        # ~18 test files covering all services/models/lib
 ├── integration/                 # ~17 test files covering workflows and lifecycle
-└── contract/                    # ~5 test files covering REST + WebSocket APIs
+├── contract/                    # ~5 test files covering REST + WebSocket APIs
+├── fixtures/                    # Test data templates
+│   ├── projects-empty.json      # Empty project registry
+│   ├── projects-with-active.json # Registry with active project
+│   └── test-repo/               # Bare git repo for SSH tests
+├── helpers/
+│   ├── test-reporter.ts         # Custom Node.js test runner reporter → test-logs/
+│   ├── test-ssh-server.ts       # Local SSH server using ssh2 for integration tests
+│   └── test-keypair.ts          # Idempotent ECDSA P-256 test keypair generation
+└── android-integration/         # Android integration test orchestration
+    └── run.sh                   # Start server, adb reverse, install APK, run tests
+
+test-logs/                       # Generated test output (gitignored)
+├── unit/<timestamp>/
+├── integration/<timestamp>/
+├── contract/<timestamp>/
+└── android-integration/<timestamp>/
 
 android/                         # Kotlin Android app
 ├── app/src/main/
 │   ├── java/.../
 │   │   ├── MainActivity.kt     # WebView + native WebSocket
-│   │   ├── YubikeyManager.kt   # PIV signing via yubikit-android
-│   │   ├── SignRequestModal.kt # Sign authorization dialog
+│   │   ├── signing/
+│   │   │   ├── SigningBackend.kt    # Interface for signing operations
+│   │   │   ├── YubikeySigningBackend.kt  # PIV signing via yubikit-android
+│   │   │   ├── KeystoreSigningBackend.kt # Android Keystore + biometric
+│   │   │   └── KeyRegistry.kt      # keys.json management
+│   │   ├── YubikeyManager.kt   # USB/NFC detection and PIV communication
+│   │   ├── SignRequestDialog.kt # Sign modal with key picker
+│   │   ├── KeyManagementActivity.kt # Key registry UI
 │   │   └── ServerConfig.kt     # SharedPreferences URL storage
 │   └── res/
+├── app/src/debug/
+│   └── java/.../
+│       └── signing/
+│           └── MockSigningBackend.kt  # Auto-sign with test keypair
+├── app/src/androidTest/
+│   ├── java/.../
+│   │   ├── WebViewDashboardTest.kt    # PWA loads, dashboard renders
+│   │   ├── SignRequestFlowTest.kt     # Mock server → sign modal → response
+│   │   ├── SshBridgeEndToEndTest.kt   # Full SSH bridge loop with test SSH server
+│   │   ├── KeyManagementTest.kt       # Add/remove/rename keys
+│   │   └── helpers/
+│   │       ├── TestRunListener.kt     # JUnit listener → test-logs/
+│   │       └── MockBiometricPrompt.kt # Auto-succeed biometric
+│   └── assets/
+│       └── test-fixtures/             # projects.json templates
 └── build.gradle.kts
 ```
 
-**Structure Decision**: Hybrid structure — server + client in a single `src/` tree (client at `src/client/`), Android app in separate `android/` directory. This matches the existing codebase structure established across specs 001–006.
+**Structure Decision**: Hybrid structure — server + client in a single `src/` tree (client at `src/client/`), Android app in separate `android/` directory. Android uses interface-based dependency injection for signing backends with debug build flavor providing MockSigningBackend.
 
 ## Complexity Tracking
 
-No constitution violations. No complexity justifications needed.
+**Complexity Justification — SigningBackend interface**: Three implementations (Yubikey, Keystore, Mock) across two build flavors (debug/release) with shared key registry. This exceeds the "three concrete uses" threshold from Constitution V. The interface is necessary because: (1) users need both Yubikey and app key signing, (2) development/testing needs mock signing, (3) the sign request flow must be backend-agnostic to support the key picker UI.

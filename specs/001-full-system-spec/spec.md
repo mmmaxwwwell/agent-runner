@@ -155,20 +155,28 @@ A sandboxed agent needs to push code to GitHub. It runs `git push`, which trigge
 
 ---
 
-### User Story 10 - Android App with Yubikey PIV Signing (Priority: P2)
+### User Story 10 - Android App with Multi-Key Signing (Priority: P2)
 
-The Android app loads the existing Preact PWA in a WebView and adds native Yubikey PIV signing. When the server sends an `ssh-agent-request`, the app displays a sign modal, the user touches their Yubikey (USB-C or NFC), and the app signs via PIV and responds.
+The Android app loads the existing Preact PWA in a WebView and adds native signing support via multiple key types. Users can register Yubikey PIV keys (USB-C or NFC) and/or Android Keystore app keys. When the server sends an `ssh-agent-request`, the app displays a sign modal with a key picker, the user confirms, and the app signs via the selected backend and responds.
 
-**Why this priority**: The native app enables hardware key authentication that browsers cannot provide.
+**Why this priority**: The native app enables hardware key authentication that browsers cannot provide, and app keys provide a software fallback for users without Yubikeys.
+
+**Independent Test**: Install the app, configure server URL, register a key (Yubikey or app key), trigger a sign request from a task run, verify the modal appears with correct context and key selection, sign completes.
 
 **Acceptance Scenarios**:
 
 1. **Given** the app is installed and server URL configured, **When** the app opens, **Then** the dashboard loads in the WebView with all PWA functionality working.
-2. **Given** a sign request arrives with `messageType: 13`, **When** displayed, **Then** a modal shows the operation context, and Yubikey touch completes the signing.
-3. **Given** a key listing request (`messageType: 11`), **When** received, **Then** the native layer queries the Yubikey and responds automatically (no modal).
-4. **Given** no Yubikey is connected when a sign request arrives, **When** the modal displays, **Then** it shows "Connect Yubikey" and waits.
-5. **Given** the Yubikey is disconnected mid-signing, **When** the app detects it, **Then** it sends `ssh-agent-cancel` and shows an error.
-6. **Given** the PIN is required, **When** the sign modal appears, **Then** a PIN input field is shown. After successful verification, subsequent requests skip the PIN prompt.
+2. **Given** a sign request arrives with `messageType: 13`, **When** displayed, **Then** a modal shows the operation context, a key picker (auto-selects if only one key matches), and signing completes on confirmation.
+3. **Given** a key listing request (`messageType: 11`), **When** received, **Then** the native layer returns only currently-available keys (app keys always; Yubikey keys only when connected) automatically (no modal).
+4. **Given** no signing keys are registered, **When** a sign request arrives, **Then** the app shows an error directing the user to key management settings.
+5. **Given** multiple keys can fulfill a request, **When** the modal displays, **Then** the user can choose which key to use.
+6. **Given** a Yubikey key is selected but the Yubikey is disconnected, **When** the modal displays, **Then** it shows "Connect Yubikey" and waits.
+7. **Given** the Yubikey is disconnected mid-signing, **When** the app detects it, **Then** it sends `ssh-agent-cancel` and shows an error.
+8. **Given** the Yubikey PIN is required, **When** the sign modal appears, **Then** a PIN input field is shown. After successful verification, subsequent requests skip the PIN prompt.
+9. **Given** an app key is selected and biometric is enabled, **When** the user confirms signing, **Then** biometric authentication is required before the signature is produced.
+10. **Given** the user opens Key Management, **When** they tap "Add App Key", **Then** an ECDSA P-256 keypair is generated in Android Keystore, the public key is displayed in SSH `authorized_keys` format with a copy button, and the key appears in the registry.
+11. **Given** the user opens Key Management with a Yubikey connected, **When** they tap "Add Yubikey", **Then** the public key is read from PIV slot 9a, displayed, and added to the registry.
+12. **Given** the key registry, **When** the user views it, **Then** each key shows name, type, fingerprint, and last used date. Keys can be renamed or removed.
 
 ---
 
@@ -252,7 +260,7 @@ The entire application has full unit test coverage for all services, models, and
 - **FR-013**: System MUST allow users to stop a running session at any time.
 - **FR-014**: System MUST run agent processes via `nix develop <project-dir> --command` to inherit the project's Nix flake toolchain.
 - **FR-015**: System MUST persist session state to disk and automatically resume running/waiting-for-input sessions on server startup.
-- **FR-016**: System MUST emit structured JSON logs to stderr across all components using 5 log levels (debug, info, warn, error, fatal), configurable at runtime.
+- **FR-016**: System MUST emit structured JSON logs to stderr across all components using 6 log levels (trace, debug, info, warn, error, fatal), configurable at runtime.
 - **FR-017**: System MUST monitor disk space in `AGENT_RUNNER_DATA_DIR` every 60 seconds and warn when below `DISK_WARN_THRESHOLD_MB` (default 8192 MB).
 
 #### Voice Input
@@ -266,7 +274,7 @@ The entire application has full unit test coverage for all services, models, and
 
 - **FR-022**: `GET /api/projects` MUST return both registered projects (`type: "registered"`) and discovered directories (`type: "discovered"`) in a single response.
 - **FR-023**: System MUST scan only top-level, non-hidden entries in the configured projects directory (`AGENT_RUNNER_PROJECTS_DIR`, default `~/git`). No recursive scanning.
-- **FR-024**: For each discovered directory, detect whether it is a git repository and whether spec-kit artifacts exist.
+- **FR-024**: For each discovered directory, detect whether it is a git repository, whether it has a `flake.nix`, and whether spec-kit artifacts exist.
 - **FR-025**: Each discovered directory MUST have an "Onboard" action that initiates the onboarding workflow.
 - **FR-026**: Onboard MUST register the project (persist to `projects.json` with status `"onboarding"`) before running any initialization, so it appears on the dashboard immediately.
 
@@ -351,7 +359,27 @@ The entire application has full unit test coverage for all services, models, and
 - **FR-076**: Sign modal MUST remain visible until Yubikey touch completes, user cancels, or request times out. Multiple requests queued, shown one at a time.
 - **FR-077**: Server URL persisted in SharedPreferences. First launch prompts for URL. Editable from settings.
 - **FR-078**: Native layer monitors WebView URL hash changes to detect active session ID and manage its WebSocket connection.
-- **FR-079**: Native layer exposes `@JavascriptInterface` for Yubikey status queries.
+- **FR-079**: Native layer exposes `@JavascriptInterface` for key status queries (connected Yubikeys, available app keys).
+
+#### Multi-Key Support and Android Keystore
+
+- **FR-097**: App MUST support multiple signing keys of mixed types (Yubikey PIV and Android Keystore) registered simultaneously.
+- **FR-098**: App MUST persist a key registry (`keys.json` in app-private storage) containing key metadata: id, name, type, public key blob, SSH-format comment, fingerprint, creation date, last used date, and type-specific fields (pivSlot for Yubikey, keystoreAlias for app keys).
+- **FR-099**: App MUST provide a key management UI: list registered keys (name, type, fingerprint, last used), add Yubikey (detect + read public key from PIV slot), generate app key (Android Keystore ECDSA P-256), remove keys, rename keys, export public key in `authorized_keys` format (copy to clipboard).
+- **FR-100**: For `SSH_AGENTC_REQUEST_IDENTITIES` (type 11), app MUST return only keys that can sign right now: app keys are always available; Yubikey keys only when a Yubikey is connected. No caching of Yubikey public keys when hardware is absent.
+- **FR-101**: Android Keystore signing backend MUST generate ECDSA P-256 keypairs, store them in hardware-backed Keystore when available, and produce SSH-format signatures.
+- **FR-102**: Android Keystore signing MUST require biometric authentication (fingerprint/face) before each sign operation. Biometric requirement is an optional setting (enabled by default).
+- **FR-103**: Sign modal MUST show a key picker when multiple keys can fulfill the request. Auto-select if only one key matches the requested key blob. User can always override the selection.
+- **FR-104**: Signing architecture MUST use interface-based dependency injection: `SigningBackend` interface with `YubikeySigningBackend`, `KeystoreSigningBackend`, and `MockSigningBackend` (debug/test builds) implementations.
+- **FR-105**: Debug build flavor MUST include `MockSigningBackend` that auto-signs with a test ECDSA P-256 keypair (generated idempotently) for development and testing without hardware.
+
+#### Android Integration Testing
+
+- **FR-106**: Android integration tests MUST run on a connected device via ADB using AndroidX Test + Espresso for UI assertions and DOM inspection of WebView content.
+- **FR-107**: Integration test orchestration script (`npm run test:android:integration`) MUST: start the real agent-runner server with test fixtures, configure `adb reverse` port forwarding, install test APK, run instrumented tests, collect results to `test-logs/android-integration/`, tear down server.
+- **FR-108**: Test fixtures MUST use template `projects.json` files in a temp data directory to initialize server state for different test scenarios.
+- **FR-109**: Integration tests MUST include a local SSH test server (Node.js `ssh2` library) with a test ECDSA P-256 keypair (generated idempotently) and local bare git repo, enabling unattended end-to-end SSH agent bridge testing with `MockSigningBackend`.
+- **FR-110**: Biometric prompts MUST be mocked in integration tests to auto-succeed, enabling unattended test execution.
 
 #### UI Flow Documentation
 
@@ -374,14 +402,23 @@ The entire application has full unit test coverage for all services, models, and
 - **FR-093**: End-to-end tests MUST cover: voice transcription API (valid audio, missing API key → 503, no audio → 400).
 - **FR-094**: End-to-end tests MUST cover: dashboard API (project list with task summaries, project detail with sessions, WebSocket dashboard updates on state change).
 - **FR-095**: End-to-end tests MUST cover: crash recovery (server restart resumes running/waiting-for-input sessions).
-- **FR-096**: All tests MUST run via `npm test` and pass in the Nix flake environment.
+- **FR-096**: All Node.js tests MUST run via `npm test` and pass in the Nix flake environment.
+
+#### Test Log Infrastructure
+
+- **FR-111**: All test runners (Node.js unit/integration/contract, Android instrumented) MUST output structured results to `test-logs/<type>/<timestamp>/`.
+- **FR-112**: Passing tests MUST produce only a summary line (test name, duration). Failing tests MUST produce: test name, assertion details (expected vs actual), full stack trace, and any relevant context (logcat for Android, server logs for integration).
+- **FR-113**: Each test run MUST produce a `summary.json` with pass/fail counts and list of failed test names. Failure detail files in `failures/` subdirectory.
+- **FR-114**: Node.js test runner MUST use a custom reporter (Node native test runner custom reporter API) that writes the structured log format.
+- **FR-115**: Android test runner MUST use a custom JUnit `RunListener` that writes the structured log format, including screenshots on UI test failure and filtered logcat on any failure.
+- **FR-116**: Android integration tests MUST run via `npm run test:android:integration`. Node.js tests remain under `npm test`.
 
 ### Key Entities
 
 - **Project**: A registered agent-framework project. `{ id, name, dir, status ("active" | "onboarding" | "error"), taskFile, promptFile, createdAt, description }`. Can have zero or one active sessions and many historical sessions.
 - **Session**: An agent execution context tied to a project. `{ id, projectId, type ("interview" | "task-run"), state ("running" | "waiting-for-input" | "completed" | "failed"), startedAt, endedAt, pid, exitCode }`. Persistent output log. State persisted to disk for crash recovery.
 - **Task**: An item parsed from a project's markdown task file. Has description, status (unchecked, checked, blocked with question), and ordering. Read from project files on demand, not stored by the system.
-- **Session Log**: Persistent, append-only JSONL file. Each line: `{ timestamp, streamType ("stdout" | "stderr" | "system"), content }`. One per session.
+- **Session Log**: Persistent, append-only JSONL file. Each line: `{ seq, ts, stream ("stdout" | "stderr" | "system"), content }`. One per session. `seq` is monotonically increasing for replay.
 - **Discovered Directory**: A top-level, non-hidden folder in the projects directory not present in `projects.json`.
 - **Agent Framework**: Managed git clone at `<dataDir>/agent-framework/` containing skill files, interview wrapper, and run-tasks script.
 - **Transcript**: `specs/<name>/transcript.md` — real-time conversation record from server-side parser.
@@ -389,8 +426,10 @@ The entire application has full unit test coverage for all services, models, and
 - **SSHAgentBridge**: Server-side service managing Unix socket creation, SSH agent protocol parsing, and WebSocket relay. One per active session with SSH remote.
 - **SSHAgentRequest**: `{ requestId, messageType, context, data (base64) }`.
 - **SSHAgentResponse**: `{ requestId, data (base64) }` or `{ requestId, cancelled: true }`.
-- **YubikeyManager**: Native Kotlin class managing USB/NFC detection, PIV communication, and signing.
-- **SignRequestModal**: Native dialog overlaid on WebView for sign authorization.
+- **KeyRegistry**: Persistent JSON file (`keys.json`) in Android app-private storage. Array of `KeyEntry` objects representing all registered signing keys.
+- **KeyEntry**: `{ id (UUID), name, type ("yubikey-piv" | "android-keystore"), publicKey (base64 blob), publicKeyComment (SSH format), fingerprint (SHA256), pivSlot (yubikey only), keystoreAlias (app key only), createdAt, lastUsedAt }`.
+- **SigningBackend**: Interface for signing operations with three implementations: `YubikeySigningBackend` (real PIV), `KeystoreSigningBackend` (Android Keystore with biometric), `MockSigningBackend` (debug/test builds).
+- **SignRequestModal**: Native dialog overlaid on WebView for sign authorization. Shows operation context, key picker (auto-selects when possible, user can always override), PIN prompt for Yubikey, biometric prompt for app keys.
 - **ServerConfig**: Persisted server URL in Android SharedPreferences.
 
 ## Success Criteria *(mandatory)*
@@ -429,7 +468,7 @@ The entire application has full unit test coverage for all services, models, and
 - Voice transcription: browser-native Web Speech API and Google STT, switchable at runtime.
 - Session resume: running/waiting-for-input sessions automatically resumed on server restart.
 - Interview exhaustiveness: no cap at 5 questions — keep probing until comprehensive.
-- SSH bridge: server-side only; client-side signing via Android app with Yubikey PIV.
+- SSH bridge: server-side only; client-side signing via Android app with Yubikey PIV or Android Keystore app keys.
 - SSH protocol parser: hand-written (protocol is tiny — 2 message types, binary framing).
 - Binary SSH data: base64-encoded inside JSON WebSocket messages.
 - SSH auth: only enabled when project has SSH git remote configured.
@@ -439,7 +478,7 @@ The entire application has full unit test coverage for all services, models, and
 - Pre-interview init commands: run inside systemd sandbox.
 - Project status transition: `"onboarding"` → `"active"` when interview completes and user signals readiness.
 - Dashboard discovery: refresh on page load only (manual browser refresh).
-- Project registration schema: `{ name, path, createdAt, status }` minimal at onboarding time.
+- Project registration schema: `{ name, dir, createdAt, status }` minimal at onboarding time.
 
 ## Assumptions
 
@@ -452,3 +491,7 @@ The entire application has full unit test coverage for all services, models, and
 - Push notifications use standard Web Push protocol with self-hosted setup.
 - Projects directory typically has fewer than 100 top-level directories.
 - Android app targets API 26+ (Android 8.0 Oreo), compileSdk 34.
+
+## Future Requirements (Out of Scope)
+
+- **NixOS Module**: `services.agent-runner` NixOS module with nginx TLS termination, certificate path configuration, and port forwarding to the server on localhost or a Unix socket with restricted permissions. Server should support listening on a Unix socket (not just TCP) to enable this.

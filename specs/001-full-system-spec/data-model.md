@@ -272,6 +272,33 @@ Agent's response text (tool calls omitted)
 |-------|------|-------------|
 | serverUrl | string | Base URL of agent-runner server |
 
+### KeyEntry (Android)
+
+**Storage**: `keys.json` in app-private storage (JSON array)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string (UUID) | yes | Unique identifier |
+| name | string | yes | User-assigned display name |
+| type | enum | yes | `"yubikey-piv"` \| `"android-keystore"` |
+| publicKey | string (base64) | yes | Raw public key blob |
+| publicKeyComment | string | yes | SSH authorized_keys format string |
+| fingerprint | string | yes | `SHA256:...` fingerprint |
+| pivSlot | string \| null | yubikey only | PIV slot (default `"9a"`) |
+| keystoreAlias | string \| null | app key only | Android Keystore alias |
+| createdAt | string (ISO 8601) | yes | Registration timestamp |
+| lastUsedAt | string \| null | no | Last successful sign timestamp |
+
+### SigningBackend (Android)
+
+**Interface** with three implementations:
+
+| Implementation | Description |
+|----------------|-------------|
+| `YubikeySigningBackend` | PIV signing via `yubikit-android`. Requires connected hardware. |
+| `KeystoreSigningBackend` | Android Keystore ECDSA P-256. Requires biometric auth (configurable). |
+| `MockSigningBackend` | Debug/test builds. Auto-signs with idempotently-generated test keypair. |
+
 ### YubikeyManager (Android)
 
 **In-memory state**:
