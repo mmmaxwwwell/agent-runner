@@ -33,3 +33,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The byte 50 marker after session_id is the key indicator for userauth format. If missing or data is too short, username/keyAlgorithm should be undefined (not null, not error).
 - Stub added to `ssh-agent-protocol.ts` following same pattern as T005 — throws "not yet implemented". T011 will replace with real implementation.
 
+### T010 — Integration test patterns for bridge end-to-end
+- Integration tests use real Unix sockets (not mocks). Connect with `net.createConnection`, send wire-format messages, read response.
+- The `onRequest` callback in tests simulates the WebSocket client by immediately calling `bridge.handleResponse()` or `bridge.handleCancel()`.
+- `sendAndReceive()` helper resolves on first `data` event since the bridge writes complete messages atomically. `sendToSocket()` waits for `end` event for cases where the server closes the connection.
+- Tests cover: REQUEST_IDENTITIES round-trip, SIGN_REQUEST round-trip, cancel → FAILURE, non-whitelisted type → FAILURE without onRequest.
+- The `handleResponse` data parameter includes the type byte + payload (the full message body excluding the 4-byte length prefix). T013 must wrap it with the length prefix before writing to the socket.
+

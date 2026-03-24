@@ -55,7 +55,7 @@
 
 - [x] T008 [P] [US1] Write tests for SSH agent bridge lifecycle in tests/unit/ssh-agent-bridge.test.ts — test socket creation at correct path, test socket cleanup on destroy, test stale socket removal before creation, test socket permissions (0600), test pending request timeout (60s) returns FAILURE
 - [x] T009 [P] [US1] Write tests for sign request parsing in tests/unit/ssh-agent-protocol.test.ts — test parsing type 13 message: extract key blob, data, and flags. Test extracting username and key algorithm from the data field's SSH userauth structure. Test fallback when data is not SSH userauth format
-- [ ] T010 [P] [US1] Write integration test for bridge end-to-end in tests/integration/ssh-agent-bridge.test.ts — create bridge, connect to Unix socket, send REQUEST_IDENTITIES (type 11), verify WebSocket receives `ssh-agent-request` message. Send mock response, verify Unix socket receives it. Test sign request (type 13) flow with mock response. Test cancel flow returns FAILURE to socket
+- [x] T010 [P] [US1] Write integration test for bridge end-to-end in tests/integration/ssh-agent-bridge.test.ts — create bridge, connect to Unix socket, send REQUEST_IDENTITIES (type 11), verify WebSocket receives `ssh-agent-request` message. Send mock response, verify Unix socket receives it. Test sign request (type 13) flow with mock response. Test cancel flow returns FAILURE to socket
 
 ### Implementation for User Story 1
 
