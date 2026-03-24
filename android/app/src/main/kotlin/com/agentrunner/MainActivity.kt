@@ -10,6 +10,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -121,10 +122,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        webView.addJavascriptInterface(AgentRunnerBridge(), "AgentRunner")
+
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
         } else {
             webView.loadUrl(serverUrl!!)
+        }
+    }
+
+    inner class AgentRunnerBridge {
+        @JavascriptInterface
+        fun openSettings() {
+            runOnUiThread {
+                startActivity(Intent(this@MainActivity, ServerConfigActivity::class.java))
+            }
         }
     }
 

@@ -63,3 +63,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `onPageFinished` hides the error view — this handles the case where a retry succeeds.
 - Error view layout is at `res/layout/view_error.xml`.
 
+### T011 — JavaScript bridge for settings access
+- `AgentRunnerBridge` is an `inner class` of MainActivity so it can call `runOnUiThread` and `startActivity` via `this@MainActivity`. `@JavascriptInterface` methods run on a WebView background thread, so `runOnUiThread` is required for UI/Activity operations.
+- The bridge is registered as `"AgentRunner"` — accessible in JS as `window.AgentRunner.openSettings()`. This matches the contract in `contracts/javascript-bridge.md`.
+- T021 will extend this same bridge class with `getYubikeyStatus()` and `getYubikeySerial()` methods.
+
