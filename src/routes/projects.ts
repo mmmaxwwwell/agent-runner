@@ -1,20 +1,20 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join, resolve } from 'node:path';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import type { Config } from '../lib/config.js';
 import { createLogger } from '../lib/logger.js';
-import { listProjects, getProject, createProject, removeProject, registerForOnboarding, type DiscoveredDirectory } from '../models/project.js';
+import { listProjects, getProject, createProject, removeProject, registerForOnboarding, updateProjectStatus, type DiscoveredDirectory } from '../models/project.js';
 import { createSession } from '../models/session.js';
 import { parseTasks, parseTaskSummary } from '../services/task-parser.js';
 import { scanProjectsDir } from '../services/discovery.js';
-import { ensureFlakeNix } from '../services/flake-generator.js';
-import { startAddFeatureWorkflow, startNewProjectWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
+import { startAddFeatureWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
 import { buildCommand } from '../services/sandbox.js';
 import { ensureAgentFramework } from '../services/agent-framework.js';
 import { spawnProcess } from '../services/process-manager.js';
 import { createSessionLogger } from '../services/session-logger.js';
 import { broadcastPhaseTransition } from '../ws/session-stream.js';
 import { broadcastProjectUpdate } from '../ws/dashboard.js';
+import { runOnboardingPipeline, type OnboardingContext } from '../services/onboarding.js';
 import { randomUUID } from 'node:crypto';
 
 const log = createLogger('server');
@@ -385,10 +385,16 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     }
   });
 
-  // POST /api/projects/onboard — onboard a discovered directory
+  // POST /api/projects/onboard — unified onboarding endpoint for discovered dirs and new projects
   apiRoutes.set('POST /api/projects/onboard', async (req, res) => {
     const raw = await readBody(req);
-    let parsed: { name?: string; path?: string };
+    let parsed: {
+      name?: string;
+      path?: string;
+      newProject?: boolean;
+      remoteUrl?: string;
+      createGithubRepo?: boolean;
+    };
     try {
       parsed = JSON.parse(raw);
     } catch {
@@ -396,213 +402,160 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       return;
     }
 
-    if (!parsed.path || typeof parsed.path !== 'string') {
-      sendJson(res, 400, { error: 'Missing or invalid "path" field' });
+    const isNewProject = parsed.newProject === true;
+
+    // Validate mutually exclusive remote options
+    if (parsed.remoteUrl && parsed.createGithubRepo) {
+      sendJson(res, 400, { error: 'remoteUrl and createGithubRepo are mutually exclusive' });
       return;
     }
 
-    // Derive name from path basename if not provided
-    const dirPath = parsed.path;
-    const name = (parsed.name && typeof parsed.name === 'string') ? parsed.name.trim() : dirPath.split('/').pop() || 'unnamed';
+    let projectDir: string;
+    let projectName: string;
 
-    try {
-      const project = registerForOnboarding(cfg.dataDir, { name, dir: dirPath });
-
-      // Ensure the project has a flake.nix so nix develop works
-      const flakeGenerated = ensureFlakeNix(dirPath);
-      if (flakeGenerated) {
-        log.info({ dir: dirPath }, 'Generated flake.nix for project');
+    if (isNewProject) {
+      // New project: name is required, path is derived from projectsDir
+      const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
+      if (!name) {
+        sendJson(res, 400, { error: 'Missing or empty name for new project' });
+        return;
+      }
+      if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+        sendJson(res, 400, { error: 'Invalid project name: must contain only letters, numbers, dots, hyphens, underscores' });
+        return;
       }
 
-      log.info({ projectId: project.id, name, dir: dirPath }, 'Project onboarded');
-      sendJson(res, 201, {
-        projectId: project.id,
-        name: project.name,
-        path: project.dir,
-        status: project.status,
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('already registered')) {
-        sendJson(res, 409, { error: message });
-      } else {
-        sendJson(res, 400, { error: message });
-      }
-    }
-  });
-
-  // POST /api/workflows/new-project — create a new project and start spec-kit SDD workflow
-  apiRoutes.set('POST /api/workflows/new-project', async (req, res) => {
-    const raw = await readBody(req);
-    let parsed: { name?: string; description?: string; allowUnsandboxed?: boolean };
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      sendJson(res, 400, { error: 'Invalid JSON body' });
-      return;
-    }
-
-    // Validate name
-    const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
-    if (!name) {
-      sendJson(res, 400, { error: 'Missing or empty name' });
-      return;
-    }
-    if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
-      sendJson(res, 400, { error: 'Invalid project name: must contain only letters, numbers, dots, hyphens, underscores' });
-      return;
-    }
-
-    // Validate description
-    const description = typeof parsed.description === 'string' ? parsed.description.trim() : '';
-    if (!description) {
-      sendJson(res, 400, { error: 'Missing or empty description' });
-      return;
-    }
-
-    // Check duplicate name — registry and filesystem
-    const existingProjects = listProjects(cfg.dataDir);
-    if (existingProjects.some(p => p.name === name)) {
-      sendJson(res, 409, { error: `A project with name '${name}' already exists` });
-      return;
-    }
-    const targetDir = join(cfg.projectsDir, name);
-    if (existsSync(targetDir)) {
-      sendJson(res, 409, { error: `A project with name '${name}' already exists` });
-      return;
-    }
-
-    // Check sandbox availability
-    const allowUnsandboxed = parsed.allowUnsandboxed === true;
-    if (allowUnsandboxed && !cfg.allowUnsandboxed) {
-      sendJson(res, 400, { error: 'allowUnsandboxed requested but server ALLOW_UNSANDBOXED env var not set' });
-      return;
-    }
-    try {
-      buildCommand(targetDir, 'interview', {
-        agentFrameworkDir: cfg.agentFrameworkDir,
-        allowUnsandboxed,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      sendJson(res, 503, { error: message });
-      return;
-    }
-
-    // Create the first session (specify phase) as an interview
-    // We need a placeholder project ID since the project isn't registered yet
-    const placeholderProjectId = randomUUID();
-    let session;
-    try {
-      session = createSession(cfg.dataDir, { projectId: placeholderProjectId, type: 'interview' });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      sendJson(res, 500, { error: message });
-      return;
-    }
-
-    log.info({ sessionId: session.id, name, description }, 'New-project workflow started');
-
-    // Kick off the workflow asynchronously
-    const firstSessionId = session.id;
-    let sessionCounter = 0;
-    let currentSessionId = firstSessionId;
-    const deps: SpecKitDeps = {
-      createSessionId: () => {
-        sessionCounter++;
-        if (sessionCounter === 1) return firstSessionId;
-        return randomUUID();
-      },
-      onPhaseTransition: (event: PhaseTransitionEvent) => {
-        currentSessionId = event.sessionId;
-        broadcastPhaseTransition(firstSessionId, event);
-
-        broadcastProjectUpdate({
-          projectId: placeholderProjectId,
-          activeSession: {
-            id: event.sessionId,
-            type: 'interview',
-            state: 'running',
-          },
-          taskSummary: { total: 0, completed: 0, blocked: 0, skipped: 0, remaining: 0 },
-          workflow: {
-            type: event.workflow,
-            phase: event.phase,
-            iteration: event.iteration,
-            description,
-          },
-        });
-      },
-      runPhase: async (phase: string, projectDir: string, sessionId: string): Promise<PhaseResult> => {
-        if (sessionId !== firstSessionId) {
-          createSession(cfg.dataDir, { projectId: placeholderProjectId, type: 'interview' });
+      // Check duplicate name in registry
+      const existingProjects = listProjects(cfg.dataDir);
+      const existingByName = existingProjects.find(p => p.name === name);
+      if (existingByName) {
+        // Allow re-onboard if status is "onboarding" or "error"
+        if (existingByName.status === 'onboarding' || existingByName.status === 'error') {
+          projectDir = existingByName.dir;
+          projectName = existingByName.name;
+        } else {
+          sendJson(res, 409, { error: `A project with name '${name}' already exists` });
+          return;
         }
+      } else {
+        // Check for directory collision on disk
+        const targetDir = join(cfg.projectsDir, name);
+        if (existsSync(targetDir)) {
+          sendJson(res, 409, { error: `A directory with name '${name}' already exists on disk` });
+          return;
+        }
+        projectDir = targetDir;
+        projectName = name;
+      }
+    } else {
+      // Discovered directory: path is required
+      if (!parsed.path || typeof parsed.path !== 'string') {
+        sendJson(res, 400, { error: 'Missing or invalid "path" field' });
+        return;
+      }
 
-        // Ensure agent framework is up-to-date before each session (FR-004)
-        ensureAgentFramework(cfg.dataDir);
+      projectDir = resolve(parsed.path);
 
-        const sandboxCmd = buildCommand(projectDir, 'interview', {
-          agentFrameworkDir: cfg.agentFrameworkDir,
-          allowUnsandboxed,
-        });
-        const logPath = join(cfg.dataDir, 'sessions', sessionId, 'output.jsonl');
-        const logger = createSessionLogger(logPath);
-        const handle = spawnProcess({
-          command: sandboxCmd.command,
-          args: sandboxCmd.args,
-          sessionId,
-          logger,
-          dataDir: cfg.dataDir,
-        });
+      // Validate path exists
+      if (!existsSync(projectDir)) {
+        sendJson(res, 400, { error: `Path does not exist: ${parsed.path}` });
+        return;
+      }
 
-        const result = await handle.waitForExit();
-        return { exitCode: result.exitCode };
-      },
-      analyzeHasIssues: async (_projectDir: string): Promise<boolean> => {
-        return false;
-      },
-      registerProject: async (regName: string, dir: string): Promise<string> => {
-        const project = createProject(cfg.dataDir, { name: regName, dir });
-        log.info({ projectId: project.id, name: regName, dir }, 'Project auto-registered after workflow');
-        return project.id;
-      },
-      launchTaskRun: async (_projectId: string): Promise<void> => {
-        // TODO: wire up to actual task run launch
-      },
+      // Validate path is a directory
+      const stat = statSync(projectDir);
+      if (!stat.isDirectory()) {
+        sendJson(res, 400, { error: `Path is not a directory: ${parsed.path}` });
+        return;
+      }
+
+      projectName = (parsed.name && typeof parsed.name === 'string') ? parsed.name.trim() : projectDir.split('/').pop() || 'unnamed';
+
+      // Check if already registered
+      const existingProjects = listProjects(cfg.dataDir);
+      const existingByDir = existingProjects.find(p => resolve(p.dir) === projectDir);
+      if (existingByDir) {
+        // Allow re-onboard if status is "onboarding" or "error"
+        if (existingByDir.status === 'onboarding' || existingByDir.status === 'error') {
+          projectName = existingByDir.name;
+        } else {
+          sendJson(res, 409, { error: `A project with this directory is already registered: ${parsed.path}` });
+          return;
+        }
+      }
+    }
+
+    // Synchronously register or find existing project
+    let projectId: string;
+    const allProjects = listProjects(cfg.dataDir);
+    const existingProject = allProjects.find(p => resolve(p.dir) === resolve(projectDir));
+
+    if (existingProject) {
+      projectId = existingProject.id;
+      // If re-onboarding from error, reset status
+      if (existingProject.status === 'error') {
+        updateProjectStatus(cfg.dataDir, existingProject.id, 'onboarding');
+      }
+    } else {
+      // For new projects, create directory first if needed
+      if (isNewProject) {
+        mkdirSync(projectDir, { recursive: true });
+      }
+      try {
+        const project = registerForOnboarding(cfg.dataDir, { name: projectName, dir: projectDir });
+        projectId = project.id;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('already registered')) {
+          sendJson(res, 409, { error: message });
+        } else {
+          sendJson(res, 400, { error: message });
+        }
+        return;
+      }
+    }
+
+    // Pre-create an interview session so we can return its ID immediately
+    // For re-onboards, reuse the existing active session if one exists
+    let sessionId: string;
+    const activeSession = getActiveSession(cfg.dataDir, projectId) as { id: string } | null;
+    if (activeSession) {
+      sessionId = activeSession.id;
+    } else {
+      const session = createSession(cfg.dataDir, { projectId, type: 'interview' });
+      sessionId = session.id;
+    }
+
+    // Build the onboarding context and run pipeline async (fire-and-forget)
+    const ctx: OnboardingContext = {
+      dataDir: cfg.dataDir,
+      projectDir,
+      projectName,
+      projectId,
+      agentFrameworkDir: cfg.agentFrameworkDir,
+      allowUnsandboxed: cfg.allowUnsandboxed,
     };
 
-    startNewProjectWorkflow({
-      repoName: name,
-      description,
-      projectsDir: cfg.projectsDir,
-      dataDir: cfg.dataDir,
-      deps,
-    }).then((result) => {
-      log.info({ name, outcome: result.outcome, projectId: result.projectId }, 'New-project workflow finished');
-
-      broadcastProjectUpdate({
-        projectId: result.projectId ?? placeholderProjectId,
-        activeSession: null,
-        taskSummary: { total: 0, completed: 0, blocked: 0, skipped: 0, remaining: 0 },
-        workflow: null,
-      });
+    // Fire pipeline async — it will skip register (already done) and handle remaining steps
+    runOnboardingPipeline(ctx).then((result) => {
+      log.info({ projectId: result.projectId, name: result.name, path: result.path }, 'Onboarding pipeline completed');
     }).catch((err) => {
-      log.error({ name, err }, 'New-project workflow error');
-
-      broadcastProjectUpdate({
-        projectId: placeholderProjectId,
-        activeSession: null,
-        taskSummary: { total: 0, completed: 0, blocked: 0, skipped: 0, remaining: 0 },
-        workflow: null,
-      });
+      log.error({ err, projectDir, projectName }, 'Onboarding pipeline failed');
     });
 
-    // Return the first session info immediately
+    log.info({ projectId, sessionId, name: projectName, path: projectDir }, 'Project onboarded via unified endpoint');
     sendJson(res, 201, {
-      sessionId: session.id,
-      projectId: placeholderProjectId,
-      phase: 'specify',
-      state: session.state,
+      projectId,
+      sessionId,
+      name: projectName,
+      path: projectDir,
+      status: 'onboarding' as const,
     });
+  });
+
+  // POST /api/workflows/new-project — DEPRECATED: use POST /api/projects/onboard with newProject: true
+  // Kept as redirect for backward compatibility during transition
+  apiRoutes.set('POST /api/workflows/new-project', async (_req, res) => {
+    sendJson(res, 410, { error: 'This endpoint has been removed. Use POST /api/projects/onboard with newProject: true' });
   });
 }

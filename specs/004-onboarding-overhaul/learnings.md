@@ -76,3 +76,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `sessionId` is resolved post-pipeline via `listSessionsByProject()` looking for a running session.
 - The integration tests in T013 (`onboard-api.test.ts`) still fail — they depend on T015's unified endpoint changes.
 
+### T015 — Unified onboard endpoint
+- The endpoint runs the onboarding pipeline **async** (fire-and-forget) because the contract says "Return immediately with projectId and sessionId". Registration and session creation happen synchronously before the pipeline starts.
+- For re-onboarding (status "onboarding" or "error"), the endpoint reuses the existing active session if one exists (`getActiveSession`), otherwise creates a new one. This avoids the `createSession` "already has active session" error.
+- The `POST /api/workflows/new-project` endpoint now returns 410 (Gone). 17 tests in `new-project-workflow.test.ts` and 1 in `dashboard-api.test.ts` fail because they still target this deprecated endpoint — T037 handles their removal.
+- 3 onboard-api tests (`should persist ... in projects.json`) fail due to a race condition: the async pipeline fails fast (install-specify → nix not available in test env) and sets status to "error" before tests read `projects.json`. In production this isn't an issue because pipeline steps take real time. T036 should update these tests to accept either "onboarding" or "error" status, or mock the pipeline.
+- `registerForOnboarding()` validates that the directory exists, so for `newProject: true` the directory must be created (`mkdirSync`) BEFORE calling `registerForOnboarding()`.
+
