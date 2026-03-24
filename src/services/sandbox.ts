@@ -9,10 +9,6 @@ export interface SandboxCommand {
   unsandboxed: boolean;
 }
 
-interface LegacyBuildCommandOptions {
-  sandboxAvailable?: boolean;
-}
-
 export interface BuildCommandOptions {
   agentFrameworkDir: string;
   sandboxAvailable?: boolean;
@@ -49,34 +45,8 @@ export function resetAvailabilityCache(): void {
 
 /**
  * Build the command array to spawn a sandboxed (or unsandboxed) agent process.
- *
- * New signature: buildCommand(projectDir, sessionType, options)
- * Legacy signature: buildCommand(projectDir, claudeArgs[], allowUnsandboxed, options?)
  */
 export function buildCommand(
-  projectDir: string,
-  sessionTypeOrArgs: SessionType | string[],
-  optionsOrAllowUnsandboxed?: BuildCommandOptions | boolean,
-  legacyOptions?: LegacyBuildCommandOptions,
-): SandboxCommand {
-  // Dispatch based on second argument type
-  if (Array.isArray(sessionTypeOrArgs)) {
-    return buildCommandLegacy(
-      projectDir,
-      sessionTypeOrArgs,
-      optionsOrAllowUnsandboxed as boolean,
-      legacyOptions,
-    );
-  }
-
-  return buildCommandNew(
-    projectDir,
-    sessionTypeOrArgs as SessionType,
-    optionsOrAllowUnsandboxed as BuildCommandOptions,
-  );
-}
-
-function buildCommandNew(
   projectDir: string,
   sessionType: SessionType,
   options: BuildCommandOptions,
@@ -146,55 +116,4 @@ function buildCommandNew(
   }
 
   return { command: 'nix', args: nixShellCommand, unsandboxed: true };
-}
-
-function buildCommandLegacy(
-  projectDir: string,
-  claudeArgs: string[],
-  allowUnsandboxed: boolean,
-  options?: LegacyBuildCommandOptions,
-): SandboxCommand {
-  const sandboxAvailable = options?.sandboxAvailable ?? isAvailable();
-
-  if (sandboxAvailable) {
-    const args = [
-      '--user',
-      '--pipe',
-      '--property=ProtectHome=tmpfs',
-      `--property=BindPaths=${projectDir}`,
-      '--property=ProtectSystem=strict',
-      '--property=NoNewPrivileges=yes',
-      '--property=PrivateDevices=yes',
-      '--property=PrivateTmp=yes',
-      'nix',
-      'develop',
-      projectDir,
-      '--command',
-      'claude',
-      ...claudeArgs,
-    ];
-
-    return { command: 'systemd-run', args, unsandboxed: false };
-  }
-
-  // Sandbox unavailable — check two-gate override
-  const serverGate = process.env['ALLOW_UNSANDBOXED'] === 'true';
-
-  if (!serverGate || !allowUnsandboxed) {
-    throw new Error(
-      'Sandbox (systemd-run) is unavailable. To run without sandbox, ' +
-      'BOTH the server must be started with ALLOW_UNSANDBOXED=true ' +
-      'AND the session request must include allowUnsandboxed: true.',
-    );
-  }
-
-  const args = [
-    'develop',
-    projectDir,
-    '--command',
-    'claude',
-    ...claudeArgs,
-  ];
-
-  return { command: 'nix', args, unsandboxed: true };
 }

@@ -176,7 +176,7 @@
 
 **Purpose**: Cleanup, consistency, test coverage
 
-- [ ] T035 [P] Update existing tests that call `buildCommand()` with old signature in tests/unit/sandbox.test.ts, tests/integration/*.test.ts — fix all broken tests from the signature change in T008/T009
+- [x] T035 [P] Update existing tests that call `buildCommand()` with old signature in tests/unit/sandbox.test.ts, tests/integration/*.test.ts — fix all broken tests from the signature change in T008/T009
 - [ ] T036 [P] Update existing onboard API tests to match unified endpoint in tests/integration/onboard-api.test.ts, tests/contract/rest-api-projects.test.ts
 - [ ] T037 Remove deprecated `POST /api/workflows/new-project` references from tests/integration/new-project-workflow.test.ts and any other test files
 - [ ] T038 Run quickstart.md validation — execute all manual sandbox test commands from specs/004-onboarding-overhaul/quickstart.md to verify nix shell composition and bind paths work correctly

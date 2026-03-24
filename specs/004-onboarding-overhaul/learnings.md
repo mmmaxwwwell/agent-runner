@@ -176,3 +176,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The GitRemoteModal is duplicated from `dashboard.tsx` into `new-project.tsx` (local copy). T034 or polish could extract it to a shared component if desired, but keeping it local avoids cross-component coupling for now.
 - The `OnboardResponse` type in `api.ts` doesn't include `sessionId` yet — T034 will add it. The new-project form doesn't need it since it navigates to dashboard.
 
+### T035 — Migrating legacy buildCommand tests to new signature
+- Removed the legacy `buildCommandLegacy()` function and the `LegacyBuildCommandOptions` interface from `sandbox.ts`. The overloaded dispatch (`Array.isArray` check) is also gone — `buildCommand` now only accepts the new `(projectDir, sessionType, options)` signature.
+- All legacy tests in `sandbox.test.ts` were rewritten to use the new signature with `BuildCommandOptions`. Tests that were duplicative of the new-signature section (e.g., BindPaths with project dir, nix develop chain) were removed since they're already covered above.
+- The no-op test ("should throw when sandbox unavailable and allowUnsandboxed is false") was removed — it had no assertion.
+- The 20 remaining test failures are all in T036/T037 scope (deprecated endpoint, onboard race conditions), not related to sandbox changes.
+
