@@ -170,3 +170,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `reconfigureSignDialog` looks up the dialog by fragment tag after restoration — the DialogFragment's `arguments` Bundle survives but `callback`/`yubikeyStatus` references (set via `configure()`) are lost in `onDestroyView`. Must call `configure()` again before the fragment's `onViewCreated` re-observes the LiveData.
 - `activityScope` is recreated with the new activity instance, so the restored `SignRequestHandler` gets a fresh scope. Any in-flight sign operations from the previous activity instance are lost (acceptable — server would have timed out anyway).
 
+### T027 — Yubikey disconnect mid-signing
+- Two disconnect paths: (1) USB `onClosed` fires → status LiveData → MainActivity observer → `signRequestHandler.onYubikeyDisconnected()`, and (2) IOException thrown from `device.openConnection`/SmartCard operations during `sign()` or `listKeys()` → caught in `processSign`'s coroutine.
+- NFC has no `onClosed` callback like USB. NFC field loss manifests as IOException during SmartCard operations. YubikeyManager now catches IOException and resets `nfcDevice = null` + posts DISCONNECTED status, ensuring the status overlay updates.
+- `onSignError` is called before `onDismissDialog` in the disconnect handler — this briefly shows the error before the dialog dismisses. Matches the pattern used for PIN blocked errors.
+- The IOException catch in `signWithPinLoop` re-throws to let the outer `processSign` handler deal with it (send cancel, show error, dismiss, finish).
+

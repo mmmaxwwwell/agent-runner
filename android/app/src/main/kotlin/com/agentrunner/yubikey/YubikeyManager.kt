@@ -97,18 +97,27 @@ open class YubikeyManager(context: Context) {
         val device = usbDevice ?: nfcDevice
             ?: throw IllegalStateException("No Yubikey connected")
 
-        device.openConnection(SmartCardConnection::class.java).use { connection ->
-            val piv = PivSession(connection)
-            val cert: X509Certificate = try {
-                piv.getCertificate(Slot.AUTHENTICATION)
-            } catch (e: ApduException) {
-                Log.w(TAG, "No certificate in slot 9a", e)
-                return@withContext emptyList()
-            }
+        try {
+            device.openConnection(SmartCardConnection::class.java).use { connection ->
+                val piv = PivSession(connection)
+                val cert: X509Certificate = try {
+                    piv.getCertificate(Slot.AUTHENTICATION)
+                } catch (e: ApduException) {
+                    Log.w(TAG, "No certificate in slot 9a", e)
+                    return@withContext emptyList()
+                }
 
-            val blob = SshKeyFormatter.toSshPublicKeyBlob(cert)
-            val comment = "YubiKey PIV Slot 9a"
-            listOf(SshPublicKey(blob = blob, comment = comment))
+                val blob = SshKeyFormatter.toSshPublicKeyBlob(cert)
+                val comment = "YubiKey PIV Slot 9a"
+                listOf(SshPublicKey(blob = blob, comment = comment))
+            }
+        } catch (e: java.io.IOException) {
+            // Connection lost (USB yanked or NFC field lost) — update status
+            if (device is NfcYubiKeyDevice) {
+                nfcDevice = null
+                _status.postValue(YubikeyStatus.DISCONNECTED)
+            }
+            throw e
         }
     }
 
@@ -126,37 +135,46 @@ open class YubikeyManager(context: Context) {
         val device = usbDevice ?: nfcDevice
             ?: throw IllegalStateException("No Yubikey connected")
 
-        device.openConnection(SmartCardConnection::class.java).use { connection ->
-            val piv = PivSession(connection)
+        try {
+            device.openConnection(SmartCardConnection::class.java).use { connection ->
+                val piv = PivSession(connection)
 
-            // Determine the key type and verify it's ECCP256
-            val metadata = try {
-                piv.getSlotMetadata(Slot.AUTHENTICATION)
-            } catch (e: ApduException) {
-                throw IllegalStateException("Cannot read slot metadata — ensure a key is loaded in slot 9a", e)
-            }
-
-            if (metadata.keyType != KeyType.ECCP256) {
-                throw IllegalStateException(
-                    "Unsupported key type: ${metadata.keyType}. Only ECDSA P-256 (ECCP256) is supported."
-                )
-            }
-
-            // Verify PIN — use provided pin or fall back to cached pin
-            val pinToUse = pin ?: cachedPin
-            if (pinToUse != null) {
-                try {
-                    piv.verifyPin(pinToUse)
-                    // Cache on successful verification
-                    if (pin != null && cachedPin == null) {
-                        cachedPin = pin.copyOf()
-                    }
+                // Determine the key type and verify it's ECCP256
+                val metadata = try {
+                    piv.getSlotMetadata(Slot.AUTHENTICATION)
                 } catch (e: ApduException) {
-                    handlePinError(e)
+                    throw IllegalStateException("Cannot read slot metadata — ensure a key is loaded in slot 9a", e)
                 }
-            }
 
-            piv.rawSignOrDecrypt(Slot.AUTHENTICATION, KeyType.ECCP256, data)
+                if (metadata.keyType != KeyType.ECCP256) {
+                    throw IllegalStateException(
+                        "Unsupported key type: ${metadata.keyType}. Only ECDSA P-256 (ECCP256) is supported."
+                    )
+                }
+
+                // Verify PIN — use provided pin or fall back to cached pin
+                val pinToUse = pin ?: cachedPin
+                if (pinToUse != null) {
+                    try {
+                        piv.verifyPin(pinToUse)
+                        // Cache on successful verification
+                        if (pin != null && cachedPin == null) {
+                            cachedPin = pin.copyOf()
+                        }
+                    } catch (e: ApduException) {
+                        handlePinError(e)
+                    }
+                }
+
+                piv.rawSignOrDecrypt(Slot.AUTHENTICATION, KeyType.ECCP256, data)
+            }
+        } catch (e: java.io.IOException) {
+            // Connection lost (USB yanked or NFC field lost) — update status
+            if (device is NfcYubiKeyDevice) {
+                nfcDevice = null
+                _status.postValue(YubikeyStatus.DISCONNECTED)
+            }
+            throw e
         }
     }
 

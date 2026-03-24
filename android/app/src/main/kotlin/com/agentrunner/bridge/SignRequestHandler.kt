@@ -9,6 +9,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.Base64
 import java.util.LinkedList
@@ -78,6 +79,7 @@ class SignRequestHandler(
         intentionallyCancelled = true
         currentJob?.cancel()
         webSocket.sendCancel(request.requestId)
+        listener.onSignError("Yubikey disconnected during signing. Request cancelled.")
         listener.onDismissDialog()
         finishCurrent()
     }
@@ -140,6 +142,13 @@ class SignRequestHandler(
                     listener.onDismissDialog()
                     finishCurrent()
                 }
+            } catch (e: IOException) {
+                // Connection lost (USB yanked or NFC field lost during sign)
+                Log.e(TAG, "Yubikey connection lost during signing", e)
+                webSocket.sendCancel(request.requestId)
+                listener.onSignError("Yubikey disconnected during signing. Request cancelled.")
+                listener.onDismissDialog()
+                finishCurrent()
             }
         }
     }
@@ -159,6 +168,9 @@ class SignRequestHandler(
                 listener.onDismissDialog()
                 finishCurrent()
                 return
+            } catch (e: IOException) {
+                // Yubikey disconnected while signing with PIN — rethrow to processSign handler
+                throw e
             }
         }
     }

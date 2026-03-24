@@ -249,6 +249,10 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         // Observe Yubikey connection state
         yubikeyManager.status.observe(this) { status ->
             updateYubikeyStatus(status)
+            // Notify sign handler when Yubikey disconnects during an active sign operation
+            if (status == YubikeyStatus.DISCONNECTED) {
+                signRequestHandler?.onYubikeyDisconnected()
+            }
         }
     }
 
