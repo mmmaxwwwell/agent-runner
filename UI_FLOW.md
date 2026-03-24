@@ -15,16 +15,19 @@ flowchart TD
     SETT["#/settings Settings"]
 
     %% ===== SHARED INLINE COMPONENTS =====
-    SKCHAT_NEW["SpecKitChat (inline in New Project)"]
+    GITMODAL_DASH["GitRemoteModal (inline in Dashboard)"]
+    GITMODAL_NEW["GitRemoteModal (inline in New Project)"]
     SKCHAT_FEAT["SpecKitChat (inline in Add Feature)"]
 
     %% ===== NAVIGATION TRANSITIONS =====
     DASH -- "Click '+ New Project'" --> NEW
     DASH -- "Click project card" --> PROJ
     DASH -- "Click Settings (header)" --> SETT
+    DASH -- "Click 'Onboard' on discovered dir" --> GITMODAL_DASH
+    GITMODAL_DASH -- "Select remote option, confirm\nPOST /api/projects/onboard → 201" --> DASH
 
-    NEW -- "POST /api/workflows/new-project → 201" --> SKCHAT_NEW
-    SKCHAT_NEW -- "Phase reaches 'implementation' (auto-nav 2s)" --> DASH
+    NEW -- "Enter name, select remote option\nPOST /api/projects/onboard → 201" --> DASH
+    NEW -- "Back (header)" --> DASH
 
     PROJ -- "Click 'View Session'" --> SESS
     PROJ -- "Click 'Add Feature'" --> FEAT
@@ -35,7 +38,6 @@ flowchart TD
 
     SESS -- "Back (header)" --> PROJ
     SETT -- "Back (header)" --> DASH
-    NEW -- "Back (header)" --> DASH
     FEAT -- "Back (header)" --> PROJ
 
     %% ===== ON-LOAD API CALLS =====
@@ -46,9 +48,8 @@ flowchart TD
     SETT -. "GET /api/health" .-> SETT
 
     %% ===== WEBSOCKET CONNECTIONS =====
-    DASH == "WS /ws/dashboard\n(project-update messages)" ==> DASH
+    DASH == "WS /ws/dashboard\n(project-update, onboarding-step)" ==> DASH
     SESS == "WS /ws/sessions/:id?lastSeq=N\n(output, state, progress)" ==> SESS
-    SKCHAT_NEW == "WS /ws/sessions/:sessionId\n(output, state, phase)" ==> SKCHAT_NEW
     SKCHAT_FEAT == "WS /ws/sessions/:sessionId\n(output, state, phase)" ==> SKCHAT_FEAT
 
     %% ===== USER ACTIONS (non-navigation) =====
@@ -68,7 +69,7 @@ flowchart TD
     classDef screen fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
     classDef inline fill:#fff3e0,stroke:#f57c00,stroke-width:2px
     class DASH,NEW,PROJ,SESS,FEAT,SETT screen
-    class SKCHAT_NEW,SKCHAT_FEAT inline
+    class GITMODAL_DASH,GITMODAL_NEW,SKCHAT_FEAT inline
 ```
 
 ### Legend
@@ -94,13 +95,46 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-### Spec-Kit Workflow Phases
+### Project Status State Machine
 
 ```mermaid
 stateDiagram-v2
-    [*] --> specify: Workflow starts
-    specify --> clarify
-    clarify --> plan
+    [*] --> onboarding: POST /api/projects/onboard
+    onboarding --> active: POST /api/projects/:id/start-planning
+    onboarding --> error: Onboarding step fails
+    error --> onboarding: Re-onboard (POST /api/projects/onboard)
+    active --> [*]
+```
+
+### Spec-Kit Workflow Phases
+
+#### Onboarding (New Project / Discovered Directory)
+
+```mermaid
+stateDiagram-v2
+    [*] --> interview: Onboarding launches interview session
+    interview --> [*]: User completes interview (writes interview-notes.md)
+    note right of interview: Single long-running Claude session.\nAgent researches, probes, loops until spec is comprehensive.\nDoes NOT auto-advance to planning.
+```
+
+#### Planning (Triggered by User)
+
+```mermaid
+stateDiagram-v2
+    [*] --> plan: POST /api/projects/:id/start-planning
+    plan --> tasks
+    tasks --> analyze
+    analyze --> analyze: Issues found (max 5 iterations)
+    analyze --> implementation: No issues / cap reached
+    implementation --> [*]
+```
+
+#### Add Feature
+
+```mermaid
+stateDiagram-v2
+    [*] --> interview: Workflow starts
+    interview --> plan
     plan --> tasks
     tasks --> analyze
     analyze --> analyze: Issues found (max 5 iterations)
@@ -116,12 +150,14 @@ stateDiagram-v2
 | PUT | `/api/config/log-level` | Settings | Update server log level |
 | GET | `/api/projects` | Dashboard | List all projects with task summaries |
 | POST | `/api/projects` | (admin) | Register existing project directory |
+| POST | `/api/projects/onboard` | Dashboard, NewProject | Unified onboarding for discovered dirs and new projects |
 | GET | `/api/projects/:id` | ProjectDetail | Full project info with tasks/sessions |
 | DELETE | `/api/projects/:id` | (admin) | Unregister project |
 | POST | `/api/projects/:id/sessions` | ProjectDetail | Start task-run or interview session |
 | GET | `/api/projects/:id/sessions` | (API) | List sessions for a project |
 | POST | `/api/projects/:id/add-feature` | AddFeature | Start add-feature workflow |
-| POST | `/api/workflows/new-project` | NewProject | Start new-project workflow |
+| POST | `/api/projects/:id/start-planning` | (API/UI) | Trigger interview-to-planning transition |
+| ~~POST~~ | ~~`/api/workflows/new-project`~~ | ~~Removed~~ | ~~Returns 410 Gone. Use `/api/projects/onboard` with `newProject: true`~~ |
 | GET | `/api/sessions/:id` | SessionView | Fetch session metadata |
 | GET | `/api/sessions/:id/log` | SessionView | Fetch session log entries |
 | POST | `/api/sessions/:id/stop` | ProjectDetail | Stop a running session |
@@ -134,7 +170,7 @@ stateDiagram-v2
 
 | Path | Used By | Messages Received |
 |------|---------|-------------------|
-| `/ws/dashboard` | Dashboard | `project-update` (projectId, activeSession, taskSummary, workflow) |
+| `/ws/dashboard` | Dashboard | `project-update` (projectId, activeSession, taskSummary, workflow), `onboarding-step` (projectId, step, status, error) |
 | `/ws/sessions/:id` | SessionView, SpecKitChat | `output`, `state`, `progress`, `phase`, `sync`, `error` |
 
 ---
@@ -147,23 +183,30 @@ stateDiagram-v2
 **Component**: `src/client/components/dashboard.tsx`
 
 **On Load**:
-- `GET /api/projects` — fetches all projects with task summaries and active session info
+- `GET /api/projects` — fetches all projects (registered and discovered) with task summaries and active session info
 
 **User Actions**:
 | Element | Action | Result |
 |---------|--------|--------|
 | "+ New Project" link | Click | Navigate to `#/new` |
-| Project card | Click | Navigate to `#/projects/:id` |
+| Project card (registered) | Click | Navigate to `#/projects/:id` |
+| "Onboard" button (discovered dir) | Click | Opens GitRemoteModal — user selects skip/URL/GitHub, then `POST /api/projects/onboard` |
 | Settings icon (header) | Click | Navigate to `#/settings` |
 
-**Field Validations**: None (read-only screen)
+**Field Validations**: None (read-only screen except for onboard modal)
 
 **Real-time Updates**:
-- WebSocket `/ws/dashboard` — receives `project-update` messages containing:
-  - `projectId`: which project changed
-  - `activeSession`: current session state (id, type, state) or null
-  - `taskSummary`: updated task counts (total, completed, blocked, skipped, remaining)
-  - `workflow`: current workflow info (type, phase, iteration, description) or null
+- WebSocket `/ws/dashboard` — receives:
+  - `project-update` messages containing:
+    - `projectId`: which project changed
+    - `activeSession`: current session state (id, type, state) or null
+    - `taskSummary`: updated task counts (total, completed, blocked, skipped, remaining)
+    - `workflow`: current workflow info (type, phase, iteration, description) or null
+  - `onboarding-step` messages containing:
+    - `projectId`: which project is being onboarded
+    - `step`: current step name (`register`, `create-directory`, `generate-flake`, `git-init`, `git-remote`, `install-specify`, `specify-init`, `launch-interview`)
+    - `status`: step outcome (`running`, `completed`, `skipped`, `error`)
+    - `error`: error message if status is `error`, null otherwise
 
 **Navigation Out**:
 - `#/new` — create new project
@@ -173,6 +216,7 @@ stateDiagram-v2
 **Error States**:
 - API fetch failure — error message displayed inline
 - WebSocket disconnect — auto-reconnect with exponential backoff (500ms → 30s); non-fatal
+- Onboard failure — error surfaced via `onboarding-step` WebSocket message with `status: "error"`
 
 ---
 
@@ -187,31 +231,22 @@ stateDiagram-v2
 | Element | Action | Result |
 |---------|--------|--------|
 | "Repository name" text input | Type | Sets `name` state |
-| "Describe your idea" textarea | Type | Sets `description` state |
-| Mic button (M) | Click | Starts voice transcription → fills description field |
-| "Start Project" button | Click | `POST /api/workflows/new-project` with `{ name, description }` |
+| Git remote option (skip / URL / GitHub) | Select | Sets remote config for onboard request |
+| "Go" button | Click | `POST /api/projects/onboard` with `{ name, newProject: true, remoteUrl?, createGithubRepo? }` → navigate to `#/` |
 | Back (header) | Click | Navigate to `#/` |
 
 **Field Validations**:
 - `name`: required, non-empty (button disabled until filled)
-- `description`: required, non-empty (button disabled until filled)
-- Server-side: name must match `/^[a-zA-Z0-9._-]+$/`, must not be duplicate
+- Server-side: name must match `/^[a-zA-Z0-9._-]+$/`, must not be duplicate in registry or on disk
 
-**Real-time Updates**:
-- After workflow starts, transitions to inline SpecKitChat component
-- SpecKitChat connects to `WS /ws/sessions/:sessionId`
-- Receives: `output` (log lines), `state` (session state changes), `phase` (workflow phase transitions)
-- Phase indicator shows: specify → clarify → plan → tasks → analyze progression
+**Real-time Updates**: None — navigates to dashboard on success, where `onboarding-step` WebSocket messages show progress.
 
 **Navigation Out**:
-- `#/` — back via header
-- `#/` — auto-navigation when workflow phase reaches "implementation" (2s delay)
+- `#/` — back via header or on successful onboard submission
 
 **Error States**:
-- 400 — validation error (empty name, invalid chars, empty description) — displayed inline
-- 409 — duplicate project name — displayed inline
-- 503 — sandbox unavailable — displayed inline
-- Voice transcription failure — graceful fallback, user can type instead
+- 400 — validation error (empty name, invalid chars) — displayed inline
+- 409 — duplicate project name or directory exists — displayed inline
 
 ---
 
@@ -315,7 +350,7 @@ stateDiagram-v2
 - After workflow starts, transitions to inline SpecKitChat component
 - SpecKitChat connects to `WS /ws/sessions/:sessionId`
 - Receives: `output`, `state`, `phase` messages
-- Phase indicator shows: specify → clarify → plan → tasks → analyze progression
+- Phase indicator shows: interview → plan → tasks → analyze progression
 
 **Navigation Out**:
 - `#/projects/:id` — back via header
@@ -364,7 +399,7 @@ stateDiagram-v2
 
 ### SpecKitChat (Shared Inline Component)
 
-**Route**: None (inline within New Project and Add Feature)
+**Route**: None (inline within Add Feature)
 **Component**: `src/client/components/spec-kit-chat.tsx`
 
 **On Load**:
@@ -397,9 +432,74 @@ stateDiagram-v2
 
 ---
 
+### GitRemoteModal (Shared Inline Component)
+
+**Route**: None (inline within Dashboard discovered cards and New Project)
+**Component**: Defined locally in `src/client/components/dashboard.tsx` and `src/client/components/new-project.tsx`
+
+**User Actions**:
+| Element | Action | Result |
+|---------|--------|--------|
+| "Skip" button | Click | Proceeds with onboard without remote setup |
+| "Remote URL" text input | Type + confirm | Sets `remoteUrl` on the onboard request |
+| "Create GitHub Repo" button | Click | Sets `createGithubRepo: true` on the onboard request |
+| Backdrop click | Click | Closes modal (cancel) |
+
+**Field Validations**:
+- Remote URL: optional, free-form text (validated server-side by git)
+- `remoteUrl` and `createGithubRepo` are mutually exclusive (server-side validation)
+
+---
+
 ## API Sequence Diagrams
 
-### New Project Workflow
+### Unified Onboarding (New Project or Discovered Directory)
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant C as PWA Client
+    participant S as Server
+    participant OB as Onboarding Pipeline
+    participant SB as Sandbox (systemd-run)
+    participant WS as WebSocket
+    participant TP as Transcript Parser
+
+    U->>C: Click "Onboard" or enter name + click "Go"
+    C->>C: Show GitRemoteModal (skip / URL / GitHub)
+    U->>C: Select remote option
+    C->>S: POST /api/projects/onboard<br/>{ name, path?, newProject?, remoteUrl?, createGithubRepo? }
+    S->>S: Validate input (name/path, duplicates)
+    S->>S: Register project (status: "onboarding")
+    S->>S: Create interview session
+    S-->>C: 201 { projectId, sessionId, name, path, status: "onboarding" }
+    C->>C: Navigate to Dashboard (project appears with "onboarding" status)
+
+    Note over S,OB: Async — pipeline runs after response
+
+    S->>OB: runOnboardingPipeline(ctx)
+
+    loop For each step: create-dir → generate-flake → git-init → git-remote → install-specify → specify-init → launch-interview
+        OB->>OB: step.check() — skip if already done
+        alt Step needed
+            OB->>SB: Execute step inside sandbox
+            SB-->>OB: Success
+            OB->>WS: broadcastOnboardingStep(step, "completed")
+        else Already done
+            OB->>WS: broadcastOnboardingStep(step, "skipped")
+        end
+    end
+
+    OB->>SB: Launch interview session (Claude with -p interview wrapper)
+    OB->>TP: Start transcript parser (watches output.jsonl → writes transcript.md)
+    WS-->>C: { type: "onboarding-step", step: "launch-interview", status: "completed" }
+
+    Note over U,TP: Interview runs as long-running Claude session
+
+    U->>C: Navigate to Session View to interact with interview
+```
+
+### Interview-to-Planning Handoff
 
 ```mermaid
 sequenceDiagram
@@ -408,30 +508,25 @@ sequenceDiagram
     participant S as Server
     participant SK as SpecKit Orchestrator
     participant SB as Sandbox (systemd-run)
-    participant WS as WebSocket
 
-    U->>C: Fill name + description, click "Start Project"
-    C->>S: POST /api/workflows/new-project<br/>{ name, description }
-    S->>S: Validate name (non-empty, /^[a-zA-Z0-9._-]+$/)
-    S->>S: Validate description (non-empty)
-    S->>S: Check duplicate (projects.json + filesystem)
-    S->>S: Check sandbox availability (buildCommand)
-    S->>S: Create session (type: interview)
-    S-->>C: 201 { sessionId, projectId, phase: "specify", state: "running" }
+    Note over U,SB: Interview complete — agent has written interview-notes.md
 
-    C->>WS: Connect WS /ws/sessions/:sessionId
-    WS-->>C: sync { lastSeq }
+    U->>C: Trigger planning transition
+    C->>S: POST /api/projects/:id/start-planning
+    S->>S: Validate project status is "onboarding"
+    S->>S: Verify no active session (interview completed)
+    S->>S: Transition status: onboarding → active
+    S->>S: Extract description from interview-notes.md
+    S->>S: Create planning session (type: task-run)
+    S-->>C: 200 { projectId, sessionId, status: "active", phase: "plan" }
 
-    Note over S,SK: Async — workflow runs after response
+    Note over S,SK: Async — planning phases run after response
 
-    S->>SK: startNewProjectWorkflow()
-    SK->>SK: mkdirSync(projectsDir/name)
+    S->>SK: startPlanningPhases()
 
-    loop For each phase: specify → clarify → plan → tasks
-        SK->>SK: createSessionId()
-        SK->>WS: broadcastPhaseTransition(phase)
-        WS-->>C: { type: "phase", phase, sessionId }
-        SK->>SB: spawnProcess(sandboxCmd)
+    loop For each phase: plan → tasks
+        SK->>SB: spawnProcess(sandboxCmd with context prompt)
+        Note over SB: Agent reads spec.md, interview-notes.md, transcript.md
         SB-->>SK: PhaseResult { exitCode: 0 }
     end
 
@@ -445,12 +540,6 @@ sequenceDiagram
             Note over SK: Loop continues (max 5)
         end
     end
-
-    SK->>S: registerProject(name, dir) → projectId
-    SK->>S: launchTaskRun(projectId)
-    S->>WS: broadcastProjectUpdate(workflow: null)
-    WS-->>C: { type: "phase", phase: "implementation" }
-    C->>C: Auto-navigate to Dashboard (2s delay)
 ```
 
 ### Add Feature Workflow
@@ -480,7 +569,7 @@ sequenceDiagram
 
     S->>SK: startAddFeatureWorkflow()
 
-    loop For each phase: specify → clarify → plan → tasks
+    loop For each phase: interview → plan → tasks
         SK->>SK: createSessionId()
         SK->>WS: broadcastPhaseTransition(phase)
         WS-->>C: { type: "phase", phase, sessionId }
@@ -605,6 +694,19 @@ sequenceDiagram
 
 ---
 
+## Generated Files Reference
+
+Files generated during the onboarding and interview process:
+
+| File | Location | Generated By | Purpose |
+|------|----------|-------------|---------|
+| `transcript.md` | `<projectDir>/transcript.md` | Transcript parser (server-side) | Real-time conversation record from `output.jsonl`. Contains `## User` and `## Agent` sections. Tool calls are omitted. Append-only. |
+| `interview-notes.md` | `<projectDir>/specs/<feature>/interview-notes.md` | Interview agent (Claude) | Agent-written summary of key decisions, rejected alternatives, and user priorities. Written when user signals readiness to plan. |
+| `spec.md` | `<projectDir>/specs/<feature>/spec.md` | Interview agent (Claude) | Feature specification produced during the interview. |
+| `flake.nix` | `<projectDir>/flake.nix` | Flake generator (onboarding pipeline) | Nix flake with stack-specific packages (node, python, rust, go, or generic). Uses detected host architecture. |
+
+---
+
 ## Field Validation Reference Table
 
 Every input field in the application, with client-side and server-side validation rules.
@@ -613,11 +715,11 @@ Every input field in the application, with client-side and server-side validatio
 
 | Screen | Field | Required | Client Validation | Server Validation | Error Message |
 |--------|-------|----------|-------------------|-------------------|---------------|
-| New Project | Repository name | Yes | Button disabled when empty | Non-empty after trim; must match `/^[a-zA-Z0-9._-]+$/`; no duplicate in registry or filesystem | 400: "Missing or empty name" / "Invalid project name: must contain only letters, numbers, dots, hyphens, underscores" / 409: "A project with name '{name}' already exists" |
-| New Project | Describe your idea | Yes | Button disabled when empty | Non-empty after trim | 400: "Missing or empty description" |
+| New Project | Repository name | Yes | Button disabled when empty | Non-empty after trim; must match `/^[a-zA-Z0-9._-]+$/`; no duplicate in registry or filesystem | 400: "Missing or empty name for new project" / "Invalid project name: must contain only letters, numbers, dots, hyphens, underscores" / 409: "A project with name '{name}' already exists" |
+| Dashboard (Onboard) | Git remote URL | No | Free-form text in GitRemoteModal | Validated by `git remote add` at execution time | Error surfaced via onboarding-step WebSocket |
 | Add Feature | Describe the feature | Yes | Button disabled when empty | Non-empty after trim | 400: "Missing or empty description" |
-| Session View | Type your answer… | Yes | Button disabled when empty or submitting | Non-empty after trim; session must be in `waiting-for-input` state | 400: "Empty answer" / 400: "Session is not in waiting-for-input state" |
-| SpecKitChat | Type a message… | Yes | Send disabled when empty | Trim before WebSocket send | N/A (WebSocket, no HTTP error) |
+| Session View | Type your answer... | Yes | Button disabled when empty or submitting | Non-empty after trim; session must be in `waiting-for-input` state | 400: "Empty answer" / 400: "Session is not in waiting-for-input state" |
+| SpecKitChat | Type a message... | Yes | Send disabled when empty | Trim before WebSocket send | N/A (WebSocket, no HTTP error) |
 | Settings | Log level (dropdown) | Yes | Predefined options: debug, info, warn, error, fatal | Must be one of the LOG_LEVELS set | 400: "Invalid level. Must be one of: debug, info, warn, error, fatal" |
 | Settings | Voice backend (radio) | No | "browser" disabled if Web Speech unavailable; "cloud" disabled if `!health.cloudSttAvailable` | N/A (localStorage only) | N/A |
 
@@ -627,9 +729,14 @@ These are not user-typed fields but are validated on the server for each endpoin
 
 | Endpoint | Check | Error |
 |----------|-------|-------|
-| `POST /api/workflows/new-project` | Duplicate name (registry + filesystem) | 409: "A project with name '{name}' already exists" |
-| `POST /api/workflows/new-project` | Sandbox available (`buildCommand`) | 503: sandbox error |
-| `POST /api/workflows/new-project` | `allowUnsandboxed` without server env var | 400: "allowUnsandboxed requested but server ALLOW_UNSANDBOXED env var not set" |
+| `POST /api/projects/onboard` | Name required when `newProject: true` | 400: "Missing or empty name for new project" |
+| `POST /api/projects/onboard` | Name matches `/^[a-zA-Z0-9._-]+$/` when `newProject: true` | 400: "Invalid project name..." |
+| `POST /api/projects/onboard` | Path required when `newProject: false` | 400: "Missing or invalid \"path\" field" |
+| `POST /api/projects/onboard` | Path exists and is a directory | 400: "Path does not exist" / "Path is not a directory" |
+| `POST /api/projects/onboard` | `remoteUrl` and `createGithubRepo` mutually exclusive | 400: "remoteUrl and createGithubRepo are mutually exclusive" |
+| `POST /api/projects/onboard` | No duplicate (active project at same path/name) | 409: duplicate error |
+| `POST /api/projects/:id/start-planning` | Project status is "onboarding" | 400: "Project status is \"...\", expected \"onboarding\"" |
+| `POST /api/projects/:id/start-planning` | No active session (interview completed) | 409: "Project has an active session..." |
 | `POST /api/projects/:id/add-feature` | Project exists | 404: "Project not found" |
 | `POST /api/projects/:id/add-feature` | No active session | 409: "Project already has an active session" |
 | `POST /api/projects/:id/add-feature` | Sandbox available | 503: sandbox error |

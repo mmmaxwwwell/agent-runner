@@ -180,7 +180,7 @@
 - [x] T036 [P] Update existing onboard API tests to match unified endpoint in tests/integration/onboard-api.test.ts, tests/contract/rest-api-projects.test.ts
 - [x] T037 Remove deprecated `POST /api/workflows/new-project` references from tests/integration/new-project-workflow.test.ts and any other test files
 - [x] T038 Run quickstart.md validation — execute all manual sandbox test commands from specs/004-onboarding-overhaul/quickstart.md to verify nix shell composition and bind paths work correctly
-- [ ] T039 Update UI_FLOW.md with new unified onboarding flow, removed new-project endpoint, and transcript/interview-notes file descriptions
+- [x] T039 Update UI_FLOW.md with new unified onboarding flow, removed new-project endpoint, and transcript/interview-notes file descriptions
 
 ---
 
@@ -282,3 +282,7 @@ Task T024: "Write tests for transcript parser in tests/unit/transcript-parser.te
 - Commit after each task or logical group
 - Constitution VII requires test-first for all new modules
 - All sandbox commands tested experimentally — `BindPaths` for nix cache verified working
+
+## Phase: Review
+
+- [ ] REVIEW — Run code review on all changes from this feature branch
