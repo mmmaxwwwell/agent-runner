@@ -108,3 +108,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Android source lives under `kotlin/` not `java/`**: Task description says `.../java/.../signing/` but the project uses `src/main/kotlin/com/agentrunner/`. Created the `signing` package there.
 - **KeyEntry data class co-created with interface**: The `SigningBackend` interface references `KeyEntry` in its method signatures. Created `KeyEntry.kt` in the same `signing` package with all fields from data-model.md. T021 (KeyRegistry) will build CRUD and JSON serialization on top of this type.
 - **KeyType enum with JSON serialization**: Data model uses kebab-case strings (`"yubikey-piv"`, `"android-keystore"`). Created `KeyType` enum with `toJsonValue()`/`fromJsonValue()` helpers for JSON round-tripping.
+
+### T021 — KeyRegistry
+- **`JSONObject.optString(key, null)` returns `Nothing?`**: Kotlin infers the null literal's type as `Nothing?`, causing type mismatch warnings when assigning to `String?`. Use `if (json.isNull(key)) null else json.getString(key)` instead.
+- **Duplicate detection by public key blob**: `KeyEntry.publicKey` is `ByteArray`, so equality checks must use `contentEquals()`, not `==`. The `KeyEntry.equals()` only checks `id`, so registry must explicitly check for duplicate public keys with `contentEquals()`.
+- **`@Synchronized` on instance methods**: All mutating methods use `@Synchronized` for thread safety since multiple backends may register keys concurrently. Read methods are unsynchronized since `listKeys()` reads the whole file atomically.
