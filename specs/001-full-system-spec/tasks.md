@@ -69,7 +69,7 @@
 
 **Purpose**: Validate API contracts match the spec
 
-- [ ] T012 Run `nix develop -c npm run test:contract` and make all contract tests pass. Read `test-logs/contract/` for failures, fix code, re-run until green. This covers all 5 contract test files: rest-api, rest-api-projects, rest-api-add-feature, rest-api-voice, websocket-api per rest-api.md and websocket-api.md
+- [x] T012 Run `nix develop -c npm run test:contract` and make all contract tests pass. Read `test-logs/contract/` for failures, fix code, re-run until green. This covers all 5 contract test files: rest-api, rest-api-projects, rest-api-add-feature, rest-api-voice, websocket-api per rest-api.md and websocket-api.md
 
 **Checkpoint**: All contract tests green, API matches spec
 

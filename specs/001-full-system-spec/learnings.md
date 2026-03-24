@@ -50,3 +50,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - All 172 integration tests (12 test files) passed on first run with zero failures and zero code changes needed.
 - The WebSocket heartbeat tests are slow (~90s) due to real ping/pong interval timing — this dominates the overall ~110s test duration.
 - Phase 4 checkpoint met immediately.
+
+### T012 — Contract tests all green
+- All 94 contract tests (5 test files) passed on first run with zero failures and zero code changes needed.
+- WebSocket heartbeat contract tests are the slowest (~60s) due to 30s ping interval verification — dominates the ~63s total contract test duration.
+- Phase 5 checkpoint met immediately.
