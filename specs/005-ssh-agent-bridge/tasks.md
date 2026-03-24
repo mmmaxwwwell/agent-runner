@@ -132,7 +132,7 @@
 
 ### Implementation for User Story 5
 
-- [ ] T023 [US5] Verify concurrent bridge isolation — each bridge is independent (own socket, own pendingRequests map, own WebSocket routing via sessionId). This should already work from T013's design. This task validates with the integration test from T022 and fixes any issues found
+- [x] T023 [US5] Verify concurrent bridge isolation — each bridge is independent (own socket, own pendingRequests map, own WebSocket routing via sessionId). This should already work from T013's design. This task validates with the integration test from T022 and fixes any issues found
 
 **Checkpoint**: Multiple sessions can push simultaneously without cross-talk
 
