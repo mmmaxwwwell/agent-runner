@@ -99,6 +99,14 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `onSignRequest` callback is invoked on OkHttp's background thread — callers (SignRequestHandler/MainActivity) need to handle thread safety.
 - Non-`ssh-agent-request` messages are silently ignored (server sends output, phase, state messages on the same endpoint).
 
+### T017 — SignRequestHandler implementation
+- Uses `Channel<CharArray>(Channel.CONFLATED)` for PIN delivery from UI to coroutine. `trySend` from `onPinEntered`, `receive` in `signWithPinLoop`.
+- Timeout vs intentional cancellation: `withTimeout` throws `TimeoutCancellationException` (subclass of `CancellationException`). To distinguish from manual `job.cancel()`, an `intentionallyCancelled` flag is set in `onCancel`/`onYubikeyDisconnected` before calling `cancel()`.
+- `performSign` passes the base64-decoded data directly to `YubikeyManager.sign()` — the server sends the raw data-to-sign in the `data` field, not the full SSH agent message envelope.
+- Response format: SSH_AGENT_SIGN_RESPONSE (type 14) = byte 14 + SSH string signature_blob, where signature_blob = SSH string "ecdsa-sha2-nistp256" + SSH string DER_signature.
+- List keys response is built manually (byte 12 + uint32 nkeys + keys) rather than using SshKeyFormatter.buildIdentitiesAnswer — this allows handling multiple keys and matches the test expectations.
+- `finishCurrent()` calls `processNext()` which chains to the next queued request. This is how the FIFO queue is drained.
+
 ### T014 — YubikeyManager implementation
 - Constructor now takes `(context: Context)` — T019 (MainActivity wiring) must pass `applicationContext` or activity context.
 - `YubikeyStatus` enum is in its own file `YubikeyStatus.kt` (not inline in YubikeyManager).
