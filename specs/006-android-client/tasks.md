@@ -19,7 +19,7 @@
 
 - [x] T001 Create Android project with Gradle Kotlin DSL — root build.gradle.kts, settings.gradle.kts, gradle.properties. Set min SDK 26, target SDK 34, Kotlin 1.9+. Add dependencies: `com.yubico.yubikit:android:3.0.1`, `com.yubico.yubikit:piv:3.0.1`, OkHttp (for native WebSocket). Configure mavenCentral repository
 - [x] T002 Create AndroidManifest.xml — declare MainActivity as launcher, declare ServerConfigActivity, add INTERNET permission, USB/NFC features (required=false). Set app theme and icon
-- [ ] T003 [P] Create string resources in app/src/main/res/values/strings.xml — app name, server config labels, sign modal text, Yubikey status messages, error messages
+- [x] T003 [P] Create string resources in app/src/main/res/values/strings.xml — app name, server config labels, sign modal text, Yubikey status messages, error messages
 
 **Checkpoint**: Project builds and installs on device (empty app)
 

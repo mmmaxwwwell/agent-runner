@@ -1,4 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App -->
     <string name="app_name">Agent Runner</string>
+
+    <!-- Server Config -->
+    <string name="server_config_title">Server Configuration</string>
+    <string name="server_url_label">Server URL</string>
+    <string name="server_url_hint">https://your-server.example.com</string>
+    <string name="server_connect">Connect</string>
+    <string name="server_url_invalid">URL must start with http:// or https://</string>
+    <string name="server_url_empty">Please enter a server URL</string>
+
+    <!-- Sign Modal -->
+    <string name="sign_request_title">Sign Request</string>
+    <string name="sign_request_cancel">Cancel</string>
+    <string name="sign_request_touch_yubikey">Touch Yubikey to authorize</string>
+    <string name="sign_request_enter_pin_and_touch">Enter PIN and touch Yubikey</string>
+    <string name="sign_request_signing">Signing…</string>
+    <string name="sign_request_connect_yubikey">Connect Yubikey to sign</string>
+    <string name="sign_request_queue_badge">Request %1$d of %2$d</string>
+
+    <!-- PIN -->
+    <string name="pin_label">PIV PIN</string>
+    <string name="pin_hint">Enter PIN</string>
+    <string name="pin_wrong">Wrong PIN. %1$d retries remaining.</string>
+    <string name="pin_blocked">PIN is blocked. Use ykman piv access unblock-pin to recover.</string>
+
+    <!-- Yubikey Status -->
+    <string name="yubikey_disconnected">No Yubikey detected</string>
+    <string name="yubikey_connected_usb">Yubikey connected (USB)</string>
+    <string name="yubikey_connected_nfc">Yubikey detected (NFC)</string>
+    <string name="yubikey_connected_serial">Yubikey connected — S/N %1$s</string>
+
+    <!-- Errors -->
+    <string name="error_server_unreachable">Cannot reach server. Check URL and network connection.</string>
+    <string name="error_webview_load">Failed to load page</string>
+    <string name="error_retry">Retry</string>
+    <string name="error_change_server">Change Server URL</string>
+    <string name="error_websocket_disconnected">WebSocket disconnected</string>
+    <string name="error_sign_failed">Signing failed: %1$s</string>
+    <string name="error_key_type_unsupported">Unsupported key type. Only ECDSA P-256 is supported.</string>
+    <string name="error_yubikey_disconnected_during_sign">Yubikey disconnected during signing. Request cancelled.</string>
+
+    <!-- Settings -->
+    <string name="settings">Settings</string>
 </resources>
