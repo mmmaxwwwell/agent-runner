@@ -38,7 +38,7 @@
 ### Implementation for Foundational Phase
 
 - [x] T005 Implement ServerConfig in app/src/main/kotlin/com/agentrunner/config/ServerConfig.kt — persist server URL in SharedPreferences, `load()` returns null on first launch, `save()` writes URL, basic URL validation (starts with http:// or https://)
-- [ ] T006 Implement ServerConfigActivity in app/src/main/kotlin/com/agentrunner/ServerConfigActivity.kt — layout with URL text field and Connect button (app/src/main/res/layout/activity_server_config.xml). Validate URL on submit, save via ServerConfig, launch MainActivity with URL as intent extra
+- [x] T006 Implement ServerConfigActivity in app/src/main/kotlin/com/agentrunner/ServerConfigActivity.kt — layout with URL text field and Connect button (app/src/main/res/layout/activity_server_config.xml). Validate URL on submit, save via ServerConfig, launch MainActivity with URL as intent extra
 - [ ] T007 Implement MainActivity WebView shell in app/src/main/kotlin/com/agentrunner/MainActivity.kt — load server URL from ServerConfig (or intent extra). Create WebView with JavaScript enabled, DOM storage enabled, WebSocket support. Load server URL in WebView. Handle back button for WebView navigation. If no saved URL, redirect to ServerConfigActivity
 
 **Checkpoint**: App launches, shows config on first run, loads PWA dashboard in WebView

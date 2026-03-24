@@ -32,3 +32,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `isValidUrl()` trims whitespace before checking — this means `"   "` correctly returns false.
 - `removePrefix` chain works because a URL can only start with one of the two prefixes, so the other `removePrefix` is a no-op.
 
+### T006 — ServerConfigActivity
+- `EXTRA_SERVER_URL` constant defined in `ServerConfigActivity.companion` — use `ServerConfigActivity.EXTRA_SERVER_URL` from MainActivity to read the intent extra.
+- Activity uses `FLAG_ACTIVITY_CLEAR_TOP or FLAG_ACTIVITY_NEW_TASK` when launching MainActivity to avoid stacking duplicate activities.
+- Pre-populates the URL field from `ServerConfig.load()` so users can edit an existing URL (important for T023 settings navigation).
+
