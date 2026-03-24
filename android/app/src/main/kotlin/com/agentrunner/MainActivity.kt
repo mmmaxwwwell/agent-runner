@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.Toast
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
@@ -307,7 +308,10 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
             runOnUiThread { handler.onSignRequest(request) }
         }
         ws.onDisconnect = {
-            runOnUiThread { handler.cancelAll() }
+            runOnUiThread {
+                handler.cancelAll()
+                Toast.makeText(this, R.string.error_websocket_disconnected, Toast.LENGTH_LONG).show()
+            }
         }
         agentWebSocket = ws
         signRequestHandler = handler

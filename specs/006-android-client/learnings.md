@@ -180,6 +180,12 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Queue badge uses `processedCount` and `totalReceived` counters rather than tracking position per-request. Position is always 1 (current request), total is `totalReceived - processedCount`. Counters reset when queue drains.
 - `cancelAll()` cancels current job + sends cancel for all queued requests. Called from `AgentWebSocket.onDisconnect` callback (invoked on OkHttp background thread, so wrapped in `runOnUiThread` in MainActivity).
 - `AgentWebSocket.onDisconnect` fires on `onClosed` and `onFailure` but NOT on intentional disconnect (when `disconnect()` is called). This prevents double-cancel when navigating away from a session.
+- `cancelAll()` sends `webSocket.sendCancel()` on the dead socket — OkHttp silently returns false, no crash. No need to add a "skip sends" path.
 - `SignRequestListener.onQueueUpdated(position, total)` was added to update the badge on an already-visible dialog when new requests arrive. `onShowSignDialog` also received `queuePosition` and `queueTotal` params with default values of 1 to maintain backward compatibility.
 - The `queueBadge` TextView is placed between the title and context text in the dialog layout, hidden by default (gone), shown only when total > 1.
+
+### T029 — WebSocket disconnect during sign modal
+- Most of the behavior was already implemented: `cancelAll()` (from T028) dismisses the dialog, cancels current job, and clears the queue. The only missing piece was a user-visible Toast notification.
+- Reconnect safety: `cancelAll()` resets all handler state (queue, counters, current request), so when `scheduleReconnect()` fires and reconnects, the handler is clean. The server has already timed out old requests, so no replay occurs.
+- `cancelAll()` attempts `sendCancel()` on the dead socket — OkHttp `WebSocket.send()` returns false silently, no exception. Acceptable behavior, no special "dead socket" path needed.
 
