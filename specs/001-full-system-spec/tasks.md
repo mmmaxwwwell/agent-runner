@@ -140,7 +140,7 @@
 - [x] T035 [US10] Implement custom JUnit `RunListener` in `android/app/src/androidTest/java/.../helpers/TestRunListener.kt`: write structured results to device storage, capture screenshots on UI failure, filter logcat on any failure, write `summary.json` per FR-115
 - [x] T036 [P] [US10] Implement `MockBiometricPrompt.kt` in `android/app/src/androidTest/java/.../helpers/`: auto-succeed biometric authentication for unattended testing per FR-110
 - [x] T037 [P] [US10] Create test fixture `projects.json` templates in `android/app/src/androidTest/assets/test-fixtures/`: matching server-side fixtures for scenario initialization per FR-108
-- [ ] T038 [US10] Implement integration test orchestration script as `npm run test:android:integration` (shell script at `tests/android-integration/run.sh`): start real agent-runner server with test fixtures in temp data dir, `adb reverse tcp:3000 tcp:3000`, install debug test APK, run instrumented tests via `adb shell am instrument`, pull `test-logs/` from device, tear down server per FR-107
+- [x] T038 [US10] Implement integration test orchestration script as `npm run test:android:integration` (shell script at `tests/android-integration/run.sh`): start real agent-runner server with test fixtures in temp data dir, `adb reverse tcp:3000 tcp:3000`, install debug test APK, run instrumented tests via `adb shell am instrument`, pull `test-logs/` from device, tear down server per FR-107
 - [ ] T039 [US10] Verify orchestration script runs end-to-end (even if tests fail) — the pipeline itself must work
 
 **Checkpoint**: Android integration test infrastructure works, can run tests on device

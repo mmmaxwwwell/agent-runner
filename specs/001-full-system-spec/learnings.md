@@ -197,3 +197,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **`BiometricAuthenticator` fun interface added to `KeystoreSigningBackend.kt`**: Extracted the biometric sign logic into a `BiometricAuthenticator` interface with `RealBiometricAuthenticator` as default. `KeystoreSigningBackend` accepts it as an optional constructor param. This is the cleanest way to mock biometric for tests.
 - **`MockBiometricPrompt` in androidTest**: Implements `BiometricAuthenticator`, skips biometric UI, directly calls `Signature.update()/sign()`. The cryptographic signing still occurs — only the biometric gate is bypassed. Includes an `authenticationCount` counter for test assertions.
 - **Unit test update**: Tests that previously used `spyk` + `backend["signWithBiometric"]` must now use `mockk<BiometricAuthenticator>()` injected via constructor. No more fragile private-method mocking.
+
+### T038 — Android integration test orchestration script
+- **Device test logs path**: TestRunListener writes to `context.getExternalFilesDir(null)/test-logs/android-integration/<timestamp>/`. On the device filesystem this maps to `/sdcard/Android/data/com.agentrunner/files/test-logs/android-integration/`. Pullable via `adb pull` without root.
+- **`am instrument` output parsing**: Look for `OK (N tests)` for success, `FAILURES!!!` for failures. The `-w` flag waits for completion.
+- **Agent-framework dir must exist**: Server runs `git fetch` on startup. The temp data dir must contain a minimal git repo at `agent-framework/` to avoid clone attempts during tests.
+- **`-e class` filter for am instrument**: Can pass `-e class com.agentrunner` to scope tests to a package. Omit to run all instrumented tests.

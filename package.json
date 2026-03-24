@@ -21,7 +21,8 @@
     "android:install": "cd android && ./gradlew installDebug",
     "android:test": "cd android && ./gradlew testDebugUnitTest",
     "android:clean": "cd android && ./gradlew clean",
-    "android:lint": "cd android && ./gradlew lintDebug"
+    "android:lint": "cd android && ./gradlew lintDebug",
+    "test:android:integration": "bash tests/android-integration/run.sh"
   },
   "license": "UNLICENSED",
   "private": true,
