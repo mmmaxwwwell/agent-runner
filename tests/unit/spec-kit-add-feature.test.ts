@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -14,11 +14,18 @@ import {
 describe('add-feature workflow (US7)', () => {
   let tmpDir: string;
   let dataDir: string;
+  let agentFrameworkDir: string;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'spec-kit-add-feature-'));
     dataDir = join(tmpDir, 'data');
+    agentFrameworkDir = join(tmpDir, 'agent-framework');
     mkdirSync(join(dataDir, 'sessions'), { recursive: true });
+
+    // Create mock interview wrapper prompt
+    const wrapperDir = join(agentFrameworkDir, '.claude', 'skills', 'spec-kit');
+    mkdirSync(wrapperDir, { recursive: true });
+    writeFileSync(join(wrapperDir, 'interview-wrapper.md'), '# Interview Wrapper\nMock prompt for tests', 'utf-8');
   });
 
   afterEach(() => {
@@ -59,6 +66,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'Add OAuth2 authentication',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -80,6 +88,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'New feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -107,11 +116,12 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
-      // All 5 phases should receive the same existing project directory
-      assert.equal(dirsPerPhase.length, 5);
+      // All 4 phases should receive the same existing project directory
+      assert.equal(dirsPerPhase.length, 4);
       for (const entry of dirsPerPhase) {
         assert.equal(entry.dir, existingDir, `phase '${entry.phase}' should receive existing project dir`);
       }
@@ -134,6 +144,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -145,7 +156,7 @@ describe('add-feature workflow (US7)', () => {
     });
   });
 
-  describe('phase sequencing (specify → clarify → plan → tasks → analyze)', () => {
+  describe('phase sequencing (interview → plan → tasks → analyze)', () => {
     it('should run phases in the correct order', async () => {
       const existingDir = join(tmpDir, 'seq-project');
       mkdirSync(existingDir, { recursive: true });
@@ -156,11 +167,12 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       assert.equal(result.outcome, 'completed');
-      assert.deepEqual(deps.phasesRun, ['specify', 'clarify', 'plan', 'tasks', 'analyze']);
+      assert.deepEqual(deps.phasesRun, ['interview', 'plan', 'tasks', 'analyze']);
     });
 
     it('should use the same phase sequence as SPEC_KIT_PHASES constant', async () => {
@@ -173,6 +185,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -191,7 +204,7 @@ describe('add-feature workflow (US7)', () => {
       const deps = happyPathDeps({
         runPhase: async (phase: string): Promise<PhaseResult> => {
           phasesRun.push(phase);
-          if (phase === 'clarify') return { exitCode: 1 };
+          if (phase === 'plan') return { exitCode: 1 };
           return { exitCode: 0 };
         },
         phasesRun,
@@ -202,13 +215,14 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       assert.equal(result.outcome, 'failed');
-      assert.equal(result.failedPhase, 'clarify');
-      assert.deepEqual(result.completedPhases, ['specify']);
-      assert.deepEqual(phasesRun, ['specify', 'clarify']);
+      assert.equal(result.failedPhase, 'plan');
+      assert.deepEqual(result.completedPhases, ['interview']);
+      assert.deepEqual(phasesRun, ['interview', 'plan']);
     });
 
     it('should create a unique session ID for each phase', async () => {
@@ -230,12 +244,13 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       const uniqueIds = new Set(sessionIds);
       assert.equal(uniqueIds.size, sessionIds.length, 'each phase must get a unique session ID');
-      assert.ok(sessionIds.length >= 5);
+      assert.ok(sessionIds.length >= 4);
     });
   });
 
@@ -259,6 +274,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -281,6 +297,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -288,8 +305,7 @@ describe('add-feature workflow (US7)', () => {
       assert.equal(result.outcome, 'analyze-cap-reached');
       assert.equal(result.analyzeIterations, 5);
       // completedPhases should include pre-analyze phases + 5 analyze runs
-      assert.ok(result.completedPhases!.includes('specify'));
-      assert.ok(result.completedPhases!.includes('clarify'));
+      assert.ok(result.completedPhases!.includes('interview'));
       assert.ok(result.completedPhases!.includes('plan'));
       assert.ok(result.completedPhases!.includes('tasks'));
       const analyzeCount = result.completedPhases!.filter(p => p === 'analyze').length;
@@ -313,6 +329,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -344,6 +361,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -370,6 +388,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'Add search feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -395,6 +414,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -408,7 +428,7 @@ describe('add-feature workflow (US7)', () => {
       let launched = false;
       const deps = happyPathDeps({
         runPhase: async (phase: string): Promise<PhaseResult> => {
-          if (phase === 'specify') return { exitCode: 1 };
+          if (phase === 'interview') return { exitCode: 1 };
           return { exitCode: 0 };
         },
         launchTaskRun: async (): Promise<void> => {
@@ -421,6 +441,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -445,6 +466,7 @@ describe('add-feature workflow (US7)', () => {
         projectDir: existingDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 

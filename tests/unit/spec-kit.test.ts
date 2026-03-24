@@ -18,14 +18,21 @@ describe('spec-kit workflow orchestrator', () => {
   let tmpDir: string;
   let projectsDir: string;
   let dataDir: string;
+  let agentFrameworkDir: string;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'spec-kit-test-'));
     projectsDir = join(tmpDir, 'projects');
     dataDir = join(tmpDir, 'data');
+    agentFrameworkDir = join(tmpDir, 'agent-framework');
     mkdirSync(projectsDir, { recursive: true });
     mkdirSync(join(dataDir, 'sessions'), { recursive: true });
     writeFileSync(join(dataDir, 'projects.json'), '[]', 'utf-8');
+
+    // Create mock interview wrapper prompt
+    const wrapperDir = join(agentFrameworkDir, '.claude', 'skills', 'spec-kit');
+    mkdirSync(wrapperDir, { recursive: true });
+    writeFileSync(join(wrapperDir, 'interview-wrapper.md'), '# Interview Wrapper\nMock prompt for tests', 'utf-8');
   });
 
   afterEach(() => {
@@ -55,7 +62,7 @@ describe('spec-kit workflow orchestrator', () => {
 
   describe('SPEC_KIT_PHASES', () => {
     it('should define the correct phase sequence', () => {
-      assert.deepEqual(SPEC_KIT_PHASES, ['specify', 'clarify', 'plan', 'tasks', 'analyze']);
+      assert.deepEqual(SPEC_KIT_PHASES, ['interview', 'plan', 'tasks', 'analyze']);
     });
   });
 
@@ -67,6 +74,7 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'A cool project idea',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -74,17 +82,18 @@ describe('spec-kit workflow orchestrator', () => {
       assert.ok(existsSync(projectDir), 'project directory should be created');
     });
 
-    it('should run all phases in order: specify → clarify → plan → tasks → analyze', async () => {
+    it('should run all phases in order: interview → plan → tasks → analyze', async () => {
       const deps = happyPathDeps();
       await startNewProjectWorkflow({
         repoName: 'test-project',
         description: 'test idea',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
-      assert.deepEqual(deps.phasesRun, ['specify', 'clarify', 'plan', 'tasks', 'analyze']);
+      assert.deepEqual(deps.phasesRun, ['interview', 'plan', 'tasks', 'analyze']);
     });
 
     it('should pass the project directory to each phase', async () => {
@@ -101,11 +110,12 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       const expectedDir = join(projectsDir, 'dir-test');
-      assert.equal(dirsUsed.length, 5);
+      assert.equal(dirsUsed.length, 4);
       for (const dir of dirsUsed) {
         assert.equal(dir, expectedDir);
       }
@@ -116,8 +126,8 @@ describe('spec-kit workflow orchestrator', () => {
       const deps = happyPathDeps({
         runPhase: async (phase: string, _projectDir: string, _sessionId: string): Promise<PhaseResult> => {
           phasesRun.push(phase);
-          // clarify phase fails
-          if (phase === 'clarify') {
+          // plan phase fails
+          if (phase === 'plan') {
             return { exitCode: 1 };
           }
           return { exitCode: 0 };
@@ -130,13 +140,14 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       assert.equal(result.outcome, 'failed');
-      assert.equal(result.failedPhase, 'clarify');
-      // Should have run specify and clarify, but NOT plan/tasks/analyze
-      assert.deepEqual(phasesRun, ['specify', 'clarify']);
+      assert.equal(result.failedPhase, 'plan');
+      // Should have run interview and plan, but NOT tasks/analyze
+      assert.deepEqual(phasesRun, ['interview', 'plan']);
     });
 
     it('should not register project or launch task run when a phase fails', async () => {
@@ -161,6 +172,7 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -184,6 +196,7 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'a project',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -207,6 +220,7 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -221,11 +235,12 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       assert.equal(result.outcome, 'completed');
-      assert.deepEqual(result.completedPhases, ['specify', 'clarify', 'plan', 'tasks', 'analyze']);
+      assert.deepEqual(result.completedPhases, ['interview', 'plan', 'tasks', 'analyze']);
     });
   });
 
@@ -251,11 +266,12 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       assert.equal(result.outcome, 'completed');
-      // Should have: specify, clarify, plan, tasks, analyze (1st), analyze (2nd), analyze (3rd - clean)
+      // Should have: interview, plan, tasks, analyze (1st), analyze (2nd), analyze (3rd - clean)
       const analyzeRuns = phasesRun.filter(p => p === 'analyze');
       assert.equal(analyzeRuns.length, 3, 'analyze should run 3 times (2 with issues + 1 clean)');
       assert.equal(result.analyzeIterations, 3);
@@ -279,6 +295,7 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -304,6 +321,7 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -336,6 +354,7 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -358,6 +377,7 @@ describe('spec-kit workflow orchestrator', () => {
         projectDir: existingProjectDir,
         description: 'Add OAuth support',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -383,16 +403,17 @@ describe('spec-kit workflow orchestrator', () => {
         projectDir: existingProjectDir,
         description: 'new feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
-      assert.equal(dirsUsed.length, 5);
+      assert.equal(dirsUsed.length, 4);
       for (const dir of dirsUsed) {
         assert.equal(dir, existingProjectDir);
       }
     });
 
-    it('should run all phases in order: specify → clarify → plan → tasks → analyze', async () => {
+    it('should run all phases in order: interview → plan → tasks → analyze', async () => {
       const existingProjectDir = join(tmpDir, 'phase-order-project');
       mkdirSync(existingProjectDir, { recursive: true });
 
@@ -402,10 +423,11 @@ describe('spec-kit workflow orchestrator', () => {
         projectDir: existingProjectDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
-      assert.deepEqual(deps.phasesRun, ['specify', 'clarify', 'plan', 'tasks', 'analyze']);
+      assert.deepEqual(deps.phasesRun, ['interview', 'plan', 'tasks', 'analyze']);
     });
 
     it('should stop on non-zero exit code, same as new project workflow', async () => {
@@ -427,12 +449,13 @@ describe('spec-kit workflow orchestrator', () => {
         projectDir: existingProjectDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       assert.equal(result.outcome, 'failed');
       assert.equal(result.failedPhase, 'tasks');
-      assert.deepEqual(phasesRun, ['specify', 'clarify', 'plan', 'tasks']);
+      assert.deepEqual(phasesRun, ['interview', 'plan', 'tasks']);
     });
 
     it('should NOT register project (already registered) — only launch task run', async () => {
@@ -456,6 +479,7 @@ describe('spec-kit workflow orchestrator', () => {
         projectDir: existingProjectDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -487,6 +511,7 @@ describe('spec-kit workflow orchestrator', () => {
         projectDir: existingProjectDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -515,6 +540,7 @@ describe('spec-kit workflow orchestrator', () => {
         projectDir: existingProjectDir,
         description: 'feature',
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
@@ -532,11 +558,12 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       assert.equal(result.outcome, 'completed');
-      assert.equal(deps.phasesRun!.length, 5);
+      assert.equal(deps.phasesRun!.length, 4);
     });
 
     it('should treat any non-zero exit code as phase failure', async () => {
@@ -545,7 +572,7 @@ describe('spec-kit workflow orchestrator', () => {
         const deps = happyPathDeps({
           runPhase: async (phase: string): Promise<PhaseResult> => {
             phasesRun.push(phase);
-            if (phase === 'specify') return { exitCode };
+            if (phase === 'interview') return { exitCode };
             return { exitCode: 0 };
           },
           phasesRun,
@@ -556,11 +583,12 @@ describe('spec-kit workflow orchestrator', () => {
           description: 'test',
           projectsDir,
           dataDir,
+          agentFrameworkDir,
           deps,
         });
 
         assert.equal(result.outcome, 'failed', `exit code ${exitCode} should be treated as failure`);
-        assert.deepEqual(phasesRun, ['specify'], `should stop after failed specify (exit code ${exitCode})`);
+        assert.deepEqual(phasesRun, ['interview'], `should stop after failed interview (exit code ${exitCode})`);
       }
     });
   });
@@ -582,13 +610,14 @@ describe('spec-kit workflow orchestrator', () => {
         description: 'test',
         projectsDir,
         dataDir,
+        agentFrameworkDir,
         deps,
       });
 
       // Each phase should get a different session ID
       const uniqueIds = new Set(sessionIds);
       assert.equal(uniqueIds.size, sessionIds.length, 'each phase should have a unique session ID');
-      assert.ok(sessionIds.length >= 5, 'should have at least 5 session IDs (one per phase)');
+      assert.ok(sessionIds.length >= 4, 'should have at least 4 session IDs (one per phase)');
     });
   });
 });

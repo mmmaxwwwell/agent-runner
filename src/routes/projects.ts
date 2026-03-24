@@ -330,6 +330,7 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       projectDir: project.dir,
       description,
       dataDir: cfg.dataDir,
+      agentFrameworkDir: cfg.agentFrameworkDir,
       deps,
     }).then((result) => {
       log.info({ projectId: project.id, outcome: result.outcome }, 'Add-feature workflow finished');

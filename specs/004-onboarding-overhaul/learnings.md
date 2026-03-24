@@ -102,6 +102,14 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The interview wrapper lives at `<agentFrameworkDir>/.claude/skills/spec-kit/interview-wrapper.md` in the external agent-framework repo, not in this codebase. It's accessible inside the sandbox via `BindReadOnlyPaths=${agentFrameworkDir}` (sandbox.ts line 125).
 - T022 needs to read this file's content and pass it as the `-p` prompt flag to claude. The path at runtime is `join(config.agentFrameworkDir, '.claude/skills/spec-kit/interview-wrapper.md')`.
 
+### T022 — Single interview session replaces specify→clarify loop
+- `SPEC_KIT_PHASES` changed from `['specify', 'clarify', 'plan', 'tasks', 'analyze']` to `['interview', 'plan', 'tasks', 'analyze']`. All test files referencing the old phase sequence were updated.
+- `runPhase` in `SpecKitDeps` now accepts an optional 4th parameter `prompt?: string`. The workflow reads the interview wrapper prompt from `<agentFrameworkDir>/.claude/skills/spec-kit/interview-wrapper.md` and passes it to `runPhase` only for the `interview` phase.
+- `readInterviewPrompt()` is exported from `spec-kit.ts` for reuse by T023 (route-level prompt passing).
+- Both `NewProjectWorkflowOptions` and `AddFeatureWorkflowOptions` now require `agentFrameworkDir: string`. Callers must be updated to pass it.
+- Tests need a mock interview-wrapper.md file created in `beforeEach` under `<agentFrameworkDir>/.claude/skills/spec-kit/` — otherwise `readFileSync` throws.
+- The test runner uses `npx tsx --test` (not bare `node --test`) because the `.js` import extensions in source files need tsx's resolution.
+
 ### T017 — Project status transition validation
 - `VALID_TRANSITIONS` map enforces: `onboarding→active`, `onboarding→error`, `error→onboarding`. The `active` status is terminal — no transitions allowed from it.
 - The `"not affect other projects"` test was updated from `createProject` (active) to `registerForOnboarding` (onboarding) since active→error is no longer valid. Future tests that need to call `updateProjectStatus` must start from `registerForOnboarding` unless testing the rejection path.

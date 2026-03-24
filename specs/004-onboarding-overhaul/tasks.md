@@ -99,7 +99,7 @@
 ### Implementation for User Story 3
 
 - [x] T021 [US3] Verify interview wrapper prompt exists at agent-framework clone `<dataDir>/agent-framework/.claude/skills/spec-kit/interview-wrapper.md` — the file has already been written to the agent-framework repo. This task validates it's accessible from the sandbox via `BindReadOnlyPaths`, reads correctly, and contains the expected sections (approach, recovery, rules). If missing or outdated, update the agent-framework repo directly (external to this codebase)
-- [ ] T022 [US3] Modify spec-kit workflow in src/services/spec-kit.ts — replace multi-session specify→clarify loop with single long-running interview session. Launch Claude with `-p` flag containing the interview wrapper prompt content (read from agent-framework dir). Keep plan→tasks→analyze as separate sessions that read spec.md, interview-notes.md, and transcript.md
+- [x] T022 [US3] Modify spec-kit workflow in src/services/spec-kit.ts — replace multi-session specify→clarify loop with single long-running interview session. Launch Claude with `-p` flag containing the interview wrapper prompt content (read from agent-framework dir). Keep plan→tasks→analyze as separate sessions that read spec.md, interview-notes.md, and transcript.md
 - [ ] T023 [US3] Update `runPhase()` callback in src/routes/projects.ts — for the interview phase, pass the interview wrapper prompt to `buildCommand()` via the `prompt` option. For plan/tasks/analyze phases, pass their respective prompts
 
 **Checkpoint**: Interview session is exhaustive and single-session. Agent researches, probes, and waits for user signal.

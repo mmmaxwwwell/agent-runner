@@ -1,8 +1,10 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ensureFlakeNix } from './flake-generator.js';
 
-export const SPEC_KIT_PHASES = ['specify', 'clarify', 'plan', 'tasks', 'analyze'] as const;
+export const SPEC_KIT_PHASES = ['interview', 'plan', 'tasks', 'analyze'] as const;
+
+const INTERVIEW_WRAPPER_PATH = '.claude/skills/spec-kit/interview-wrapper.md';
 
 const MAX_ANALYZE_ITERATIONS = 5;
 
@@ -20,7 +22,7 @@ export interface PhaseTransitionEvent {
 }
 
 export interface SpecKitDeps {
-  runPhase: (phase: string, projectDir: string, sessionId: string) => Promise<PhaseResult>;
+  runPhase: (phase: string, projectDir: string, sessionId: string, prompt?: string) => Promise<PhaseResult>;
   analyzeHasIssues: (projectDir: string) => Promise<boolean>;
   registerProject: (name: string, dir: string) => Promise<string>;
   launchTaskRun: (projectId: string) => Promise<void>;
@@ -35,6 +37,7 @@ export interface NewProjectWorkflowOptions {
   description: string;
   projectsDir: string;
   dataDir: string;
+  agentFrameworkDir: string;
   deps: SpecKitDeps;
 }
 
@@ -43,6 +46,7 @@ export interface AddFeatureWorkflowOptions {
   projectDir: string;
   description: string;
   dataDir: string;
+  agentFrameworkDir: string;
   deps: SpecKitDeps;
 }
 
@@ -55,14 +59,28 @@ export interface WorkflowResult {
 }
 
 /**
- * Run the spec-kit SDD workflow phases in order, with analyze-remediate loop.
- * Returns the workflow result including which phases completed and analyze iteration count.
+ * Read the interview wrapper prompt from the agent-framework directory.
  */
-async function runWorkflow(projectDir: string, workflowType: 'new-project' | 'add-feature', deps: SpecKitDeps): Promise<WorkflowResult> {
+export function readInterviewPrompt(agentFrameworkDir: string): string {
+  const promptPath = join(agentFrameworkDir, INTERVIEW_WRAPPER_PATH);
+  return readFileSync(promptPath, 'utf-8');
+}
+
+/**
+ * Run the spec-kit SDD workflow phases in order, with analyze-remediate loop.
+ *
+ * The interview phase replaces the old specify→clarify multi-session loop with
+ * a single long-running Claude session that conducts an exhaustive spec-kit
+ * interview. Plan, tasks, and analyze remain as separate sessions.
+ */
+async function runWorkflow(projectDir: string, workflowType: 'new-project' | 'add-feature', agentFrameworkDir: string, deps: SpecKitDeps): Promise<WorkflowResult> {
   const completedPhases: string[] = [];
   const preAnalyzePhases = SPEC_KIT_PHASES.filter(p => p !== 'analyze');
 
-  // Run specify → clarify → plan → tasks
+  // Read the interview wrapper prompt for the interview phase
+  const interviewPrompt = readInterviewPrompt(agentFrameworkDir);
+
+  // Run interview → plan → tasks
   let previousPhase: string | null = null;
   for (const phase of preAnalyzePhases) {
     const sessionId = deps.createSessionId();
@@ -74,7 +92,9 @@ async function runWorkflow(projectDir: string, workflowType: 'new-project' | 'ad
       maxIterations: 1,
       sessionId,
     });
-    const result = await deps.runPhase(phase, projectDir, sessionId);
+    // Pass the interview wrapper prompt for the interview phase
+    const prompt = phase === 'interview' ? interviewPrompt : undefined;
+    const result = await deps.runPhase(phase, projectDir, sessionId, prompt);
     if (result.exitCode !== 0) {
       return { outcome: 'failed', failedPhase: phase, completedPhases };
     }
@@ -113,14 +133,14 @@ async function runWorkflow(projectDir: string, workflowType: 'new-project' | 'ad
 }
 
 export async function startNewProjectWorkflow(options: NewProjectWorkflowOptions): Promise<WorkflowResult> {
-  const { repoName, projectsDir, deps } = options;
+  const { repoName, projectsDir, agentFrameworkDir, deps } = options;
   const projectDir = join(projectsDir, repoName);
 
   // Create project directory and ensure it has a flake.nix for nix develop
   mkdirSync(projectDir, { recursive: true });
   ensureFlakeNix(projectDir);
 
-  const result = await runWorkflow(projectDir, 'new-project', deps);
+  const result = await runWorkflow(projectDir, 'new-project', agentFrameworkDir, deps);
 
   if (result.outcome === 'completed') {
     // Auto-register project and launch autonomous implementation
@@ -133,9 +153,9 @@ export async function startNewProjectWorkflow(options: NewProjectWorkflowOptions
 }
 
 export async function startAddFeatureWorkflow(options: AddFeatureWorkflowOptions): Promise<WorkflowResult> {
-  const { projectId, projectDir, deps } = options;
+  const { projectId, projectDir, agentFrameworkDir, deps } = options;
 
-  const result = await runWorkflow(projectDir, 'add-feature', deps);
+  const result = await runWorkflow(projectDir, 'add-feature', agentFrameworkDir, deps);
 
   if (result.outcome === 'completed') {
     // No registration needed — project already exists. Launch task run.
