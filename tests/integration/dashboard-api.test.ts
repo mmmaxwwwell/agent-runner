@@ -637,32 +637,33 @@ describe('Dashboard & Project Detail Integration Tests', () => {
       });
       assert.equal(projRes.status, 201);
 
-      // Start a new-project workflow which broadcasts project-update messages
-      const wfRes = await api('/api/workflows/new-project', {
+      // Onboard a new project which broadcasts project-update messages
+      const onboardDir = join(projectsDir, 'ws-workflow-trigger');
+      mkdirSync(onboardDir, { recursive: true });
+      const wfRes = await api('/api/projects/onboard', {
         method: 'POST',
-        body: { name: 'ws-workflow-trigger', description: 'Dashboard WS test' },
+        body: { name: 'ws-workflow-trigger', path: onboardDir },
       });
-      assert.equal(wfRes.status, 201);
+      assert.ok([200, 201].includes(wfRes.status), `Expected 200/201, got ${wfRes.status}: ${JSON.stringify(wfRes.body)}`);
 
       // Wait briefly for async workflow to broadcast
       await new Promise(r => setTimeout(r, 1500));
 
       ws.close();
 
-      // We should have received at least one project-update message
-      const projectUpdates = messages.filter(m => m.type === 'project-update');
+      // We should have received at least one onboarding-step message from the onboard pipeline
+      const onboardingSteps = messages.filter(m => m.type === 'onboarding-step');
       assert.ok(
-        projectUpdates.length >= 1,
-        `Expected at least 1 project-update message, got ${projectUpdates.length}: ${JSON.stringify(messages)}`,
+        onboardingSteps.length >= 1,
+        `Expected at least 1 onboarding-step message, got ${onboardingSteps.length}: ${JSON.stringify(messages)}`,
       );
 
       // Verify message shape
-      const update = projectUpdates[0];
-      assert.equal(update.type, 'project-update');
+      const update = onboardingSteps[0];
+      assert.equal(update.type, 'onboarding-step');
       assert.ok(update.projectId, 'Should have projectId');
-      assert.ok('activeSession' in update, 'Should have activeSession field');
-      assert.ok('taskSummary' in update, 'Should have taskSummary field');
-      assert.ok('workflow' in update, 'Should have workflow field');
+      assert.ok(update.step, 'Should have step field');
+      assert.ok(update.status, 'Should have status field');
     });
 
     it('should handle multiple concurrent dashboard WebSocket connections', async () => {

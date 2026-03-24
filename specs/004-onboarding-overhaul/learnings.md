@@ -182,6 +182,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The no-op test ("should throw when sandbox unavailable and allowUnsandboxed is false") was removed — it had no assertion.
 - The 20 remaining test failures are all in T036/T037 scope (deprecated endpoint, onboard race conditions), not related to sandbox changes.
 
+### T037 — Removing deprecated new-project workflow tests
+- Deleted `tests/integration/new-project-workflow.test.ts` entirely (all 17 tests targeted the 410 endpoint).
+- `tests/integration/dashboard-api.test.ts` had one test using the deprecated endpoint to trigger WebSocket broadcasts. Replaced with `POST /api/projects/onboard` — but the onboard endpoint broadcasts `onboarding-step` messages (not `project-update`), so the assertion had to change from checking `project-update` to `onboarding-step` message type and shape.
+- Watch for variable name collisions when editing tests — the dashboard test already had `wfDir` declared in the same scope.
+
 ### T036 — Onboard API test race condition fix
 - The 3 failing tests in `onboard-api.test.ts` were all the same issue: the async onboarding pipeline fails fast in the test environment (no nix/sandbox available) and sets status to `"error"` before the test reads `projects.json`. Fixed by accepting either `"onboarding"` or `"error"` status.
 - The contract tests in `rest-api-projects.test.ts` already passed — no changes needed there.
