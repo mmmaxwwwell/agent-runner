@@ -471,6 +471,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     try {
       sandboxCmd = buildCommand(project.dir, session.type as SessionType, {
         agentFrameworkDir: cfg.agentFrameworkDir,
+        allowUnsandboxed: cfg.allowUnsandboxed,
         prompt: respawnPrompt,
       });
     } catch (err) {
