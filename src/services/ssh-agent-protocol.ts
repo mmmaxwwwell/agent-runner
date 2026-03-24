@@ -1,6 +1,10 @@
 // SSH Agent Protocol message types
 // Reference: https://datatracker.ietf.org/doc/html/draft-miller-ssh-agent
 
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('ssh-agent-protocol');
+
 export const SSH_AGENT_FAILURE = 5;
 export const SSH_AGENT_SUCCESS = 6;
 export const SSH_AGENTC_REQUEST_IDENTITIES = 11;
@@ -26,13 +30,18 @@ export function readSSHString(buf: Buffer, offset: number): { data: Buffer; byte
  * Returns null if the buffer doesn't contain a complete message.
  */
 export function parseMessage(buf: Buffer): { type: number; payload: Buffer; totalLength: number } | null {
-  if (buf.length < 4) return null;
-  const length = buf.readUInt32BE(0);
-  if (length === 0) return null;
-  if (buf.length < 4 + length) return null;
-  const type = buf[4];
-  const payload = Buffer.from(buf.subarray(5, 4 + length));
-  return { type, payload, totalLength: 4 + length };
+  try {
+    if (buf.length < 4) return null;
+    const length = buf.readUInt32BE(0);
+    if (length === 0) return null;
+    if (buf.length < 4 + length) return null;
+    const type = buf[4];
+    const payload = Buffer.from(buf.subarray(5, 4 + length));
+    return { type, payload, totalLength: 4 + length };
+  } catch (err) {
+    log.warn({ err, bufLength: buf?.length }, 'Failed to parse SSH agent message');
+    return null;
+  }
 }
 
 /**
@@ -49,60 +58,65 @@ export function parseSignRequest(payload: Buffer): {
   username?: string;
   keyAlgorithm?: string;
 } | null {
-  // Parse: string key_blob, string data, uint32 flags
-  const keyBlobResult = readSSHString(payload, 0);
-  if (!keyBlobResult) return null;
+  try {
+    // Parse: string key_blob, string data, uint32 flags
+    const keyBlobResult = readSSHString(payload, 0);
+    if (!keyBlobResult) return null;
 
-  const dataResult = readSSHString(payload, keyBlobResult.bytesRead);
-  if (!dataResult) return null;
+    const dataResult = readSSHString(payload, keyBlobResult.bytesRead);
+    if (!dataResult) return null;
 
-  const flagsOffset = keyBlobResult.bytesRead + dataResult.bytesRead;
-  if (payload.length < flagsOffset + 4) return null;
-  const flags = payload.readUInt32BE(flagsOffset);
+    const flagsOffset = keyBlobResult.bytesRead + dataResult.bytesRead;
+    if (payload.length < flagsOffset + 4) return null;
+    const flags = payload.readUInt32BE(flagsOffset);
 
-  let username: string | undefined;
-  let keyAlgorithm: string | undefined;
+    let username: string | undefined;
+    let keyAlgorithm: string | undefined;
 
-  // Try to parse data as SSH userauth structure:
-  // string session_id, byte 50, string username, string service,
-  // string "publickey", boolean TRUE, string algorithm, string key_blob
-  const dataBuf = dataResult.data;
-  const sessionIdResult = readSSHString(dataBuf, 0);
-  if (sessionIdResult) {
-    const markerOffset = sessionIdResult.bytesRead;
-    if (markerOffset < dataBuf.length && dataBuf[markerOffset] === 50) {
-      let off = markerOffset + 1;
-      const usernameResult = readSSHString(dataBuf, off);
-      if (usernameResult) {
-        off += usernameResult.bytesRead;
-        const serviceResult = readSSHString(dataBuf, off);
-        if (serviceResult) {
-          off += serviceResult.bytesRead;
-          const methodResult = readSSHString(dataBuf, off);
-          if (methodResult) {
-            off += methodResult.bytesRead;
-            // skip boolean TRUE byte
-            if (off < dataBuf.length) {
-              off += 1;
-              const algoResult = readSSHString(dataBuf, off);
-              if (algoResult) {
-                username = usernameResult.data.toString();
-                keyAlgorithm = algoResult.data.toString();
+    // Try to parse data as SSH userauth structure:
+    // string session_id, byte 50, string username, string service,
+    // string "publickey", boolean TRUE, string algorithm, string key_blob
+    const dataBuf = dataResult.data;
+    const sessionIdResult = readSSHString(dataBuf, 0);
+    if (sessionIdResult) {
+      const markerOffset = sessionIdResult.bytesRead;
+      if (markerOffset < dataBuf.length && dataBuf[markerOffset] === 50) {
+        let off = markerOffset + 1;
+        const usernameResult = readSSHString(dataBuf, off);
+        if (usernameResult) {
+          off += usernameResult.bytesRead;
+          const serviceResult = readSSHString(dataBuf, off);
+          if (serviceResult) {
+            off += serviceResult.bytesRead;
+            const methodResult = readSSHString(dataBuf, off);
+            if (methodResult) {
+              off += methodResult.bytesRead;
+              // skip boolean TRUE byte
+              if (off < dataBuf.length) {
+                off += 1;
+                const algoResult = readSSHString(dataBuf, off);
+                if (algoResult) {
+                  username = usernameResult.data.toString();
+                  keyAlgorithm = algoResult.data.toString();
+                }
               }
             }
           }
         }
       }
     }
-  }
 
-  return {
-    keyBlob: keyBlobResult.data,
-    data: dataResult.data,
-    flags,
-    username,
-    keyAlgorithm,
-  };
+    return {
+      keyBlob: keyBlobResult.data,
+      data: dataResult.data,
+      flags,
+      username,
+      keyAlgorithm,
+    };
+  } catch (err) {
+    log.warn({ err, payloadLength: payload?.length }, 'Failed to parse SSH sign request');
+    return null;
+  }
 }
 
 /**

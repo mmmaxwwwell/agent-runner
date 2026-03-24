@@ -91,3 +91,7 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Context string format for sign requests: `"Sign request for git push to <remote> (user: <user>, algo: <algo>)"`. For list keys: `"List SSH keys for <remote>"`.
 - `handleResponse` wraps the data with a 4-byte big-endian length prefix before writing to the Unix socket.
 
+### T027 — Malformed protocol data handling
+- `parseMessage()` and `parseSignRequest()` already handled truncated buffers gracefully (null checks at every step). The try-catch wrappers are defensive against unexpected errors from corrupt data that passes length checks but triggers Buffer method exceptions.
+- Added `'ssh-agent-protocol'` to the `ComponentName` union in `src/lib/logger.ts` — this union is a closed type that must be extended when adding new logger instances.
+

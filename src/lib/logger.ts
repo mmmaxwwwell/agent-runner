@@ -20,7 +20,8 @@ export type ComponentName =
   | 'spec-kit'
   | 'sessions'
   | 'ws:session-stream'
-  | 'ws:dashboard';
+  | 'ws:dashboard'
+  | 'ssh-agent-protocol';
 
 /**
  * Set the runtime log level for the root logger and all child loggers.
