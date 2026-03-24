@@ -208,6 +208,13 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
             // Return empty string for now — serial is shown in the native overlay if available.
             return ""
         }
+
+        @JavascriptInterface
+        fun openKeyManagement() {
+            runOnUiThread {
+                startActivity(Intent(this@MainActivity, KeyManagementActivity::class.java))
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

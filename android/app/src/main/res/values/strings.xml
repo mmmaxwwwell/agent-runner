@@ -48,4 +48,32 @@
 
     <!-- Settings -->
     <string name="settings">Settings</string>
+
+    <!-- Key Management -->
+    <string name="key_mgmt_title">Signing Keys</string>
+    <string name="key_mgmt_back">Back</string>
+    <string name="key_mgmt_empty">No signing keys registered.\nAdd a YubiKey or generate an app key.</string>
+    <string name="key_mgmt_add_yubikey">Add YubiKey</string>
+    <string name="key_mgmt_generate_app_key">Generate App Key</string>
+    <string name="key_mgmt_generate_app_key_title">Generate App Key</string>
+    <string name="key_mgmt_key_name_hint">Key name</string>
+    <string name="key_mgmt_generate">Generate</string>
+    <string name="key_mgmt_name_required">Please enter a key name</string>
+    <string name="key_mgmt_key_generated">App key generated</string>
+    <string name="key_mgmt_generate_error">Failed to generate key: %1$s</string>
+    <string name="key_mgmt_yubikey_added">YubiKey key registered</string>
+    <string name="key_mgmt_yubikey_error">Failed to read YubiKey: %1$s</string>
+    <string name="key_mgmt_connect_yubikey">Connect a YubiKey via USB or tap via NFC</string>
+    <string name="key_mgmt_export">Export</string>
+    <string name="key_mgmt_rename">Rename</string>
+    <string name="key_mgmt_remove">Remove</string>
+    <string name="key_mgmt_exported">Public key copied to clipboard</string>
+    <string name="key_mgmt_rename_title">Rename Key</string>
+    <string name="key_mgmt_rename_error">Failed to rename key: %1$s</string>
+    <string name="key_mgmt_remove_title">Remove Key</string>
+    <string name="key_mgmt_remove_confirm">Remove key \"%1$s\"?\n\nFingerprint: %2$s\n\nThis cannot be undone.</string>
+    <string name="key_mgmt_removed">Key removed</string>
+    <string name="key_mgmt_remove_error">Failed to remove key: %1$s</string>
+    <string name="key_mgmt_last_used">Last used: %1$s</string>
+    <string name="key_mgmt_never_used">Never used</string>
 </resources>

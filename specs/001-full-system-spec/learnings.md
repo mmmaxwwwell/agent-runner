@@ -132,3 +132,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **`SshKeyFormatter.toSshPublicKeyBlob()` requires X509Certificate**: Since MockSigningBackend generates keys via standard Java crypto (not Android Keystore), there's no X509Certificate. Built the SSH public key blob manually using the same format: string("ecdsa-sha2-nistp256") + string("nistp256") + string(0x04 || x || y).
 - **PKCS8 for persistence**: Standard Java `KeyPairGenerator` produces PKCS8-encoded private keys via `privateKey.encoded`. These reload fine via `PKCS8EncodedKeySpec` + `KeyFactory.getInstance("EC")`.
 - **KeyType.MOCK added**: The `KeyType` enum needed a `MOCK` variant with JSON value `"mock"`. This is a main source set change since `KeyRegistry` (in main) must be able to deserialize mock key entries.
+
+### T025 — KeyManagementActivity
+- **RecyclerView with MaterialCardView items**: Used inner `KeyAdapter` and `KeyViewHolder` classes rather than a separate file to keep things simple. The adapter uses `notifyDataSetChanged()` since the key list is small.
+- **KeystoreSigningBackend.deleteKey() handles Keystore cleanup**: When removing an Android Keystore key, must call `keystoreBackend.deleteKey()` (not just `registry.removeKey()`) to also delete the key from the Android Keystore itself.
+- **JavaScript bridge `openKeyManagement()`**: Added to `MainActivity.AgentRunnerBridge` so the PWA can open the key management screen via `window.AgentRunner.openKeyManagement()`.

@@ -35,6 +35,10 @@
             android:name=".ServerConfigActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".KeyManagementActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>
