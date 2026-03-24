@@ -7,7 +7,7 @@ import { listProjects, getProject, createProject, removeProject, registerForOnbo
 import { createSession } from '../models/session.js';
 import { parseTasks, parseTaskSummary } from '../services/task-parser.js';
 import { scanProjectsDir } from '../services/discovery.js';
-import { startAddFeatureWorkflow, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
+import { startAddFeatureWorkflow, startPlanningPhases, type SpecKitDeps, type PhaseResult, type PhaseTransitionEvent } from '../services/spec-kit.js';
 import { buildCommand } from '../services/sandbox.js';
 import { ensureAgentFramework } from '../services/agent-framework.js';
 import { spawnProcess } from '../services/process-manager.js';
@@ -552,6 +552,141 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       name: projectName,
       path: projectDir,
       status: 'onboarding' as const,
+    });
+  });
+
+  // POST /api/projects/:id/start-planning — explicit user trigger for planning transition (FR-043)
+  apiRoutes.set('POST /api/projects/:id/start-planning', async (_req, res, params) => {
+    const project = getProject(cfg.dataDir, params.id!);
+    if (!project) {
+      sendJson(res, 404, { error: 'Project not found' });
+      return;
+    }
+
+    // Only onboarding projects can transition to planning
+    if (project.status !== 'onboarding') {
+      sendJson(res, 400, { error: `Project status is "${project.status}", expected "onboarding"` });
+      return;
+    }
+
+    // Verify no active session (interview should be completed)
+    const active = getActiveSession(cfg.dataDir, project.id);
+    if (active) {
+      sendJson(res, 409, { error: 'Project has an active session. Complete or stop the interview first.' });
+      return;
+    }
+
+    // Transition status from onboarding to active (FR-030a)
+    try {
+      updateProjectStatus(cfg.dataDir, project.id, 'active');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      sendJson(res, 400, { error: message });
+      return;
+    }
+
+    // Create the first planning session
+    let session;
+    try {
+      session = createSession(cfg.dataDir, { projectId: project.id, type: 'task-run' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      sendJson(res, 409, { error: message });
+      return;
+    }
+
+    const firstSessionId = session.id;
+    let sessionCounter = 0;
+    const deps: SpecKitDeps = {
+      createSessionId: () => {
+        sessionCounter++;
+        if (sessionCounter === 1) return firstSessionId;
+        return randomUUID();
+      },
+      onPhaseTransition: (event: PhaseTransitionEvent) => {
+        broadcastPhaseTransition(firstSessionId, event);
+        broadcastProjectUpdate({
+          projectId: project.id,
+          activeSession: {
+            id: event.sessionId,
+            type: 'task-run',
+            state: 'running',
+          },
+          taskSummary: safeParseTaskSummary(project),
+          workflow: {
+            type: event.workflow,
+            phase: event.phase,
+            iteration: event.iteration,
+            description: 'Planning from interview',
+          },
+        });
+      },
+      runPhase: async (phase: string, projectDir: string, sessionId: string, prompt?: string): Promise<PhaseResult> => {
+        // All planning phases use task-run session type (prompt is required)
+        if (sessionId !== firstSessionId) {
+          createSession(cfg.dataDir, { projectId: project.id, type: 'task-run' });
+        }
+
+        ensureAgentFramework(cfg.dataDir);
+
+        const sandboxCmd = buildCommand(projectDir, 'task-run', {
+          agentFrameworkDir: cfg.agentFrameworkDir,
+          allowUnsandboxed: cfg.allowUnsandboxed,
+          prompt,
+        });
+        const logPath = join(cfg.dataDir, 'sessions', sessionId, 'output.jsonl');
+        const logger = createSessionLogger(logPath);
+        const handle = spawnProcess({
+          command: sandboxCmd.command,
+          args: sandboxCmd.args,
+          sessionId,
+          logger,
+          dataDir: cfg.dataDir,
+        });
+
+        const result = await handle.waitForExit();
+        return { exitCode: result.exitCode };
+      },
+      analyzeHasIssues: async (_projectDir: string): Promise<boolean> => {
+        return false;
+      },
+      registerProject: async (_name: string, _dir: string): Promise<string> => {
+        return project.id;
+      },
+      launchTaskRun: async (_projectId: string): Promise<void> => {
+        // TODO: wire up to actual task run launch
+      },
+    };
+
+    // Launch planning phases async (fire-and-forget)
+    startPlanningPhases({
+      projectDir: project.dir,
+      agentFrameworkDir: cfg.agentFrameworkDir,
+      deps,
+    }).then((result) => {
+      log.info({ projectId: project.id, outcome: result.outcome }, 'Planning phases finished');
+      broadcastProjectUpdate({
+        projectId: project.id,
+        activeSession: result.outcome === 'completed' ? getActiveSession(cfg.dataDir, project.id) as any : null,
+        taskSummary: safeParseTaskSummary(project),
+        workflow: null,
+      });
+    }).catch((err) => {
+      log.error({ projectId: project.id, err }, 'Planning phases error');
+      broadcastProjectUpdate({
+        projectId: project.id,
+        activeSession: null,
+        taskSummary: safeParseTaskSummary(project),
+        workflow: null,
+      });
+    });
+
+    log.info({ projectId: project.id, sessionId: session.id }, 'Planning transition triggered');
+    sendJson(res, 200, {
+      projectId: project.id,
+      sessionId: session.id,
+      status: 'active',
+      phase: 'plan',
     });
   });
 

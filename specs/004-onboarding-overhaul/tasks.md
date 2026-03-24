@@ -134,7 +134,7 @@
 ### Implementation for User Story 5
 
 - [x] T027 [US5] Update spec-kit workflow to pass interview context to post-interview sessions in src/services/spec-kit.ts — plan/tasks/analyze sessions must receive prompts that instruct them to read `spec.md`, `interview-notes.md`, and `transcript.md` from the spec directory before executing their phase
-- [ ] T028 [US5] Add explicit user trigger for planning transition — the interview agent writes interview-notes.md when user signals readiness. The spec-kit workflow detects interview session completion and waits for the user to explicitly start planning (e.g., via a UI action or the interview agent signaling completion). Transition project status from `"onboarding"` to `"active"` at this point
+- [x] T028 [US5] Add explicit user trigger for planning transition — the interview agent writes interview-notes.md when user signals readiness. The spec-kit workflow detects interview session completion and waits for the user to explicitly start planning (e.g., via a UI action or the interview agent signaling completion). Transition project status from `"onboarding"` to `"active"` at this point
 - [ ] T029 [US5] Update project description after interview in src/models/project.ts — add `updateProjectDescription(dataDir, id, description)` function. The spec-kit workflow calls this after interview completion with the agent-generated description from interview-notes.md
 
 **Checkpoint**: Planning phases have full interview context. Project transitions to active.

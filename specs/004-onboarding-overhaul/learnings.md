@@ -144,3 +144,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `handle.waitForExit().then(() => parser.stop())` is fire-and-forget — the promise is intentionally not awaited since the pipeline doesn't wait for the interview to finish.
 - The spec-kit workflow (`spec-kit.ts`) does NOT have transcript parser integration yet — it would need `dataDir` plumbed through to construct the output.jsonl path. This can be added when T027 updates the post-interview handoff.
 
+### T028 — Explicit user trigger for planning transition
+- Added `POST /api/projects/:id/start-planning` endpoint that: validates project is in "onboarding" status, verifies no active session (interview must be complete), transitions to "active", and launches plan → tasks → analyze phases async.
+- Created `startPlanningPhases()` in `spec-kit.ts` to run only post-interview phases (plan → tasks → analyze) with the same analyze remediation loop pattern as `runWorkflow()`. This avoids re-running the interview phase.
+- The endpoint returns 200 (not 201) since it's a state transition + action trigger, not a resource creation. Response includes `projectId`, `sessionId`, `status: 'active'`, and `phase: 'plan'`.
+- The `deps` wiring in the route follows the same pattern as `add-feature` but uses `task-run` session type for all phases (planning phases always have prompts).
+- The `allowUnsandboxed` flag comes from `cfg.allowUnsandboxed` (server config) since there's no request body for this endpoint.
+

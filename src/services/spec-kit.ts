@@ -183,6 +183,72 @@ export async function startNewProjectWorkflow(options: NewProjectWorkflowOptions
   return result;
 }
 
+export interface StartPlanningOptions {
+  projectDir: string;
+  agentFrameworkDir: string;
+  deps: SpecKitDeps;
+}
+
+/**
+ * Run only the post-interview planning phases (plan → tasks → analyze).
+ * Called when the user explicitly triggers the planning transition after
+ * the interview session completes (FR-043).
+ */
+export async function startPlanningPhases(options: StartPlanningOptions): Promise<WorkflowResult> {
+  const { projectDir, agentFrameworkDir, deps } = options;
+  const completedPhases: string[] = [];
+  const planningPhases = ['plan', 'tasks'] as const;
+
+  // Run plan → tasks
+  let previousPhase: string | null = null;
+  for (const phase of planningPhases) {
+    const sessionId = deps.createSessionId();
+    deps.onPhaseTransition?.({
+      workflow: 'add-feature',
+      phase,
+      previousPhase,
+      iteration: 1,
+      maxIterations: 1,
+      sessionId,
+    });
+    const prompt = buildPhasePrompt(phase);
+    const result = await deps.runPhase(phase, projectDir, sessionId, prompt);
+    if (result.exitCode !== 0) {
+      return { outcome: 'failed', failedPhase: phase, completedPhases };
+    }
+    completedPhases.push(phase);
+    previousPhase = phase;
+  }
+
+  // Run analyze with remediation loop (capped at MAX_ANALYZE_ITERATIONS)
+  let analyzeIterations = 0;
+  while (analyzeIterations < MAX_ANALYZE_ITERATIONS) {
+    analyzeIterations++;
+    const sessionId = deps.createSessionId();
+    deps.onPhaseTransition?.({
+      workflow: 'add-feature',
+      phase: 'analyze',
+      previousPhase,
+      iteration: analyzeIterations,
+      maxIterations: MAX_ANALYZE_ITERATIONS,
+      sessionId,
+    });
+    const result = await deps.runPhase('analyze', projectDir, sessionId, buildPhasePrompt('analyze'));
+    if (result.exitCode !== 0) {
+      return { outcome: 'failed', failedPhase: 'analyze', completedPhases, analyzeIterations };
+    }
+    completedPhases.push('analyze');
+    previousPhase = 'analyze';
+
+    const hasIssues = await deps.analyzeHasIssues(projectDir);
+    if (!hasIssues) {
+      return { outcome: 'completed', completedPhases, analyzeIterations };
+    }
+  }
+
+  return { outcome: 'analyze-cap-reached', completedPhases, analyzeIterations };
+}
+
 export async function startAddFeatureWorkflow(options: AddFeatureWorkflowOptions): Promise<WorkflowResult> {
   const { projectId, projectDir, agentFrameworkDir, deps } = options;
 
