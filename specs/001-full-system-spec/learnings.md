@@ -76,3 +76,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Task loop needs infinite loop protection**: If the agent exits 0 but makes no progress (e.g., auth failure causes silent exit), the loop spawns indefinitely. Added `MAX_STALE_SPAWNS=5` — if remaining task count doesn't decrease for 5 consecutive spawns, the loop aborts with `exitCode: -2`.
 - **`cwd` must be threaded through**: Added `cwd` field to `SandboxCommand`, `SpawnOptions`, and `TaskLoopOptions` interfaces, and passed it through all spawn sites in `sessions.ts` and `projects.ts`.
 - **E2E verified**: Register project → start task-run → sandbox spawns → Claude completes task 1 → auto-loop detects remaining tasks → spawns again → Claude completes task 2 → session marked completed. Full flow works.
+
+### T016 — WebSocket session streaming E2E
+- **No code changes needed** — WebSocket streaming and `lastSeq` replay work correctly out of the box.
+- **Pino logs to stderr**: When spawning the server as a child process, listen on `stderr` for pino log output (not stdout). However, when spawning with compiled `dist/server.js`, stdout works; with `npx tsx`, the tsx wrapper may interfere with stdout piping.
+- **Spawning `npx tsx` from within `npx tsx` doesn't work**: Child process gets SIGTERM immediately with no output. Use compiled `node dist/server.js` instead when spawning the server from a tsx-executed script.
+- **E2E verified**: Initial connection replays all output + sends sync → live streaming delivers new entries via 50ms file poll → disconnect + reconnect with `lastSeq` replays only missed entries → live streaming resumes after reconnect. Full flow works.
