@@ -34,6 +34,7 @@ export interface SpawnOptions {
   logger: SessionLogger;
   dataDir: string;
   env?: Record<string, string>;
+  cwd?: string;
   onEvent?: (event: ProcessEvent) => void;
 }
 
@@ -42,13 +43,14 @@ export interface SpawnOptions {
  * and handle process exit.
  */
 export function spawnProcess(options: SpawnOptions): ProcessHandle {
-  const { command, args, sessionId, logger, env, onEvent } = options;
+  const { command, args, sessionId, logger, env, cwd, onEvent } = options;
 
-  log.info({ sessionId, command, args }, 'Spawning process');
+  log.info({ sessionId, command, args, cwd }, 'Spawning process');
 
   const child = spawn(command, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: env ? { ...process.env, ...env } : undefined,
+    cwd,
   });
 
   const pid = child.pid!;
@@ -107,6 +109,9 @@ export function killProcess(handle: ProcessHandle): void {
   }
 }
 
+/** Maximum number of consecutive spawns without any task progress before the loop aborts. */
+const MAX_STALE_SPAWNS = 5;
+
 export interface TaskLoopOptions {
   command: string;
   args: string[];
@@ -117,6 +122,7 @@ export interface TaskLoopOptions {
   logger: SessionLogger;
   dataDir: string;
   env?: Record<string, string>;
+  cwd?: string;
   pushService?: PushService;
 }
 
@@ -137,8 +143,10 @@ export interface TaskLoopResult {
  *    - All tasks [x] or [~] → mark completed.
  */
 export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopResult> {
-  const { command, args, sessionId, projectId, projectName, taskFilePath, logger, dataDir, env, pushService } = options;
+  const { command, args, sessionId, projectId, projectName, taskFilePath, logger, dataDir, env, cwd, pushService } = options;
   let spawnCount = 0;
+  let staleSpawnCount = 0;
+  let lastRemaining = -1;
 
   /** Broadcast project-update to dashboard clients with current session & task state. */
   function emitDashboardUpdate(summary: ReturnType<typeof parseTaskSummary>, sessionState: string): void {
@@ -172,6 +180,7 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
       logger,
       dataDir,
       env,
+      cwd,
     });
     spawnCount++;
 
@@ -198,6 +207,22 @@ export async function startTaskLoop(options: TaskLoopOptions): Promise<TaskLoopR
 
     // Re-parse task file after successful exit
     const summary = parseTaskSummary(taskFilePath);
+
+    // Detect stale progress — if remaining task count hasn't changed, increment stale counter
+    if (lastRemaining >= 0 && summary.remaining >= lastRemaining) {
+      staleSpawnCount++;
+      if (staleSpawnCount >= MAX_STALE_SPAWNS) {
+        log.warn({ sessionId, staleSpawnCount, remaining: summary.remaining, spawnCount }, 'Task loop: no progress after max stale spawns, marking failed');
+        await logger.write({ stream: 'system', content: `No progress after ${staleSpawnCount} consecutive spawns (${summary.remaining} tasks remaining). Aborting.` });
+        transitionState(dataDir, sessionId, 'failed', { exitCode: -2 });
+        broadcastSessionState(sessionId, { state: 'failed' });
+        emitDashboardUpdate(summary, 'failed');
+        return { outcome: 'failed', spawnCount };
+      }
+    } else {
+      staleSpawnCount = 0;
+    }
+    lastRemaining = summary.remaining;
 
     // Check for blocked tasks
     if (summary.blocked > 0) {

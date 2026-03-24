@@ -323,6 +323,7 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           logger,
           dataDir: cfg.dataDir,
           env: sandboxCmd.env,
+          cwd: sandboxCmd.cwd,
         });
 
         const result = await handle.waitForExit();
@@ -690,6 +691,7 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           logger,
           dataDir: cfg.dataDir,
           env: sandboxCmd.env,
+          cwd: sandboxCmd.cwd,
         });
 
         const result = await handle.waitForExit();

@@ -219,6 +219,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         logger,
         dataDir: cfg.dataDir,
         env: sandboxCmd.env,
+        cwd: sandboxCmd.cwd,
         pushService,
       }).then((result) => {
         unregisterProcess(session.id);
@@ -267,6 +268,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         logger,
         dataDir: cfg.dataDir,
         env: sandboxCmd.env,
+        cwd: sandboxCmd.cwd,
       });
 
       registerProcess(session.id, handle);
@@ -502,6 +504,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         logger,
         dataDir: cfg.dataDir,
         env: sandboxCmd.env,
+        cwd: sandboxCmd.cwd,
         pushService,
       }).then((result) => {
         unregisterProcess(session.id);
@@ -523,6 +526,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         logger,
         dataDir: cfg.dataDir,
         env: sandboxCmd.env,
+        cwd: sandboxCmd.cwd,
       });
 
       registerProcess(session.id, handle);

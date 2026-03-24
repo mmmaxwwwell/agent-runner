@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 export type SessionType = 'interview' | 'task-run';
@@ -8,6 +9,7 @@ export interface SandboxCommand {
   args: string[];
   unsandboxed: boolean;
   env?: Record<string, string>;
+  cwd?: string;
 }
 
 export interface BuildCommandOptions {
@@ -64,6 +66,7 @@ export function buildCommand(
   // Build claude args from session type preset
   const claudeArgs: string[] = [
     '--output-format', 'stream-json',
+    '--verbose',
     '--dangerously-skip-permissions',
     '--model', 'opus',
   ];
@@ -87,15 +90,22 @@ export function buildCommand(
 
   if (sandboxAvailable) {
     const home = homedir();
-    const bindPaths = [projectDir, `${home}/.cache/nix`, `${home}/.local/share/uv`].join(' ');
+    // Claude Code needs ~/.claude/ (auth, config, session-env) — writable for session state
+    const bindPaths = [projectDir, `${home}/.cache/nix`, `${home}/.local/share/uv`, `${home}/.claude`].join(' ');
+    const readOnlyPaths = [agentFrameworkDir];
+    // ~/.claude.json may not exist on all systems — only bind if present
+    if (existsSync(`${home}/.claude.json`)) {
+      readOnlyPaths.push(`${home}/.claude.json`);
+    }
 
     const args = [
       '--user',
       '--pipe',
       '--setenv=NIXPKGS_ALLOW_UNFREE=1',
+      `--property=WorkingDirectory=${projectDir}`,
       '--property=ProtectHome=tmpfs',
       `--property=BindPaths=${bindPaths}`,
-      `--property=BindReadOnlyPaths=${agentFrameworkDir}`,
+      `--property=BindReadOnlyPaths=${readOnlyPaths.join(' ')}`,
       '--property=ProtectSystem=strict',
       '--property=NoNewPrivileges=yes',
       '--property=PrivateDevices=yes',
@@ -104,7 +114,7 @@ export function buildCommand(
       ...nixShellCommand,
     ];
 
-    return { command: 'systemd-run', args, unsandboxed: false };
+    return { command: 'systemd-run', args, unsandboxed: false, cwd: projectDir };
   }
 
   // Sandbox unavailable — check two-gate override
@@ -118,5 +128,5 @@ export function buildCommand(
     );
   }
 
-  return { command: 'nix', args: nixShellCommand, unsandboxed: true };
+  return { command: 'nix', args: nixShellCommand, unsandboxed: true, cwd: projectDir };
 }
