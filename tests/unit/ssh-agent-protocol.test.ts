@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { readSSHString, parseMessage } from '../../src/services/ssh-agent-protocol.ts';
+import { readSSHString, parseMessage, MessageAccumulator } from '../../src/services/ssh-agent-protocol.ts';
 
 describe('readSSHString', () => {
   it('should read a string with 4-byte big-endian length prefix', () => {
@@ -151,5 +151,103 @@ describe('parseMessage', () => {
 
     const result = parseMessage(buf);
     assert.equal(result, null);
+  });
+});
+
+describe('MessageAccumulator', () => {
+  function buildMessage(type: number, payload: Buffer): Buffer {
+    const length = 1 + payload.length;
+    const buf = Buffer.alloc(4 + length);
+    buf.writeUInt32BE(length, 0);
+    buf[4] = type;
+    payload.copy(buf, 5);
+    return buf;
+  }
+
+  it('should emit a complete message fed in one chunk', () => {
+    const acc = new MessageAccumulator();
+    const received: Array<{ type: number; payload: Buffer }> = [];
+    acc.onMessage((type, payload) => received.push({ type, payload }));
+
+    const payload = Buffer.from([0x01, 0x02]);
+    acc.feed(buildMessage(13, payload));
+
+    assert.equal(received.length, 1);
+    assert.equal(received[0].type, 13);
+    assert.deepEqual(received[0].payload, payload);
+  });
+
+  it('should accumulate partial data across multiple feed calls', () => {
+    const acc = new MessageAccumulator();
+    const received: Array<{ type: number; payload: Buffer }> = [];
+    acc.onMessage((type, payload) => received.push({ type, payload }));
+
+    const msg = buildMessage(11, Buffer.from([0xaa, 0xbb, 0xcc]));
+
+    // Feed the message in three parts
+    acc.feed(msg.subarray(0, 2));  // partial length header
+    assert.equal(received.length, 0);
+
+    acc.feed(msg.subarray(2, 6));  // rest of header + partial body
+    assert.equal(received.length, 0);
+
+    acc.feed(msg.subarray(6));     // remaining body
+    assert.equal(received.length, 1);
+    assert.equal(received[0].type, 11);
+    assert.deepEqual(received[0].payload, Buffer.from([0xaa, 0xbb, 0xcc]));
+  });
+
+  it('should emit multiple messages from one chunk', () => {
+    const acc = new MessageAccumulator();
+    const received: Array<{ type: number; payload: Buffer }> = [];
+    acc.onMessage((type, payload) => received.push({ type, payload }));
+
+    const msg1 = buildMessage(11, Buffer.from([0x01]));
+    const msg2 = buildMessage(13, Buffer.from([0x02, 0x03]));
+    const combined = Buffer.concat([msg1, msg2]);
+
+    acc.feed(combined);
+
+    assert.equal(received.length, 2);
+    assert.equal(received[0].type, 11);
+    assert.deepEqual(received[0].payload, Buffer.from([0x01]));
+    assert.equal(received[1].type, 13);
+    assert.deepEqual(received[1].payload, Buffer.from([0x02, 0x03]));
+  });
+
+  it('should reset internal buffer after extracting a message', () => {
+    const acc = new MessageAccumulator();
+    const received: Array<{ type: number; payload: Buffer }> = [];
+    acc.onMessage((type, payload) => received.push({ type, payload }));
+
+    // Feed first complete message
+    acc.feed(buildMessage(11, Buffer.from([0x01])));
+    assert.equal(received.length, 1);
+
+    // Feed second complete message — should work independently
+    acc.feed(buildMessage(13, Buffer.from([0x02])));
+    assert.equal(received.length, 2);
+    assert.equal(received[1].type, 13);
+    assert.deepEqual(received[1].payload, Buffer.from([0x02]));
+  });
+
+  it('should handle a message split between two chunks with leftover', () => {
+    const acc = new MessageAccumulator();
+    const received: Array<{ type: number; payload: Buffer }> = [];
+    acc.onMessage((type, payload) => received.push({ type, payload }));
+
+    const msg1 = buildMessage(11, Buffer.from([0x01]));
+    const msg2 = buildMessage(5, Buffer.alloc(0));
+
+    // Send msg1 + partial msg2 in one chunk
+    const combined = Buffer.concat([msg1, msg2]);
+    const split = 8; // somewhere in msg2
+    acc.feed(combined.subarray(0, split));
+    assert.equal(received.length, 1); // msg1 emitted
+
+    // Send the rest
+    acc.feed(combined.subarray(split));
+    assert.equal(received.length, 2); // msg2 emitted
+    assert.equal(received[1].type, 5);
   });
 });
