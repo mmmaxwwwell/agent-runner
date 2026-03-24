@@ -25,6 +25,7 @@ import com.agentrunner.bridge.SignRequestDialog
 import com.agentrunner.bridge.SignRequestHandler
 import com.agentrunner.bridge.SignRequestListener
 import com.agentrunner.config.ServerConfig
+import com.agentrunner.push.PushNotificationManager
 import com.agentrunner.yubikey.YubikeyManager
 import com.agentrunner.yubikey.YubikeyStatus
 import kotlinx.coroutines.CoroutineScope
@@ -41,6 +42,7 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         private set
 
     private lateinit var yubikeyManager: YubikeyManager
+    private lateinit var pushManager: PushNotificationManager
     private var agentWebSocket: AgentWebSocket? = null
     private var signRequestHandler: SignRequestHandler? = null
     private var signDialog: SignRequestDialog? = null
@@ -67,6 +69,10 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         }
 
         yubikeyManager = YubikeyManager(applicationContext)
+        pushManager = PushNotificationManager(applicationContext)
+
+        // Handle deep link from notification tap
+        handleNotificationIntent(intent)
 
         val container = FrameLayout(this)
         setContentView(container)
@@ -180,6 +186,21 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
             // Serial number requires opening a SmartCardConnection which is expensive/async.
             // Return empty string for now — serial is shown in the native overlay if available.
             return ""
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent) {
+        val hash = intent.getStringExtra(PushNotificationManager.EXTRA_NAVIGATE_HASH)
+        if (hash != null && ::webView.isInitialized && serverUrl != null) {
+            val url = "${serverUrl}${hash}"
+            webView.loadUrl(url)
+            // Clear so it doesn't re-navigate on rotation
+            intent.removeExtra(PushNotificationManager.EXTRA_NAVIGATE_HASH)
         }
     }
 

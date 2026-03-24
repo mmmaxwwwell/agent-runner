@@ -109,8 +109,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T022 [US4] Handle app lifecycle for server config in MainActivity — in onCreate: check ServerConfig.load(). If null: start ServerConfigActivity, finish(). If URL exists: load WebView. Handle returned result from config activity
-- [ ] T023 [US4] Add settings navigation — add menu option or button accessible from WebView (via JavaScript bridge `window.AgentRunner.openSettings()` or native toolbar) that launches ServerConfigActivity for URL editing. Pre-populate current URL in the edit field
+- [~] T022 [US4] Handle app lifecycle for server config in MainActivity — in onCreate: check ServerConfig.load(). If null: start ServerConfigActivity, finish(). If URL exists: load WebView. Handle returned result from config activity
+- [~] T023 [US4] Add settings navigation — add menu option or button accessible from WebView (via JavaScript bridge `window.AgentRunner.openSettings()` or native toolbar) that launches ServerConfigActivity for URL editing. Pre-populate current URL in the edit field
 
 **Checkpoint**: Server URL persists and is configurable
 
@@ -124,7 +124,7 @@
 
 ### Implementation for User Story 5
 
-- [ ] T024 [US5] Register for web-push from native layer — call POST /api/push/subscribe from native code using the server's VAPID public key. Store subscription in SharedPreferences. Handle notification display via Android NotificationManager with notification channel
+- [x] T024 [US5] Register for web-push from native layer — call POST /api/push/subscribe from native code using the server's VAPID public key. Store subscription in SharedPreferences. Handle notification display via Android NotificationManager with notification channel
 - [ ] T025 [US5] Handle notification tap navigation — on notification tap: launch MainActivity with deep link intent containing project/session URL hash. MainActivity loads WebView and navigates to the correct hash route
 
 **Checkpoint**: Push notifications work and deep-link to correct views

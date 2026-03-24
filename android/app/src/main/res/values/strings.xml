@@ -42,6 +42,10 @@
     <string name="error_key_type_unsupported">Unsupported key type. Only ECDSA P-256 is supported.</string>
     <string name="error_yubikey_disconnected_during_sign">Yubikey disconnected during signing. Request cancelled.</string>
 
+    <!-- Notifications -->
+    <string name="notification_channel_name">Agent Runner</string>
+    <string name="notification_channel_description">Session completion, failures, and input requests</string>
+
     <!-- Settings -->
     <string name="settings">Settings</string>
 </resources>

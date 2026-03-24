@@ -144,3 +144,17 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Public methods `showPinError`, `showPinBlocked`, `showSignError` are called by the SignRequestListener implementation to update UI. They guard with `isAdded` to avoid crashes if the fragment is detached.
 - `isCancelable = false` + `setCanceledOnTouchOutside(false)` ensures back press and outside touch don't dismiss — user must use the Cancel button.
 
+### T022/T023 — Already implemented
+- T022 (app lifecycle for server config) was fully implemented in T007 (onCreate checks ServerConfig.load, redirects to ServerConfigActivity if null).
+- T023 (settings navigation) was fully implemented in T011 (`window.AgentRunner.openSettings()` JavaScript bridge) and T006 (ServerConfigActivity pre-populates saved URL).
+
+### T024 — Push notification infrastructure
+- Web-push requires a push service endpoint (normally provided by the browser's Push API or FCM on Android). Without Firebase setup (google-services.json), FCM can't provide an endpoint.
+- `PushNotificationManager.subscribe()` takes a `pushEndpoint` parameter — the caller must provide a valid endpoint (e.g., from FCM registration). This decouples the subscription logic from the endpoint provider.
+- ECDH P-256 key generation uses Android's standard `KeyPairGenerator("EC")` with `secp256r1` — same curve as web-push requires.
+- Notification channel `agent_runner_notifications` is created in init{} — safe to call multiple times (Android no-ops duplicate channel creation).
+- `POST_NOTIFICATIONS` permission added to manifest — required on Android 13+ (API 33). On lower APIs, notification permission is granted at install time.
+- `launchMode="singleTop"` added to MainActivity so notification taps call `onNewIntent()` instead of creating a new activity instance. Combined with `FLAG_ACTIVITY_SINGLE_TOP` on the PendingIntent.
+- Deep link navigation from notifications uses `EXTRA_NAVIGATE_HASH` intent extra. The hash is appended to the server URL and loaded in WebView. The extra is cleared after navigation to prevent re-navigation on rotation.
+- SharedPreferences name for push: `"agent_runner_push"` (separate from server config's `"agent_runner_prefs"`).
+
