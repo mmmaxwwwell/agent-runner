@@ -138,6 +138,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The route-level `runPhase` callback now uses `task-run` session type for plan/tasks/analyze phases (since they have required prompts) and `interview` for the interview phase. This was anticipated by T023's learning.
 - Existing spec-kit tests pass unchanged because the mock `runPhase` accepts but doesn't assert on the `prompt` parameter.
 
+### T029 — Project description update after interview
+- `updateProjectDescription()` is a simple read-modify-write on projects.json, following the same pattern as `updateProjectStatus()`. No transition validation needed — description can be set to any string or null at any time.
+- Description extraction from interview-notes.md uses a heuristic: first non-empty, non-heading, non-frontmatter line. This is intentionally simple — the interview agent's notes format may vary, and a single-line summary is better than nothing.
+- The extraction runs in the start-planning endpoint (not spec-kit.ts) because the route has direct access to `cfg.dataDir` and `project.id`. Adding these to `StartPlanningOptions` or `SpecKitDeps` felt like unnecessary coupling.
+
 ### T026 — Transcript parser integration with onboarding
 - Integrated in the `launch-interview` step of `onboarding.ts` (not spec-kit.ts) because the onboarding pipeline has direct access to the process handle, session ID, and data dir — everything needed to wire start/stop.
 - Transcript is written to `<projectDir>/transcript.md` (project root), not `specs/<feature>/transcript.md`, because the spec directory doesn't exist yet during onboarding — the interview agent creates it. T027 can refine the path when the feature name is known.

@@ -188,6 +188,17 @@ export function updateProjectStatus(dataDir: string, id: string, status: Project
   return project;
 }
 
+export function updateProjectDescription(dataDir: string, id: string, description: string | null): Project {
+  const projects = readProjects(dataDir);
+  const project = projects.find(p => p.id === id);
+  if (!project) {
+    throw new Error(`Project not found: ${id}`);
+  }
+  project.description = description;
+  writeProjects(dataDir, projects);
+  return project;
+}
+
 export function removeProject(dataDir: string, id: string): void {
   const projects = readProjects(dataDir);
   const idx = projects.findIndex(p => p.id === id);

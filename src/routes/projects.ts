@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import type { Config } from '../lib/config.js';
 import { createLogger } from '../lib/logger.js';
-import { listProjects, getProject, createProject, removeProject, registerForOnboarding, updateProjectStatus, type DiscoveredDirectory } from '../models/project.js';
+import { listProjects, getProject, createProject, removeProject, registerForOnboarding, updateProjectStatus, updateProjectDescription, type DiscoveredDirectory } from '../models/project.js';
 import { createSession } from '../models/session.js';
 import { parseTasks, parseTaskSummary } from '../services/task-parser.js';
 import { scanProjectsDir } from '../services/discovery.js';
@@ -583,6 +583,33 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       const message = err instanceof Error ? err.message : String(err);
       sendJson(res, 400, { error: message });
       return;
+    }
+
+    // Extract project description from interview-notes.md if available
+    try {
+      const specsDir = join(project.dir, 'specs');
+      if (existsSync(specsDir)) {
+        const specDirs = readdirSync(specsDir).filter(d => statSync(join(specsDir, d)).isDirectory());
+        for (const specDir of specDirs) {
+          const notesPath = join(specsDir, specDir, 'interview-notes.md');
+          if (existsSync(notesPath)) {
+            const notes = readFileSync(notesPath, 'utf-8');
+            // Extract first non-empty, non-heading line as description
+            const lines = notes.split('\n');
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('---')) {
+                updateProjectDescription(cfg.dataDir, project.id, trimmed);
+                break;
+              }
+            }
+            break; // Use the first spec dir with interview-notes.md
+          }
+        }
+      }
+    } catch (err) {
+      // Non-fatal — description is optional
+      log.warn({ projectId: project.id, err }, 'Failed to extract project description from interview-notes.md');
     }
 
     // Create the first planning session
