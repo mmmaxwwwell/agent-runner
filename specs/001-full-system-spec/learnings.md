@@ -45,3 +45,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 ### T010 — Unit tests all green
 - All 367 unit tests (18 test files) passed on first run with zero failures and zero code changes needed.
 - The codebase was already in good shape from Phases 1–2 work. Phase 3 checkpoint met immediately.
+
+### T011 — Integration tests all green
+- All 172 integration tests (12 test files) passed on first run with zero failures and zero code changes needed.
+- The WebSocket heartbeat tests are slow (~90s) due to real ping/pong interval timing — this dominates the overall ~110s test duration.
+- Phase 4 checkpoint met immediately.

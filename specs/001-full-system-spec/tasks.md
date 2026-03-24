@@ -59,7 +59,7 @@
 
 **Purpose**: Validate multi-component workflows work together
 
-- [ ] T011 Run `nix develop -c npm run test:integration` and make all integration tests pass. Read `test-logs/integration/` for failures, fix code, re-run until green. This covers all 12 integration test files: session-lifecycle, task-loop, process-manager, onboard-api, discovery-api, add-feature-workflow, dashboard-api, websocket, ssh-agent-bridge, recovery, voice-api, session-stop per FR-087–FR-095
+- [x] T011 Run `nix develop -c npm run test:integration` and make all integration tests pass. Read `test-logs/integration/` for failures, fix code, re-run until green. This covers all 12 integration test files: session-lifecycle, task-loop, process-manager, onboard-api, discovery-api, add-feature-workflow, dashboard-api, websocket, ssh-agent-bridge, recovery, voice-api, session-stop per FR-087–FR-095
 
 **Checkpoint**: All integration tests green
 
