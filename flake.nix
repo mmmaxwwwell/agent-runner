@@ -8,7 +8,21 @@
   outputs = { self, nixpkgs }:
     let
       system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      pkgs = import nixpkgs {
+        inherit system;
+        config = {
+          allowUnfree = true;
+          android_sdk.accept_license = true;
+        };
+      };
+      androidComposition = pkgs.androidenv.composeAndroidPackages {
+        platformVersions = [ "34" ];
+        buildToolsVersions = [ "34.0.0" ];
+        includeEmulator = false;
+        includeSources = false;
+        includeSystemImages = false;
+      };
+      androidSdk = androidComposition.androidsdk;
     in
     {
       devShells.${system}.default = pkgs.mkShell {
@@ -21,9 +35,11 @@
           # Android development
           gradle
           jdk17
+          androidSdk
         ];
 
         JAVA_HOME = "${pkgs.jdk17}/lib/openjdk";
+        ANDROID_HOME = "${androidSdk}/libexec/android-sdk";
 
         shellHook = ''
           echo "agent-runner dev shell — node $(node --version), uv $(uv --version), java $(java -version 2>&1 | head -1)"

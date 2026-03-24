@@ -192,7 +192,7 @@ open class YubikeyManager(context: Context) {
      * SW 0x6983 = PIN blocked.
      */
     private fun handlePinError(e: ApduException): Nothing {
-        val sw = e.sw
+        val sw = e.sw.toInt()
         if (sw == SW_PIN_BLOCKED.toInt()) {
             clearPin()
             throw PinBlockedException("PIN is blocked. Use ykman piv access unblock-pin to recover.")

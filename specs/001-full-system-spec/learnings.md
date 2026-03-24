@@ -96,3 +96,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Task file format matters**: The `parseTaskSummary` function expects `## Phase N: Name` headers and `- [ ] <number> description` format. A simple `- [ ] T001 Foo` format won't parse — the task ID must be numeric.
 - **Agent framework setup**: The server runs `git fetch` on the agent-framework dir at startup. Creating just a `.git` directory isn't enough — must `git init` a proper repo so `git fetch` succeeds (even if it has no remote).
 - **E2E verified**: Session created with bridge → socket at correct path with 0600 perms → REQUEST_IDENTITIES forwarded to WebSocket → SIGN_REQUEST forwarded with remote context → ssh-agent-response routed back through socket → non-whitelisted types rejected → cancel returns SSH_AGENT_FAILURE. Full flow works.
+
+### T019 — Android build fix
+- **Android SDK must be in nix flake**: The flake originally had `gradle` and `jdk17` but no Android SDK. Added `androidenv.composeAndroidPackages` with `platformVersions = ["34"]` and `buildToolsVersions = ["34.0.0"]`. Set `ANDROID_HOME` to `${androidSdk}/libexec/android-sdk`.
+- **Unfree + license acceptance in flake**: Android SDK is unfree and requires license acceptance. Must use `import nixpkgs { config = { allowUnfree = true; android_sdk.accept_license = true; }; }` instead of `nixpkgs.legacyPackages` — otherwise `nix develop -c` fails without `--impure` + env vars.
+- **Kotlin type mismatch in YubikeyManager**: `ApduException.sw` returns `Short`, but the code compared it with `Int` literals and used `and` bitwise operations. Fix: `e.sw.toInt()` to convert to Int before comparisons.
+- **4 unit test failures remain**: `SignRequestHandlerTest.kt` has 4 failing tests related to PIN handling and concurrent sign requests. These are for Phase 9 (T030) to fix.
+- **Android build command**: `cd android && nix develop /home/max/git/agent-runner -c ./gradlew assembleDebug` — must `cd` into `android/` first since the shellHook's `cd android` fails when already in `android/`.

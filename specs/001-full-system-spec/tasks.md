@@ -94,7 +94,7 @@
 
 **Purpose**: Get the Android app compiling before any feature work
 
-- [ ] T019 [US10] Run `./gradlew assembleDebug` in `android/` and fix all compilation errors until clean build. Update dependencies, fix Kotlin/Gradle version mismatches, ensure ProGuard/R8 rules are correct per FR-068
+- [x] T019 [US10] Run `./gradlew assembleDebug` in `android/` and fix all compilation errors until clean build. Update dependencies, fix Kotlin/Gradle version mismatches, ensure ProGuard/R8 rules are correct per FR-068
 
 **Checkpoint**: Android debug APK builds successfully
 
