@@ -40,3 +40,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Tests cover: REQUEST_IDENTITIES round-trip, SIGN_REQUEST round-trip, cancel → FAILURE, non-whitelisted type → FAILURE without onRequest.
 - The `handleResponse` data parameter includes the type byte + payload (the full message body excluding the 4-byte length prefix). T013 must wrap it with the length prefix before writing to the socket.
 
+### T013 — Bridge implementation patterns
+- `createBridge` uses closure-based state (pendingRequests map, server) rather than a class — keeps the public interface minimal (just the SSHAgentBridge interface methods).
+- Stale socket removal uses `unlink` with ENOENT suppression before `server.listen()`.
+- The `FAILURE_RESPONSE` constant (`Buffer.from([0, 0, 0, 1, 5])`) is shared across timeout, cancel, destroy, and non-whitelisted message handling.
+- Context string format for sign requests: `"Sign request for git push to <remote> (user: <user>, algo: <algo>)"`. For list keys: `"List SSH keys for <remote>"`.
+- `handleResponse` wraps the data with a 4-byte big-endian length prefix before writing to the Unix socket.
+
