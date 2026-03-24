@@ -94,7 +94,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T020 [US3] Add Yubikey status indicator overlay in MainActivity — small floating view or status bar at top/bottom of WebView showing connection state. Observe YubikeyManager.status LiveData. Show serial number when connected. Animate NFC tap detection. Update within 2 seconds of connect/disconnect
+- [x] T020 [US3] Add Yubikey status indicator overlay in MainActivity — small floating view or status bar at top/bottom of WebView showing connection state. Observe YubikeyManager.status LiveData. Show serial number when connected. Animate NFC tap detection. Update within 2 seconds of connect/disconnect
 - [ ] T021 [US3] Expose Yubikey status via JavaScript bridge in MainActivity — add @JavascriptInterface class `AgentRunnerBridge` with `getYubikeyStatus()` returning "disconnected"/"connected_usb"/"connected_nfc" and `getYubikeySerial()` returning serial or empty string. Add to WebView via `addJavascriptInterface(bridge, "AgentRunner")`
 
 **Checkpoint**: User can see Yubikey connection state at all times

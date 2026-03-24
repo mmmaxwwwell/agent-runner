@@ -1,10 +1,12 @@
 package com.agentrunner
 
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -24,6 +26,7 @@ import com.agentrunner.bridge.SignRequestHandler
 import com.agentrunner.bridge.SignRequestListener
 import com.agentrunner.config.ServerConfig
 import com.agentrunner.yubikey.YubikeyManager
+import com.agentrunner.yubikey.YubikeyStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,6 +35,7 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
     private lateinit var webView: WebView
     private var errorView: View? = null
+    private var yubikeyStatusView: View? = null
     private var serverUrl: String? = null
     var currentSessionId: String? = null
         private set
@@ -144,6 +148,8 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
         webView.addJavascriptInterface(AgentRunnerBridge(), "AgentRunner")
 
+        setupYubikeyStatusOverlay(container)
+
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
         } else {
@@ -172,6 +178,50 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
             yubikeyManager.stopDiscovery(this)
         }
         super.onPause()
+    }
+
+    private fun setupYubikeyStatusOverlay(container: FrameLayout) {
+        val statusView = layoutInflater.inflate(R.layout.view_yubikey_status, container, false)
+        container.addView(statusView)
+        yubikeyStatusView = statusView
+
+        // Set initial state
+        updateYubikeyStatus(YubikeyStatus.DISCONNECTED)
+
+        // Observe Yubikey connection state
+        yubikeyManager.status.observe(this) { status ->
+            updateYubikeyStatus(status)
+        }
+    }
+
+    private fun updateYubikeyStatus(status: YubikeyStatus) {
+        val statusText = yubikeyStatusView?.findViewById<TextView>(R.id.yubikeyStatusText) ?: return
+
+        when (status) {
+            YubikeyStatus.DISCONNECTED, YubikeyStatus.ERROR -> {
+                statusText.text = getString(R.string.yubikey_disconnected)
+                statusText.setBackgroundResource(R.drawable.yubikey_status_background)
+            }
+            YubikeyStatus.CONNECTED_USB -> {
+                statusText.text = getString(R.string.yubikey_connected_usb)
+                statusText.setBackgroundResource(R.drawable.yubikey_status_background_connected)
+            }
+            YubikeyStatus.CONNECTED_NFC -> {
+                statusText.text = getString(R.string.yubikey_connected_nfc)
+                statusText.setBackgroundResource(R.drawable.yubikey_status_background_connected)
+                animateNfcTap(statusText)
+            }
+        }
+    }
+
+    private fun animateNfcTap(view: View) {
+        ObjectAnimator.ofFloat(view, "alpha", 0.3f, 1f).apply {
+            duration = 400
+            interpolator = AccelerateDecelerateInterpolator()
+            repeatCount = 1
+            repeatMode = ObjectAnimator.REVERSE
+            start()
+        }
     }
 
     private fun onSessionChanged(oldSessionId: String?, newSessionId: String?) {

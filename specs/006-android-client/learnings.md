@@ -125,6 +125,13 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `yubikeyManager` init is guarded by `::yubikeyManager.isInitialized` in lifecycle methods because `onCreate` returns early (before init) when `serverUrl` is null.
 - `SignRequestDialog.Callback` and `SignRequestListener` are both implemented by MainActivity, which acts as the mediator between the dialog UI and the handler logic.
 
+### T020 — Yubikey status overlay
+- Status overlay is added to the same FrameLayout container as WebView and error view. It floats at bottom-end with `layout_gravity`.
+- `yubikeyManager.status` LiveData is observed with the Activity as lifecycle owner — auto-unsubscribes on destroy.
+- NFC tap uses a simple alpha pulse animation (ObjectAnimator) to draw attention. USB connection is static (persistent connection doesn't need animation).
+- Serial number display is not implemented — YubikeyManager doesn't expose serial from its LiveData (would require opening a SmartCardConnection). The `yubikey_connected_serial` string resource exists for future use if serial is added.
+- Two drawable backgrounds: dark semi-transparent for disconnected, green semi-transparent for connected. Both use 16dp corner radius for pill shape.
+
 ### T018 — SignRequestDialog design decisions
 - `SignRequestDialog.Callback` interface has two methods: `onPinSubmitted(pin: CharArray)` and `onSignCancelled()`. The host (MainActivity in T019) implements this and delegates to `SignRequestHandler.onPinEntered()` / `onCancel()`.
 - `configure(callback, yubikeyStatus)` must be called before `show()` — these references don't survive rotation (unlike Bundle arguments). T026 (rotation handling) will need to re-configure.
