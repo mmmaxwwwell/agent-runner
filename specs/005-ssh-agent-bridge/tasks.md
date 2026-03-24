@@ -17,7 +17,7 @@
 
 **Purpose**: No new dependencies needed — uses Node.js built-in `net` module. Setup is minimal.
 
-- [ ] T001 Add SSH agent protocol constants (message types 5, 6, 11, 12, 13, 14) to src/services/ssh-agent-protocol.ts — export as named constants
+- [x] T001 Add SSH agent protocol constants (message types 5, 6, 11, 12, 13, 14) to src/services/ssh-agent-protocol.ts — export as named constants
 
 **Checkpoint**: Constants available for all subsequent work
 
