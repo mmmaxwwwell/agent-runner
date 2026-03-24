@@ -78,7 +78,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Verify REQUEST_IDENTITIES (type 11) handling in bridge — already implemented in T013 as part of whitelist. This task validates the end-to-end flow: type 11 message forwarded over WebSocket, client responds with IDENTITIES_ANSWER (type 12), response written back to Unix socket. Add specific test case in tests/integration/ssh-agent-bridge.test.ts if not covered by T010
+- [~] T017 [US2] Verify REQUEST_IDENTITIES (type 11) handling in bridge — already covered by T010 integration test (line 84): sends REQUEST_IDENTITIES, verifies onRequest callback, responds with IDENTITIES_ANSWER, verifies response written back to Unix socket
 
 **Checkpoint**: Key listing works through the bridge
 
@@ -92,7 +92,7 @@
 
 ### Tests for User Story 3
 
-- [ ] T018 [P] [US3] Write tests for message type whitelisting in tests/unit/ssh-agent-bridge.test.ts — test that message types 17 (ADD_IDENTITY), 18 (REMOVE_IDENTITY), 19 (REMOVE_ALL), 22 (LOCK), 23 (UNLOCK) all return SSH_AGENT_FAILURE (type 5) without triggering onRequest callback. Test that types 11 and 13 do trigger onRequest
+- [x] T018 [P] [US3] Write tests for message type whitelisting in tests/unit/ssh-agent-bridge.test.ts — test that message types 17 (ADD_IDENTITY), 18 (REMOVE_IDENTITY), 19 (REMOVE_ALL), 22 (LOCK), 23 (UNLOCK) all return SSH_AGENT_FAILURE (type 5) without triggering onRequest callback. Test that types 11 and 13 do trigger onRequest
 
 ### Implementation for User Story 3
 
