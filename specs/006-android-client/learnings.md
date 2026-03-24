@@ -74,3 +74,15 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `buildIdentitiesAnswer` must produce: byte 12 (SSH_AGENT_IDENTITIES_ANSWER) + uint32 nkeys=1 + SSH string key_blob + SSH string comment.
 - Tests use real JDK-generated ECDSA P-256 keys with MockK-mocked X509Certificate (just `cert.publicKey` returns the real ECPublicKey). No need for a real self-signed cert.
 
+### T013 — SignRequestHandler test API surface and stub decisions
+- Added `kotlinx-coroutines-android` (implementation) and `kotlinx-coroutines-test` (testImplementation) to build.gradle.kts. Coroutines are needed because YubikeyManager methods are `suspend`.
+- Tests use `TestScope` + `runTest` from kotlinx-coroutines-test to control coroutine execution and time advancement (needed for timeout test).
+- `SignRequestHandler` constructor takes 4 params: `yubikey: YubikeyManager`, `webSocket: AgentWebSocket`, `listener: SignRequestListener`, `scope: CoroutineScope`. The scope allows injecting `TestScope` for testing.
+- `SignRequestListener` is a callback interface with 5 methods: `onShowSignDialog(request, pinRequired)`, `onDismissDialog()`, `onPinError(message, retriesRemaining)`, `onPinBlocked(message)`, `onSignError(message)`. T017/T018 must implement this.
+- `YubikeyManager.hasCachedPin(): Boolean` is the method SignRequestHandler uses to decide whether to show PIN input. T014 must implement this.
+- `YubikeyManager.sign(data: ByteArray, pin: CharArray?): ByteArray` takes optional PIN. T014 must implement this signature.
+- PIN error exceptions are in `com.agentrunner.bridge` package: `WrongPinException(retriesRemaining: Int)` and `PinBlockedException(message: String)`. T014 should throw these from YubikeyManager.
+- `SshPublicKey` data class is in `com.agentrunner.yubikey` with proper `equals`/`hashCode` overrides for `ByteArray` field.
+- Stub source files were created for all types the tests reference. These are minimal stubs with `TODO()` — T014/T016/T017 will replace the implementations.
+- `AgentWebSocket` is mocked with `relaxed = true` in tests — T016 implementation just needs matching method signatures.
+
