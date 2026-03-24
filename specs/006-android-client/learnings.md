@@ -68,3 +68,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The bridge is registered as `"AgentRunner"` — accessible in JS as `window.AgentRunner.openSettings()`. This matches the contract in `contracts/javascript-bridge.md`.
 - T021 will extend this same bridge class with `getYubikeyStatus()` and `getYubikeySerial()` methods.
 
+### T012 — SshKeyFormatter test API surface
+- Tests expect two static methods on `SshKeyFormatter`: `toSshPublicKeyBlob(cert: X509Certificate): ByteArray` and `buildIdentitiesAnswer(cert: X509Certificate, comment: String): ByteArray`.
+- `toSshPublicKeyBlob` must produce: SSH string "ecdsa-sha2-nistp256" + SSH string "nistp256" + SSH string (65-byte uncompressed EC point: 0x04 + 32-byte X + 32-byte Y). Coordinates must be zero-padded to exactly 32 bytes.
+- `buildIdentitiesAnswer` must produce: byte 12 (SSH_AGENT_IDENTITIES_ANSWER) + uint32 nkeys=1 + SSH string key_blob + SSH string comment.
+- Tests use real JDK-generated ECDSA P-256 keys with MockK-mocked X509Certificate (just `cert.publicKey` returns the real ECPublicKey). No need for a real self-signed cert.
+

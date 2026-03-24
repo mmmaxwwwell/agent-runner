@@ -70,7 +70,7 @@
 
 ### Tests for User Story 2
 
-- [ ] T012 [P] [US2] Write tests for SshKeyFormatter in app/src/test/kotlin/com/agentrunner/yubikey/SshKeyFormatterTest.kt — test converting ECDSA P-256 X509Certificate public key to SSH wire format (string "ecdsa-sha2-nistp256" + string "nistp256" + string point), test generating SSH IDENTITIES_ANSWER response bytes
+- [x] T012 [P] [US2] Write tests for SshKeyFormatter in app/src/test/kotlin/com/agentrunner/yubikey/SshKeyFormatterTest.kt — test converting ECDSA P-256 X509Certificate public key to SSH wire format (string "ecdsa-sha2-nistp256" + string "nistp256" + string point), test generating SSH IDENTITIES_ANSWER response bytes
 - [ ] T013 [P] [US2] Write tests for SignRequestHandler in app/src/test/kotlin/com/agentrunner/bridge/SignRequestHandlerTest.kt — test request queuing (second request waits until first completes), test cancel sends ssh-agent-cancel message, test timeout handling, test Yubikey disconnected during signing sends cancel, test that messageType 11 (list keys) is auto-responded via YubikeyManager.listKeys() WITHOUT showing SignRequestDialog, test PIN prompt shown on first sign (no cached PIN), test PIN cached after successful verification (no re-prompt), test wrong PIN shows error with retries remaining, test PIN blocked shows locked error and cancels request
 
 ### Implementation for User Story 2
