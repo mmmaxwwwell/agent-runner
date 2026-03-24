@@ -536,6 +536,7 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       projectDir,
       projectName,
       projectId,
+      sessionId,
       agentFrameworkDir: cfg.agentFrameworkDir,
       allowUnsandboxed: cfg.allowUnsandboxed,
       newProject: isNewProject,

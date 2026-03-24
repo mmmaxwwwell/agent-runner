@@ -55,3 +55,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - All 94 contract tests (5 test files) passed on first run with zero failures and zero code changes needed.
 - WebSocket heartbeat contract tests are the slowest (~60s) due to 30s ping interval verification — dominates the ~63s total contract test duration.
 - Phase 5 checkpoint met immediately.
+
+### T013 — Onboarding E2E flow validation
+- **Nix requires tracked files in git repos**: After `git init`, must run `git add` on `flake.nix` before `nix develop` can evaluate it. Otherwise nix fails with "Path 'flake.nix' is not tracked by Git."
+- **`nix develop` generates `flake.lock`**: After `install-specify` runs `nix develop`, a `flake.lock` file appears. Must `git add -A` after to avoid "dirty tree" warnings in subsequent nix commands.
+- **`specify` binary not on PATH inside `nix develop`**: `uv tool install` puts binaries in `~/.local/bin/` which isn't on the nix develop PATH. Must use absolute path: `join(homedir(), '.local', 'bin', 'specify')`.
+- **`specify init` requires arguments**: Needs `specify init . --ai claude --force` — the `.` tells it to init in the current directory, `--ai claude` selects the AI, and `--force` skips the "directory not empty" confirmation prompt.
+- **Pre-created session conflict**: The route handler pre-creates an interview session to return `sessionId` immediately, but the pipeline's `launch-interview` step was also creating a session, causing "already has an active session" error. Fix: pass `sessionId` through `OnboardingContext` and reuse it in launch-interview.
+- **Onboarding unit tests relied on incidental failures**: Tests expected the pipeline to fail because "nix isn't available in tests", but nix IS available (tests run via `nix develop -c`). The tests actually failed because `flake.nix` wasn't tracked by git. After fixing git-add, the pipeline succeeded and the error-handling tests failed. Fixed by writing an invalid `flake.nix` to reliably trigger failures at install-specify.

@@ -318,21 +318,18 @@ describe('onboarding pipeline', () => {
         }]),
       );
 
-      const ctx: OnboardingContext = {
+      // Write an invalid flake.nix and init .git so earlier steps are skipped,
+      // but install-specify fails because nix develop can't evaluate a broken flake
+      writeFileSync(join(projectDir, 'flake.nix'), 'this is not valid nix');
+      mkdirSync(join(projectDir, '.git'));
+
+      const brokenCtx: OnboardingContext = {
         dataDir,
         projectDir,
         projectName: 'my-project',
         projectId: 'test-id',
         agentFrameworkDir: join(dataDir, 'agent-framework'),
         allowUnsandboxed: true,
-      };
-
-      // Use a broken projectDir to make generate-flake or another step fail
-      // We'll test this by running the pipeline on a dir that will cause a step to error
-      const brokenCtx: OnboardingContext = {
-        ...ctx,
-        // install-specify will fail because there's no nix shell available in test
-        // This tests that when ANY step fails, status becomes 'error'
       };
 
       try {
@@ -480,6 +477,11 @@ describe('onboarding pipeline', () => {
 
   describe('error handling', () => {
     it('should surface step name and error message on failure', async () => {
+      // Write an invalid flake.nix and init .git so pipeline fails at install-specify
+      // (nix develop can't evaluate a broken flake) without spawning long-lived processes
+      writeFileSync(join(projectDir, 'flake.nix'), 'this is not valid nix');
+      mkdirSync(join(projectDir, '.git'));
+
       const ctx: OnboardingContext = {
         dataDir,
         projectDir,
@@ -502,13 +504,19 @@ describe('onboarding pipeline', () => {
     });
 
     it('should not leave project in onboarding status after failure', async () => {
+      // Create a project dir with an invalid flake so install-specify fails reliably
+      const failDir = join(tmpDir, 'fail-project');
+      mkdirSync(failDir);
+      writeFileSync(join(failDir, 'flake.nix'), 'this is not valid nix');
+      mkdirSync(join(failDir, '.git'));
+
       // Pre-register the project
       writeFileSync(
         join(dataDir, 'projects.json'),
         JSON.stringify([{
           id: 'fail-id',
           name: 'fail-project',
-          dir: join(tmpDir, 'nonexistent-for-fail'),
+          dir: failDir,
           taskFile: 'tasks.md',
           promptFile: '',
           createdAt: new Date().toISOString(),
@@ -519,7 +527,7 @@ describe('onboarding pipeline', () => {
 
       const ctx: OnboardingContext = {
         dataDir,
-        projectDir: join(tmpDir, 'nonexistent-for-fail'),
+        projectDir: failDir,
         projectName: 'fail-project',
         projectId: 'fail-id',
         agentFrameworkDir: join(dataDir, 'agent-framework'),
