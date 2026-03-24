@@ -229,3 +229,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **SSH signature response structure**: SSH_AGENT_SIGN_RESPONSE (type 14) wraps the signature in nested SSH strings: `byte(14) + string(string("ecdsa-sha2-nistp256") + string(der_signature))`. DER-encoded ECDSA signatures always start with 0x30 (SEQUENCE tag).
 - **Sequential bridge exchanges work without state leaks**: The SignRequestHandler correctly resets `selectedKeyId` and queue state between requests, allowing multiple identity+sign exchanges in sequence (simulating multiple git pushes).
 - **The host-side bridge flow (Unix socket → server → WebSocket) is covered by T018**: T042 covers the complementary Android side (WebSocket → SignRequestHandler → MockSigningBackend → WebSocket). Together they verify the full loop.
+
+### T043 — KeyManagementTest
+- **Espresso for dialog interaction**: Use `onView(withText(R.string.key_mgmt_generate)).perform(click())` to click AlertDialog buttons rather than fragile reflection-based approaches. Espresso handles dialog windows automatically.
+- **Espresso `withClassName(endsWith("EditText"))` for dialog EditText**: AlertDialog EditText views don't have resource IDs. Match by class name suffix instead.
+- **Pre-generate keys without biometric**: For export and remove tests, generate ECDSA P-256 keys directly via `KeyGenParameterSpec.Builder` without `setUserAuthenticationRequired(true)` to avoid biometric prompts. Register in `KeyRegistry` manually.
+- **Cleanup Keystore keys in tearDown**: Unlike `KeyRegistry.removeKey()` which only removes the registry entry, Keystore-backed keys also need `KeyStore.deleteEntry(alias)` to avoid accumulating orphaned keys across test runs.
+- **Remove confirmation dialog has "Remove" button text**: The positive button text for the removal confirmation dialog matches `R.string.key_mgmt_remove` ("Remove"), same as the card's remove button. Espresso clicks the dialog's button because it's in the foreground dialog window.

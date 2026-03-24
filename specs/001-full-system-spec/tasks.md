@@ -154,7 +154,7 @@
 - [x] T040 [US10] Write `WebViewDashboardTest.kt` in `android/app/src/androidTest/java/.../`: app launches, WebView loads PWA from server, dashboard renders with project list (DOM inspection via `evaluateJavascript`), navigation to project detail works per FR-068, FR-106
 - [x] T041 [US10] Write `SignRequestFlowTest.kt` in `android/app/src/androidTest/java/.../`: mock server sends `ssh-agent-request` over WebSocket, sign modal appears with correct context, MockSigningBackend auto-signs, `ssh-agent-response` sent back, modal dismisses per FR-072, FR-103, FR-106
 - [x] T042 [US10] Write `SshBridgeEndToEndTest.kt` in `android/app/src/androidTest/java/.../`: full loop — test SSH server running on host, server starts session with project pointing to test bare repo, real `git push` via real `ssh` (both available in nix flake) triggers SSH auth through the bridge socket, server relays to Android over WebSocket, MockSigningBackend signs, response flows back, push succeeds to local bare repo per FR-109
-- [ ] T043 [US10] Write `KeyManagementTest.kt` in `android/app/src/androidTest/java/.../`: open key management, add app key (verify keypair generated), verify key appears in list, export public key, remove key, verify removed per FR-099
+- [x] T043 [US10] Write `KeyManagementTest.kt` in `android/app/src/androidTest/java/.../`: open key management, add app key (verify keypair generated), verify key appears in list, export public key, remove key, verify removed per FR-099
 - [ ] T044 [US10] Run `npm run test:android:integration` and make all Android integration tests pass. Read `test-logs/android-integration/` for failures, fix code, re-run until green
 
 **Checkpoint**: All Android integration tests pass on device
