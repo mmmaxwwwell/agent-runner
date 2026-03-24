@@ -160,3 +160,7 @@ Each entry should include a timestamp and the task ID that produced the learning
 ### T029 — Android build verification
 - **Phase 8 builds cleanly with zero fixes**: All multi-key architecture changes (T020-T028) compiled on first try. No additional code changes needed for T029.
 - **Gradle caching effective**: After initial compilation in T019, subsequent builds are fast (~1s) since Kotlin compilation is UP-TO-DATE.
+
+### T030 — Existing Android unit tests
+- **`advanceUntilIdle()` triggers `withTimeout` in TestScope**: The `withTimeout(60_000)` added in T028's legacy signing path causes `advanceUntilIdle()` to advance virtual time 60s, triggering timeout and prematurely completing sign requests. Use `runCurrent()` instead when the coroutine needs to stay suspended (e.g., waiting on a `CompletableDeferred` or `Channel.receive()`). Use `advanceUntilIdle()` only after unblocking the coroutine (e.g., completing the deferred, sending to the channel).
+- **All 31 existing tests pass**: 27 were already green; the 4 `SignRequestHandlerTest` failures (concurrent sign, wrong PIN, PIN cached, PIN blocked) were all caused by the same `advanceUntilIdle()` vs `withTimeout` interaction. No code changes to production source — only test timing fixes.

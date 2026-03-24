@@ -7,6 +7,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
@@ -86,14 +87,15 @@ class SignRequestHandlerTest {
         }
 
         handler.onSignRequest(makeSignRequest(requestId = "req-1"))
-        advanceUntilIdle()
+        // Use runCurrent() to dispatch coroutine without advancing virtual time past withTimeout
+        runCurrent()
 
         // First request should show dialog
         verify(exactly = 1) { listener.onShowSignDialog(any(), any(), any(), any()) }
 
         // Second request arrives while first is pending
         handler.onSignRequest(makeSignRequest(requestId = "req-2"))
-        advanceUntilIdle()
+        runCurrent()
 
         // Still only one dialog shown (second is queued)
         verify(exactly = 1) { listener.onShowSignDialog(any(), any(), any(), any()) }
@@ -212,7 +214,8 @@ class SignRequestHandlerTest {
         coEvery { yubikey.sign(any(), any()) } returns byteArrayOf(0x01, 0x02)
 
         handler.onSignRequest(makeSignRequest(requestId = "req-1"))
-        advanceUntilIdle()
+        // Use runCurrent() to dispatch coroutine without advancing past withTimeout
+        runCurrent()
 
         // Dialog shows with PIN required
         verify { listener.onShowSignDialog(any(), eq(true), any(), any()) }
@@ -229,7 +232,7 @@ class SignRequestHandlerTest {
         coEvery { yubikey.hasCachedPin() } returns true
 
         handler.onSignRequest(makeSignRequest(requestId = "req-2"))
-        advanceUntilIdle()
+        runCurrent()
 
         // Dialog should show with pinRequired = false (PIN cached)
         verify { listener.onShowSignDialog(any(), eq(false), any(), any()) }
@@ -241,11 +244,12 @@ class SignRequestHandlerTest {
         coEvery { yubikey.sign(any(), any()) } throws WrongPinException(2)
 
         handler.onSignRequest(makeSignRequest(requestId = "req-wrong-pin"))
-        advanceUntilIdle()
+        // Use runCurrent() to dispatch coroutine without advancing past withTimeout
+        runCurrent()
 
         // User enters wrong PIN
         handler.onPinEntered("000000".toCharArray())
-        advanceUntilIdle()
+        runCurrent()
 
         // Should show PIN error with retries remaining
         verify { listener.onPinError(any(), eq(2)) }
@@ -262,7 +266,8 @@ class SignRequestHandlerTest {
         )
 
         handler.onSignRequest(makeSignRequest(requestId = "req-blocked"))
-        advanceUntilIdle()
+        // Use runCurrent() to dispatch coroutine without advancing past withTimeout
+        runCurrent()
 
         // User enters PIN (but it's blocked)
         handler.onPinEntered("123456".toCharArray())
