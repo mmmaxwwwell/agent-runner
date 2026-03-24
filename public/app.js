@@ -1486,6 +1486,229 @@
     ] });
   }
 
+  // src/client/components/new-project.tsx
+  function NewProject() {
+    const [name, setName] = d2("");
+    const [starting, setStarting] = d2(false);
+    const [error, setError] = d2(null);
+    const [showGitModal, setShowGitModal] = d2(false);
+    const handleGo = () => {
+      if (!name.trim() || starting) return;
+      setShowGitModal(true);
+    };
+    const handleConfirm = async (option, remoteUrl) => {
+      setShowGitModal(false);
+      setStarting(true);
+      setError(null);
+      try {
+        const body = {
+          name: name.trim(),
+          newProject: true
+        };
+        if (option === "remote-url" && remoteUrl) {
+          body.remoteUrl = remoteUrl;
+        } else if (option === "create-github") {
+          body.createGithubRepo = true;
+        }
+        await post("/projects/onboard", body);
+        navigate("/");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to start project");
+        setStarting(false);
+      }
+    };
+    return /* @__PURE__ */ u3("div", { children: [
+      /* @__PURE__ */ u3("h2", { style: { margin: "0 0 16px 0", fontSize: "1.2rem" }, children: "New Project" }),
+      error && /* @__PURE__ */ u3("div", { style: { color: "#f44336", marginBottom: "12px", fontSize: "0.85rem" }, children: error }),
+      /* @__PURE__ */ u3("div", { style: { marginBottom: "16px" }, children: [
+        /* @__PURE__ */ u3("label", { style: { display: "block", fontSize: "0.85rem", color: "#aaa", marginBottom: "4px" }, children: "Repository name" }),
+        /* @__PURE__ */ u3(
+          "input",
+          {
+            type: "text",
+            value: name,
+            onInput: (e3) => setName(e3.target.value),
+            placeholder: "my-project",
+            style: {
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: "4px",
+              border: "1px solid #555",
+              background: "#1a1a2e",
+              color: "#ddd",
+              fontSize: "0.9rem",
+              outline: "none",
+              boxSizing: "border-box"
+            }
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u3(
+        "button",
+        {
+          onClick: handleGo,
+          disabled: starting || !name.trim(),
+          style: {
+            padding: "10px 24px",
+            background: starting || !name.trim() ? "#555" : "#7c8dff",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: starting || !name.trim() ? "default" : "pointer",
+            fontSize: "0.9rem"
+          },
+          children: starting ? "Starting..." : "Go"
+        }
+      ),
+      showGitModal && /* @__PURE__ */ u3(
+        GitRemoteModal2,
+        {
+          dirName: name.trim(),
+          onConfirm: handleConfirm,
+          onCancel: () => setShowGitModal(false)
+        }
+      )
+    ] });
+  }
+  function GitRemoteModal2({ dirName, onConfirm, onCancel }) {
+    const [option, setOption] = d2("skip");
+    const [remoteUrl, setRemoteUrl] = d2("");
+    const handleSubmit = () => {
+      if (option === "remote-url" && !remoteUrl.trim()) return;
+      onConfirm(option, option === "remote-url" ? remoteUrl.trim() : void 0);
+    };
+    return /* @__PURE__ */ u3(
+      "div",
+      {
+        onClick: onCancel,
+        style: {
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1e3
+        },
+        children: /* @__PURE__ */ u3(
+          "div",
+          {
+            onClick: (e3) => e3.stopPropagation(),
+            style: {
+              background: "#1a1a2e",
+              border: "1px solid #333",
+              borderRadius: "8px",
+              padding: "24px",
+              width: "400px",
+              maxWidth: "90vw"
+            },
+            children: [
+              /* @__PURE__ */ u3("h3", { style: { margin: "0 0 16px 0", fontSize: "1rem" }, children: [
+                "Git Remote Setup \u2014 ",
+                dirName
+              ] }),
+              /* @__PURE__ */ u3("label", { style: { display: "block", marginBottom: "12px", cursor: "pointer" }, children: [
+                /* @__PURE__ */ u3(
+                  "input",
+                  {
+                    type: "radio",
+                    name: "git-remote",
+                    checked: option === "skip",
+                    onChange: () => setOption("skip"),
+                    style: { marginRight: "8px" }
+                  }
+                ),
+                "Skip \u2014 no remote"
+              ] }),
+              /* @__PURE__ */ u3("label", { style: { display: "block", marginBottom: "8px", cursor: "pointer" }, children: [
+                /* @__PURE__ */ u3(
+                  "input",
+                  {
+                    type: "radio",
+                    name: "git-remote",
+                    checked: option === "remote-url",
+                    onChange: () => setOption("remote-url"),
+                    style: { marginRight: "8px" }
+                  }
+                ),
+                "Enter remote URL"
+              ] }),
+              option === "remote-url" && /* @__PURE__ */ u3(
+                "input",
+                {
+                  type: "text",
+                  value: remoteUrl,
+                  onInput: (e3) => setRemoteUrl(e3.target.value),
+                  placeholder: "git@github.com:user/repo.git",
+                  style: {
+                    width: "100%",
+                    padding: "6px 8px",
+                    marginBottom: "12px",
+                    background: "#12121f",
+                    border: "1px solid #555",
+                    borderRadius: "4px",
+                    color: "#eee",
+                    fontSize: "0.85rem",
+                    boxSizing: "border-box"
+                  }
+                }
+              ),
+              /* @__PURE__ */ u3("label", { style: { display: "block", marginBottom: "16px", cursor: "pointer" }, children: [
+                /* @__PURE__ */ u3(
+                  "input",
+                  {
+                    type: "radio",
+                    name: "git-remote",
+                    checked: option === "create-github",
+                    onChange: () => setOption("create-github"),
+                    style: { marginRight: "8px" }
+                  }
+                ),
+                "Create GitHub repo (via gh CLI)"
+              ] }),
+              /* @__PURE__ */ u3("div", { style: { display: "flex", justifyContent: "flex-end", gap: "8px" }, children: [
+                /* @__PURE__ */ u3(
+                  "button",
+                  {
+                    onClick: onCancel,
+                    style: {
+                      padding: "6px 16px",
+                      borderRadius: "4px",
+                      border: "1px solid #555",
+                      background: "transparent",
+                      color: "#aaa",
+                      cursor: "pointer"
+                    },
+                    children: "Cancel"
+                  }
+                ),
+                /* @__PURE__ */ u3(
+                  "button",
+                  {
+                    onClick: handleSubmit,
+                    disabled: option === "remote-url" && !remoteUrl.trim(),
+                    style: {
+                      padding: "6px 16px",
+                      borderRadius: "4px",
+                      border: "1px solid #7c8dff",
+                      background: "#7c8dff22",
+                      color: "#7c8dff",
+                      cursor: "pointer"
+                    },
+                    children: "Create"
+                  }
+                )
+              ] })
+            ]
+          }
+        )
+      }
+    );
+  }
+
   // src/client/lib/voice.ts
   var SILENCE_TIMEOUT_MS = 5e3;
   var currentBackend = "browser";
@@ -1861,155 +2084,6 @@
         }
       )
     ] });
-  }
-
-  // src/client/components/new-project.tsx
-  function NewProject() {
-    const [name, setName] = d2("");
-    const [description, setDescription] = d2("");
-    const [starting, setStarting] = d2(false);
-    const [error, setError] = d2(null);
-    const [sessionId, setSessionId] = d2(null);
-    const [currentPhase, setCurrentPhase] = d2(null);
-    const [sessionState, setSessionState] = d2(null);
-    const [voiceState, setVoiceState] = d2("idle");
-    y2(() => {
-      return onVoiceStateChange(setVoiceState);
-    }, []);
-    const startWorkflow = q2(async () => {
-      if (!name.trim() || !description.trim() || starting) return;
-      setStarting(true);
-      setError(null);
-      try {
-        const result = await post("/workflows/new-project", {
-          name: name.trim(),
-          description: description.trim()
-        });
-        setSessionId(result.sessionId);
-        setCurrentPhase(result.phase);
-        setSessionState(result.state);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start workflow");
-        setStarting(false);
-      }
-    }, [name, description, starting]);
-    const handleVoice = q2(async () => {
-      try {
-        const text = await transcribe();
-        if (text) {
-          setDescription(text);
-        }
-      } catch {
-      }
-    }, []);
-    if (!sessionId) {
-      return /* @__PURE__ */ u3("div", { children: [
-        /* @__PURE__ */ u3("h2", { style: { margin: "0 0 16px 0", fontSize: "1.2rem" }, children: "New Project" }),
-        error && /* @__PURE__ */ u3("div", { style: { color: "#f44336", marginBottom: "12px", fontSize: "0.85rem" }, children: error }),
-        /* @__PURE__ */ u3("div", { style: { marginBottom: "12px" }, children: [
-          /* @__PURE__ */ u3("label", { style: { display: "block", fontSize: "0.85rem", color: "#aaa", marginBottom: "4px" }, children: "Repository name" }),
-          /* @__PURE__ */ u3(
-            "input",
-            {
-              type: "text",
-              value: name,
-              onInput: (e3) => setName(e3.target.value),
-              placeholder: "my-project",
-              style: {
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "4px",
-                border: "1px solid #555",
-                background: "#1a1a2e",
-                color: "#ddd",
-                fontSize: "0.9rem",
-                outline: "none",
-                boxSizing: "border-box"
-              }
-            }
-          )
-        ] }),
-        /* @__PURE__ */ u3("div", { style: { marginBottom: "16px" }, children: [
-          /* @__PURE__ */ u3("label", { style: { display: "block", fontSize: "0.85rem", color: "#aaa", marginBottom: "4px" }, children: "Describe your idea" }),
-          /* @__PURE__ */ u3("div", { style: { position: "relative" }, children: [
-            /* @__PURE__ */ u3(
-              "textarea",
-              {
-                value: description,
-                onInput: (e3) => setDescription(e3.target.value),
-                placeholder: "Describe what you want to build...",
-                rows: 4,
-                style: {
-                  width: "100%",
-                  padding: "10px 12px",
-                  paddingRight: "44px",
-                  borderRadius: "4px",
-                  border: "1px solid #555",
-                  background: "#1a1a2e",
-                  color: "#ddd",
-                  fontSize: "0.9rem",
-                  outline: "none",
-                  resize: "vertical",
-                  fontFamily: "inherit",
-                  boxSizing: "border-box"
-                }
-              }
-            ),
-            /* @__PURE__ */ u3(
-              "button",
-              {
-                onClick: handleVoice,
-                disabled: voiceState !== "idle",
-                title: "Speak your idea",
-                style: {
-                  position: "absolute",
-                  right: "8px",
-                  top: "8px",
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  border: "none",
-                  background: voiceState === "listening" ? "#f44336" : voiceState === "processing" ? "#ff9800" : "#333",
-                  color: "#fff",
-                  cursor: voiceState !== "idle" ? "default" : "pointer",
-                  fontSize: "1rem",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                },
-                children: voiceState === "listening" ? "..." : voiceState === "processing" ? "~" : "M"
-              }
-            )
-          ] })
-        ] }),
-        /* @__PURE__ */ u3(
-          "button",
-          {
-            onClick: startWorkflow,
-            disabled: starting || !name.trim() || !description.trim(),
-            style: {
-              padding: "10px 24px",
-              background: starting || !name.trim() || !description.trim() ? "#555" : "#7c8dff",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: starting || !name.trim() || !description.trim() ? "default" : "pointer",
-              fontSize: "0.9rem"
-            },
-            children: starting ? "Starting..." : "Start Project"
-          }
-        )
-      ] });
-    }
-    return /* @__PURE__ */ u3(
-      SpecKitChat,
-      {
-        sessionId,
-        initialPhase: currentPhase ?? "specify",
-        initialState: sessionState ?? "running",
-        completionRoute: "/"
-      }
-    );
   }
 
   // src/client/components/add-feature.tsx

@@ -171,3 +171,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The modal uses `onClick` on the backdrop to cancel and `stopPropagation` on the dialog body to prevent backdrop clicks from bubbling through.
 - `onInput` is used instead of `onChange` for the text input because Preact's `onChange` behaves differently from React's — `onInput` fires on every keystroke as expected.
 
+### T033 — Simplified new-project form
+- Removed the SpecKitChat inline workflow entirely — new projects now navigate back to dashboard (`navigate('/')`) on success. The project appears in the registered list with "onboarding" status and the user can click into it from there.
+- The GitRemoteModal is duplicated from `dashboard.tsx` into `new-project.tsx` (local copy). T034 or polish could extract it to a shared component if desired, but keeping it local avoids cross-component coupling for now.
+- The `OnboardResponse` type in `api.ts` doesn't include `sessionId` yet — T034 will add it. The new-project form doesn't need it since it navigates to dashboard.
+
