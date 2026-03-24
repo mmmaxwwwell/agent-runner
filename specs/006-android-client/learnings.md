@@ -86,3 +86,14 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Stub source files were created for all types the tests reference. These are minimal stubs with `TODO()` — T014/T016/T017 will replace the implementations.
 - `AgentWebSocket` is mocked with `relaxed = true` in tests — T016 implementation just needs matching method signatures.
 
+### T014 — YubikeyManager implementation
+- Constructor now takes `(context: Context)` — T019 (MainActivity wiring) must pass `applicationContext` or activity context.
+- `YubikeyStatus` enum is in its own file `YubikeyStatus.kt` (not inline in YubikeyManager).
+- `SshKeyFormatter` stub was created as an `object` (not class) with `toSshPublicKeyBlob` and `buildIdentitiesAnswer` — T015 must keep these as static-style methods on the object.
+- PIN caching: `cachedPin` is a `CharArray?` copied on first successful verification. `clearPin()` zeros and nulls it. Never persisted.
+- `handlePinError` parses `ApduException.sw`: `0x63CX` → `WrongPinException(retries=X)`, `0x6983` → `PinBlockedException`. On PIN blocked, cached PIN is also cleared.
+- `sign()` always opens a fresh `SmartCardConnection` per call (research notes: PIN policy ONCE means per-connection, so PIN must be verified each connection).
+- `listKeys()` returns `emptyList()` (not throws) when slot 9a has no certificate — callers should handle empty result gracefully.
+- USB device reference is stored and used for `openConnection`. NFC device is stored similarly but is transient (tap-based).
+- `stopDiscovery` nulls `nfcDevice` but not `usbDevice` — USB device is nulled via its `onClosed` callback.
+
