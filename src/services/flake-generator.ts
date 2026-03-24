@@ -3,6 +3,29 @@ import { join } from 'node:path';
 
 export type DetectedStack = 'node' | 'python' | 'rust' | 'go' | 'generic';
 
+const ARCH_MAP: Record<string, string> = {
+  x64: 'x86_64',
+  arm64: 'aarch64',
+};
+
+const PLATFORM_MAP: Record<string, string> = {
+  linux: 'linux',
+  darwin: 'darwin',
+};
+
+/**
+ * Detect the Nix system string from the current architecture and platform.
+ * Falls back to x86_64-linux for unknown combinations.
+ */
+export function detectArch(arch?: string, platform?: string): string {
+  const a = arch ?? process.arch;
+  const p = platform ?? process.platform;
+  const nixArch = ARCH_MAP[a];
+  const nixPlatform = PLATFORM_MAP[p];
+  if (nixArch && nixPlatform) return `${nixArch}-${nixPlatform}`;
+  return 'x86_64-linux';
+}
+
 /**
  * Detect the primary tech stack of a project directory by checking for
  * common manifest files.
@@ -46,11 +69,9 @@ function nodeVersionPackage(major: number): string {
   return 'nodejs_22'; // default to latest LTS
 }
 
-const FLAKE_TEMPLATES: Record<DetectedStack, (dirPath: string) => string> = {
-  node: (dirPath) => {
-    const major = detectNodeVersion(dirPath);
-    const pkg = nodeVersionPackage(major);
-    return `{
+function flakeShell(packages: string): string {
+  const system = detectArch();
+  return `{
   description = "Development shell";
 
   inputs = {
@@ -59,110 +80,38 @@ const FLAKE_TEMPLATES: Record<DetectedStack, (dirPath: string) => string> = {
 
   outputs = { self, nixpkgs }:
     let
-      system = "x86_64-linux";
+      system = "${system}";
       pkgs = nixpkgs.legacyPackages.\${system};
     in
     {
       devShells.\${system}.default = pkgs.mkShell {
         packages = with pkgs; [
-          ${pkg}
+          ${packages}
         ];
       };
     };
 }
 `;
+}
+
+const FLAKE_TEMPLATES: Record<DetectedStack, (dirPath: string) => string> = {
+  node: (dirPath) => {
+    const major = detectNodeVersion(dirPath);
+    const pkg = nodeVersionPackage(major);
+    return flakeShell(pkg);
   },
 
-  python: () => `{
-  description = "Development shell";
+  python: () => flakeShell(`python312
+          uv`),
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  };
-
-  outputs = { self, nixpkgs }:
-    let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.\${system};
-    in
-    {
-      devShells.\${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-          python312
-          uv
-        ];
-      };
-    };
-}
-`,
-
-  rust: () => `{
-  description = "Development shell";
-
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  };
-
-  outputs = { self, nixpkgs }:
-    let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.\${system};
-    in
-    {
-      devShells.\${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-          rustc
+  rust: () => flakeShell(`rustc
           cargo
           rustfmt
-          clippy
-        ];
-      };
-    };
-}
-`,
+          clippy`),
 
-  go: () => `{
-  description = "Development shell";
+  go: () => flakeShell('go'),
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  };
-
-  outputs = { self, nixpkgs }:
-    let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.\${system};
-    in
-    {
-      devShells.\${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-          go
-        ];
-      };
-    };
-}
-`,
-
-  generic: () => `{
-  description = "Development shell";
-
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  };
-
-  outputs = { self, nixpkgs }:
-    let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.\${system};
-    in
-    {
-      devShells.\${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-        ];
-      };
-    };
-}
-`,
+  generic: () => flakeShell(''),
 };
 
 /**

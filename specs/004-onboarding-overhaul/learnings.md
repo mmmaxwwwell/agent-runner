@@ -31,3 +31,7 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Failure tests: clone failure should not leave a partial directory; pull failure on corrupted .git should throw with a descriptive message matching `/pull|failed|error/i`.
 - The `git init --bare` output produces `hint:` messages about default branch name — this is cosmetic noise in test output, not a problem.
 
+### T007 — detectArch and flake template refactor
+- Introduced `flakeShell(packages)` helper to DRY up the five identical flake templates. All templates now call `flakeShell()` which calls `detectArch()` at generation time. Future templates should use this pattern.
+- `detectArch()` is called at flake generation time (not module load time), so the system string is always current. This matters if the code is ever used in a cross-compilation context.
+
