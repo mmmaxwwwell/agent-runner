@@ -128,7 +128,7 @@
 
 ### Tests for User Story 5
 
-- [ ] T022 [P] [US5] Write test for concurrent bridge isolation in tests/integration/ssh-agent-bridge.test.ts — create two bridges with different sessionIds, send sign requests on both, respond to each with different data, verify correct responses arrive at correct Unix sockets
+- [x] T022 [P] [US5] Write test for concurrent bridge isolation in tests/integration/ssh-agent-bridge.test.ts — create two bridges with different sessionIds, send sign requests on both, respond to each with different data, verify correct responses arrive at correct Unix sockets
 
 ### Implementation for User Story 5
 

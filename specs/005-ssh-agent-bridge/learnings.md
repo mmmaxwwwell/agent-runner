@@ -64,6 +64,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The context string format for sign requests is: `"Sign request for git push to <remote> (user: <user>, algo: <algo>)"` — parenthetical part is omitted when userauth parsing fails.
 - For REQUEST_IDENTITIES: `"List SSH keys for <remote>"`.
 
+### T022 — Concurrent bridge isolation test pattern
+- The test creates two bridges in the same tmpDir with different socket paths (`agent.sock` and `agent2.sock`), sends sign requests to both concurrently, then responds with different data to verify isolation.
+- Key pattern: send requests without auto-responding (unlike other tests), then poll `requests` arrays until both `onRequest` callbacks fire, then respond manually. This validates that pending requests are bridge-scoped.
+- Bridge2 is cleaned up via `try/finally` since the `afterEach` hook only destroys `bridge` (the first one).
+
 ### T013 — Bridge implementation patterns
 - `createBridge` uses closure-based state (pendingRequests map, server) rather than a class — keeps the public interface minimal (just the SSHAgentBridge interface methods).
 - Stale socket removal uses `unlink` with ENOENT suppression before `server.listen()`.
