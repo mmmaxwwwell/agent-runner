@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { readSSHString } from '../../src/services/ssh-agent-protocol.ts';
+import { readSSHString, parseMessage } from '../../src/services/ssh-agent-protocol.ts';
 
 describe('readSSHString', () => {
   it('should read a string with 4-byte big-endian length prefix', () => {
@@ -72,5 +72,84 @@ describe('readSSHString', () => {
     assert.ok(result);
     assert.equal(result.data.length, 0);
     assert.equal(result.bytesRead, 4);
+  });
+});
+
+describe('parseMessage', () => {
+  // SSH agent wire format: [4-byte big-endian length] [1-byte type] [payload...]
+  // length = 1 (type byte) + payload.length
+
+  function buildMessage(type: number, payload: Buffer): Buffer {
+    const length = 1 + payload.length;
+    const buf = Buffer.alloc(4 + length);
+    buf.writeUInt32BE(length, 0);
+    buf[4] = type;
+    payload.copy(buf, 5);
+    return buf;
+  }
+
+  it('should extract a complete message from a buffer', () => {
+    const payload = Buffer.from([0x01, 0x02, 0x03]);
+    const buf = buildMessage(13, payload);
+
+    const result = parseMessage(buf);
+    assert.ok(result);
+    assert.equal(result.type, 13);
+    assert.deepEqual(result.payload, payload);
+    assert.equal(result.totalLength, 4 + 1 + payload.length);
+  });
+
+  it('should return null for partial buffer — length header truncated', () => {
+    const buf = Buffer.from([0x00, 0x00]); // only 2 bytes, need at least 4
+    const result = parseMessage(buf);
+    assert.equal(result, null);
+  });
+
+  it('should return null for partial buffer — body shorter than declared length', () => {
+    const buf = Buffer.alloc(4 + 2);
+    buf.writeUInt32BE(10, 0); // declares 10 bytes but only 2 available after header
+    buf[4] = 11;
+    buf[5] = 0xff;
+
+    const result = parseMessage(buf);
+    assert.equal(result, null);
+  });
+
+  it('should extract multiple messages from one buffer', () => {
+    const p1 = Buffer.from([0xaa]);
+    const p2 = Buffer.from([0xbb, 0xcc]);
+    const msg1 = buildMessage(11, p1);
+    const msg2 = buildMessage(13, p2);
+    const buf = Buffer.concat([msg1, msg2]);
+
+    const r1 = parseMessage(buf);
+    assert.ok(r1);
+    assert.equal(r1.type, 11);
+    assert.deepEqual(r1.payload, p1);
+
+    const r2 = parseMessage(buf.subarray(r1.totalLength));
+    assert.ok(r2);
+    assert.equal(r2.type, 13);
+    assert.deepEqual(r2.payload, p2);
+  });
+
+  it('should handle zero-length payload (length field = 1, type only)', () => {
+    const buf = Buffer.alloc(5);
+    buf.writeUInt32BE(1, 0); // length = 1 (just the type byte)
+    buf[4] = 5; // SSH_AGENT_FAILURE
+
+    const result = parseMessage(buf);
+    assert.ok(result);
+    assert.equal(result.type, 5);
+    assert.equal(result.payload.length, 0);
+    assert.equal(result.totalLength, 5);
+  });
+
+  it('should return null for zero-length message (length field = 0)', () => {
+    const buf = Buffer.alloc(4);
+    buf.writeUInt32BE(0, 0); // length = 0, no type byte
+
+    const result = parseMessage(buf);
+    assert.equal(result, null);
   });
 });
