@@ -123,8 +123,11 @@ class KeystoreSigningBackendTest {
         tempDir.deleteRecursively()
     }
 
-    private fun createBackend(requireBiometric: Boolean = true): KeystoreSigningBackend {
-        return KeystoreSigningBackend(activity, registry, requireBiometric)
+    private fun createBackend(
+        requireBiometric: Boolean = true,
+        biometricAuthenticator: BiometricAuthenticator = RealBiometricAuthenticator()
+    ): KeystoreSigningBackend {
+        return KeystoreSigningBackend(activity, registry, requireBiometric, biometricAuthenticator)
     }
 
     private fun addKeystoreEntry(
@@ -330,7 +333,7 @@ class KeystoreSigningBackendTest {
     // --- sign (with biometric) ---
 
     @Test
-    fun `sign with biometric delegates to signWithBiometric and returns signature`() = runTest {
+    fun `sign with biometric delegates to biometricAuthenticator and returns signature`() = runTest {
         val entry = addKeystoreEntry()
         val mockPrivateKey = mockk<PrivateKey>()
         every { mockKeyStore.getKey("agent-runner-ks-key-1", null) } returns mockPrivateKey
@@ -340,22 +343,23 @@ class KeystoreSigningBackendTest {
         mockkStatic(Signature::class)
         every { Signature.getInstance("SHA256withECDSA") } returns mockSignature
 
-        // Spy on backend and mock the private signWithBiometric method
-        val backend = spyk(createBackend(requireBiometric = true))
-        coEvery { backend["signWithBiometric"](any<Signature>(), any<ByteArray>()) } returns expectedSignature
+        // Mock the BiometricAuthenticator to return expected signature
+        val mockAuthenticator = mockk<BiometricAuthenticator>()
+        coEvery { mockAuthenticator.authenticateAndSign(any(), any(), any()) } returns expectedSignature
 
+        val backend = createBackend(requireBiometric = true, biometricAuthenticator = mockAuthenticator)
         val result = backend.sign(entry.id, byteArrayOf(42))
 
         assertTrue(expectedSignature.contentEquals(result))
         // Verify initSign was called (biometric path still initializes the signature)
         verify { mockSignature.initSign(mockPrivateKey) }
-        // Verify that update/sign were NOT called directly (biometric path delegates)
+        // Verify that update/sign were NOT called directly (biometric path delegates to authenticator)
         verify(exactly = 0) { mockSignature.update(any<ByteArray>()) }
         verify(exactly = 0) { mockSignature.sign() }
     }
 
     @Test
-    fun `sign with biometric does not call signature update directly`() = runTest {
+    fun `sign with biometric propagates authenticator error`() = runTest {
         val entry = addKeystoreEntry()
         val mockPrivateKey = mockk<PrivateKey>()
         every { mockKeyStore.getKey("agent-runner-ks-key-1", null) } returns mockPrivateKey
@@ -364,11 +368,13 @@ class KeystoreSigningBackendTest {
         mockkStatic(Signature::class)
         every { Signature.getInstance("SHA256withECDSA") } returns mockSignature
 
-        // Spy on backend; mock signWithBiometric to simulate auth error
-        val backend = spyk(createBackend(requireBiometric = true))
+        // Mock the BiometricAuthenticator to simulate auth error
+        val mockAuthenticator = mockk<BiometricAuthenticator>()
         coEvery {
-            backend["signWithBiometric"](any<Signature>(), any<ByteArray>())
+            mockAuthenticator.authenticateAndSign(any(), any(), any())
         } throws BiometricAuthException(BiometricPrompt.ERROR_USER_CANCELED, "User canceled")
+
+        val backend = createBackend(requireBiometric = true, biometricAuthenticator = mockAuthenticator)
 
         try {
             backend.sign(entry.id, byteArrayOf(42))

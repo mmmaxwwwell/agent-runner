@@ -10,18 +10,90 @@ import com.agentrunner.yubikey.SshKeyFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.Signature
 import java.security.cert.X509Certificate
-import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.time.Instant
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+/**
+ * Abstraction over biometric authentication, allowing tests to auto-succeed (FR-110).
+ *
+ * The default implementation shows a real [BiometricPrompt]. Tests can inject a
+ * mock that immediately succeeds without user interaction.
+ */
+fun interface BiometricAuthenticator {
+    /**
+     * Authenticate and then sign [data] using [signature].
+     * The implementation must call [Signature.update]/[Signature.sign] after authentication.
+     *
+     * @return the signed bytes
+     */
+    suspend fun authenticateAndSign(
+        activity: FragmentActivity,
+        signature: Signature,
+        data: ByteArray
+    ): ByteArray
+}
+
+/**
+ * Default [BiometricAuthenticator] that shows a real [BiometricPrompt] dialog.
+ */
+class RealBiometricAuthenticator : BiometricAuthenticator {
+    override suspend fun authenticateAndSign(
+        activity: FragmentActivity,
+        signature: Signature,
+        data: ByteArray
+    ): ByteArray = suspendCancellableCoroutine { cont ->
+        val executor = ContextCompat.getMainExecutor(activity)
+        val cryptoObject = BiometricPrompt.CryptoObject(signature)
+
+        val callback = object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                try {
+                    val authedSignature = result.cryptoObject?.signature
+                        ?: throw IllegalStateException("No signature in crypto object")
+                    authedSignature.update(data)
+                    val signed = authedSignature.sign()
+                    cont.resume(signed)
+                } catch (e: Exception) {
+                    cont.resumeWithException(e)
+                }
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                cont.resumeWithException(
+                    BiometricAuthException(errorCode, errString.toString())
+                )
+            }
+
+            override fun onAuthenticationFailed() {
+                // Called on a single failed attempt (e.g., unrecognized fingerprint).
+                // BiometricPrompt handles retry internally; no action needed here.
+            }
+        }
+
+        val prompt = BiometricPrompt(activity, executor, callback)
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("SSH Signing Request")
+            .setDescription("Authenticate to sign with your app key")
+            .setNegativeButtonText("Cancel")
+            .build()
+
+        // BiometricPrompt must be shown on the main thread
+        activity.runOnUiThread {
+            prompt.authenticate(promptInfo, cryptoObject)
+        }
+
+        cont.invokeOnCancellation {
+            activity.runOnUiThread { prompt.cancelAuthentication() }
+        }
+    }
+}
 
 /**
  * SigningBackend implementation using Android Keystore ECDSA P-256.
@@ -34,7 +106,8 @@ import kotlin.coroutines.resumeWithException
 class KeystoreSigningBackend(
     private val activity: FragmentActivity,
     private val registry: KeyRegistry,
-    private val requireBiometric: Boolean = true
+    private val requireBiometric: Boolean = true,
+    private val biometricAuthenticator: BiometricAuthenticator = RealBiometricAuthenticator()
 ) : SigningBackend {
 
     companion object {
@@ -141,7 +214,7 @@ class KeystoreSigningBackend(
         signature.initSign(privateKey as java.security.PrivateKey)
 
         val signedBytes = if (requireBiometric) {
-            signWithBiometric(signature, data)
+            biometricAuthenticator.authenticateAndSign(activity, signature, data)
         } else {
             signature.update(data)
             signature.sign()
@@ -161,59 +234,6 @@ class KeystoreSigningBackend(
         } catch (e: Exception) {
             Log.w(TAG, "Failed to check key availability: ${keyEntry.id}", e)
             false
-        }
-    }
-
-    /**
-     * Sign data using BiometricPrompt to authenticate the user.
-     * Uses suspendCancellableCoroutine to bridge the callback-based BiometricPrompt API.
-     */
-    private suspend fun signWithBiometric(
-        signature: Signature,
-        data: ByteArray
-    ): ByteArray = suspendCancellableCoroutine { cont ->
-        val executor = ContextCompat.getMainExecutor(activity)
-        val cryptoObject = BiometricPrompt.CryptoObject(signature)
-
-        val callback = object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                try {
-                    val authedSignature = result.cryptoObject?.signature
-                        ?: throw IllegalStateException("No signature in crypto object")
-                    authedSignature.update(data)
-                    val signed = authedSignature.sign()
-                    cont.resume(signed)
-                } catch (e: Exception) {
-                    cont.resumeWithException(e)
-                }
-            }
-
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                cont.resumeWithException(
-                    BiometricAuthException(errorCode, errString.toString())
-                )
-            }
-
-            override fun onAuthenticationFailed() {
-                // Called on a single failed attempt (e.g., unrecognized fingerprint).
-                // BiometricPrompt handles retry internally; no action needed here.
-            }
-        }
-
-        val prompt = BiometricPrompt(activity, executor, callback)
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("SSH Signing Request")
-            .setDescription("Authenticate to sign with your app key")
-            .setNegativeButtonText("Cancel")
-            .build()
-
-        // BiometricPrompt must be shown on the main thread
-        activity.runOnUiThread {
-            prompt.authenticate(promptInfo, cryptoObject)
-        }
-
-        cont.invokeOnCancellation {
-            activity.runOnUiThread { prompt.cancelAuthentication() }
         }
     }
 

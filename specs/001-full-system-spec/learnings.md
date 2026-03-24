@@ -191,3 +191,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Device storage path**: Results go to `context.getExternalFilesDir(null)/test-logs/android-integration/<timestamp>/` — this path is accessible via `adb pull` without root. Falls back to `context.filesDir` if external storage unavailable.
 - **`screencap` command**: Available on all Android devices without special permissions. Captures the current screen as PNG. Works from within instrumented tests via `Runtime.getRuntime().exec()`.
 - **Logcat PID filtering**: `logcat -d -t 200 --pid=<pid>` captures last 200 log lines for the current process only, avoiding noise from other apps.
+
+### T036 — MockBiometricPrompt for instrumented tests
+- **`BiometricPrompt.authenticate()` is final**: Can't subclass and override. `AuthenticationResult` constructor is `@RestrictTo(LIBRARY)`. Must use interface injection instead.
+- **`BiometricAuthenticator` fun interface added to `KeystoreSigningBackend.kt`**: Extracted the biometric sign logic into a `BiometricAuthenticator` interface with `RealBiometricAuthenticator` as default. `KeystoreSigningBackend` accepts it as an optional constructor param. This is the cleanest way to mock biometric for tests.
+- **`MockBiometricPrompt` in androidTest**: Implements `BiometricAuthenticator`, skips biometric UI, directly calls `Signature.update()/sign()`. The cryptographic signing still occurs — only the biometric gate is bypassed. Includes an `authenticationCount` counter for test assertions.
+- **Unit test update**: Tests that previously used `spyk` + `backend["signWithBiometric"]` must now use `mockk<BiometricAuthenticator>()` injected via constructor. No more fragile private-method mocking.
