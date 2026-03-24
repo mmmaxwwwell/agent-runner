@@ -24,3 +24,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `BindPaths` is expected as a single `--property=BindPaths=` arg containing space-separated paths (project dir + `~/.cache/nix` + `~/.local/share/uv`). `BindReadOnlyPaths` is a separate property containing agentFrameworkDir.
 - The nix shell wrapper structure: `nix shell <claude-code-ref> <uv-ref> --command nix develop <projectDir> --command claude <flags>`. Tests check for two `--command` args in sequence.
 
+### T006 — ensureAgentFramework test design
+- Tests use a local bare git repo (`git init --bare`) in a temp dir as the "remote" instead of hitting GitHub. This makes tests fast and offline-capable. T010 should accept an optional `repoUrl` parameter (defaulting to `AGENT_FRAMEWORK_REPO`) to enable this.
+- Function signature: `ensureAgentFramework(dataDir: string, repoUrl?: string): void`. It should create `<dataDir>/agent-framework/` via clone, or pull if it already exists.
+- Tests expect the function to create dataDir recursively if it doesn't exist (mkdir -p equivalent).
+- Failure tests: clone failure should not leave a partial directory; pull failure on corrupted .git should throw with a descriptive message matching `/pull|failed|error/i`.
+- The `git init --bare` output produces `hint:` messages about default branch name — this is cosmetic noise in test output, not a problem.
+
