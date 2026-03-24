@@ -19,3 +19,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - SSH authorized_keys format for ECDSA P-256: `ecdsa-sha2-nistp256 <base64(string("ecdsa-sha2-nistp256") + string("nistp256") + string(0x04||x||y))> comment`
 - Generated test keys are gitignored — each machine generates its own. The `ensureTestKeypair()` function is idempotent.
 
+### T005 — Test SSH server
+- `ssh2` library does NOT export named ESM exports. Must use `import ssh2 from 'ssh2'` then destructure `const { Server } = ssh2`.
+- `ssh2` cannot parse PKCS8 PEM keys (the format Node.js `generateKeyPairSync` uses by default for EC keys). EC private keys must be in SEC1 format (`"BEGIN EC PRIVATE KEY"`). Use `createPrivateKey(pkcs8Pem).export({ type: 'sec1', format: 'pem' })` to convert.
+- For SSH server host keys, `ssh2` needs RSA (PKCS1) or similar — ed25519 PKCS8 format is rejected.
+- OpenSSH 10.0 has algorithm negotiation issues with `ssh2`'s server. Integration tests should use the `ssh2` Client library rather than shelling out to `ssh`/`git clone`. The `info.clientPrivateKey` field provides the SEC1-formatted key for ssh2 Client use.
+- The test SSH server creates a temp bare git repo with an initial commit and cleans it up on `stop()`. The repo path changes each run (uses `mkdtempSync`).
+

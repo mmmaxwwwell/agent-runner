@@ -26,7 +26,7 @@
 - [x] T002 [P] Update `package.json` test scripts to use custom reporter: `npm test` passes `--test-reporter=./tests/helpers/test-reporter.ts`, add `test:unit`, `test:integration`, `test:contract` subscripts per FR-114
 - [x] T003 [P] Create test fixture templates in `tests/fixtures/`: `projects-empty.json`, `projects-with-active.json`, `projects-with-onboarding.json`. Each is a valid `projects.json` for different test scenarios per FR-108
 - [x] T004 [P] Implement test keypair generator in `tests/helpers/test-keypair.ts`: idempotently generate ECDSA P-256 keypair, store in `tests/fixtures/`, export in SSH authorized_keys format per FR-109
-- [ ] T005 [P] Implement test SSH server in `tests/helpers/test-ssh-server.ts`: Node.js `ssh2` server accepting the test public key, serving a local bare git repo, start/stop helpers for integration tests per FR-109. Add `ssh2` as dev dependency
+- [x] T005 [P] Implement test SSH server in `tests/helpers/test-ssh-server.ts`: Node.js `ssh2` server accepting the test public key, serving a local bare git repo, start/stop helpers for integration tests per FR-109. Add `ssh2` as dev dependency
 - [ ] T006 [P] Add `test-logs/` to `.gitignore`
 
 ---
