@@ -86,6 +86,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Stub source files were created for all types the tests reference. These are minimal stubs with `TODO()` — T014/T016/T017 will replace the implementations.
 - `AgentWebSocket` is mocked with `relaxed = true` in tests — T016 implementation just needs matching method signatures.
 
+### T015 — SshKeyFormatter implementation
+- `BigInteger.toByteArray()` may return 33 bytes for a 32-byte coordinate (leading 0x00 sign byte) or fewer bytes if the value has leading zeros. `bigIntToFixedBytes` handles both cases — strips leading bytes or zero-pads.
+- SSH wire format uses big-endian uint32 length-prefixed strings throughout. `ByteArrayOutputStream` with extension functions keeps the encoding clean.
+- The object keeps the static-style API surface (`SshKeyFormatter.toSshPublicKeyBlob(cert)`) matching how YubikeyManager already calls it.
+
 ### T014 — YubikeyManager implementation
 - Constructor now takes `(context: Context)` — T019 (MainActivity wiring) must pass `applicationContext` or activity context.
 - `YubikeyStatus` enum is in its own file `YubikeyStatus.kt` (not inline in YubikeyManager).
