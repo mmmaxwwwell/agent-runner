@@ -37,3 +37,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Activity uses `FLAG_ACTIVITY_CLEAR_TOP or FLAG_ACTIVITY_NEW_TASK` when launching MainActivity to avoid stacking duplicate activities.
 - Pre-populates the URL field from `ServerConfig.load()` so users can edit an existing URL (important for T023 settings navigation).
 
+### T007 — MainActivity WebView shell
+- WebView is created programmatically (no XML layout) — `setContentView(webView)` makes it fill the screen. This works well with the NoActionBar theme from T002.
+- `configChanges` in manifest (set in T002) prevents activity recreation on rotation, so WebView state is preserved without save/restore in most cases. `onSaveInstanceState` is still implemented as a safety net for low-memory kills.
+- Intent extra from ServerConfigActivity takes priority over SharedPreferences — this ensures a freshly-entered URL is used immediately without a round-trip through prefs.
+- `onBackPressed()` is deprecated but still the simplest way to intercept back for WebView navigation. T008+ tasks that add more WebView features should build on this class.
+
