@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import net from 'node:net';
 
-import { createBridge, type BridgeRequest } from '../../src/services/ssh-agent-bridge.ts';
+import { createBridge, type BridgeRequest, type SSHAgentBridge } from '../../src/services/ssh-agent-bridge.ts';
 import {
   SSH_AGENT_FAILURE,
   SSH_AGENTC_REQUEST_IDENTITIES,
@@ -430,5 +430,160 @@ describe('SSHAgentBridge context generation', () => {
     } finally {
       await bridge.destroy();
     }
+  });
+});
+
+describe('SSHAgentBridge WebSocket message routing', () => {
+  let tmpDir: string;
+  let socketPath: string;
+  let bridge: SSHAgentBridge;
+  const requests: BridgeRequest[] = [];
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'ssh-bridge-ws-routing-'));
+    socketPath = join(tmpDir, 'agent.sock');
+    requests.length = 0;
+  });
+
+  afterEach(async () => {
+    if (bridge) {
+      await bridge.destroy();
+    }
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Helper: connect to bridge socket, send a message, and wait for onRequest
+   * callback WITHOUT auto-responding. Returns the pending requestId.
+   */
+  async function sendRequestAndCapture(
+    path: string,
+    type: number,
+    payload: Buffer,
+    capturedRequests: BridgeRequest[],
+  ): Promise<{ requestId: string; client: net.Socket }> {
+    const client = await new Promise<net.Socket>((resolve, reject) => {
+      const sock = net.createConnection(path, () => resolve(sock));
+      sock.on('error', reject);
+    });
+    client.write(buildMessage(type, payload));
+
+    // Wait for onRequest callback to fire
+    const start = Date.now();
+    while (capturedRequests.length === 0 && Date.now() - start < 2000) {
+      await new Promise(r => setTimeout(r, 10));
+    }
+    assert.ok(capturedRequests.length > 0, 'Expected onRequest to be called');
+
+    return { requestId: capturedRequests[capturedRequests.length - 1].requestId, client };
+  }
+
+  it('should route ssh-agent-response to correct bridge handleResponse', async () => {
+    bridge = await createBridge({
+      sessionId: 'ws-route-response-1',
+      socketPath,
+      remoteContext: 'github.com:user/repo.git',
+      onRequest: (req) => { requests.push(req); },
+      timeoutMs: 5000,
+    });
+
+    // Send a REQUEST_IDENTITIES to create a pending request
+    const { requestId, client } = await sendRequestAndCapture(
+      socketPath,
+      SSH_AGENTC_REQUEST_IDENTITIES,
+      Buffer.alloc(0),
+      requests,
+    );
+
+    // Simulate what the WebSocket handler does for ssh-agent-response:
+    // decode base64 data and call bridge.handleResponse(requestId, data)
+    const responseData = Buffer.from([SSH_AGENT_IDENTITIES_ANSWER, 0, 0, 0, 0]); // nkeys=0
+    const base64Data = responseData.toString('base64');
+
+    const socketResponse = await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      client.on('data', (chunk) => {
+        chunks.push(chunk);
+        client.end();
+      });
+      client.on('end', () => resolve(Buffer.concat(chunks)));
+      client.on('error', reject);
+
+      // Route the response as the WebSocket handler would
+      bridge.handleResponse(requestId, Buffer.from(base64Data, 'base64'));
+    });
+
+    // Verify the Unix socket received the response with length prefix
+    const expectedLength = Buffer.alloc(4);
+    expectedLength.writeUInt32BE(responseData.length, 0);
+    const expected = Buffer.concat([expectedLength, responseData]);
+    assert.deepEqual(socketResponse, expected, 'Socket should receive length-prefixed response');
+  });
+
+  it('should route ssh-agent-cancel to correct bridge handleCancel', async () => {
+    bridge = await createBridge({
+      sessionId: 'ws-route-cancel-1',
+      socketPath,
+      remoteContext: 'github.com:user/repo.git',
+      onRequest: (req) => { requests.push(req); },
+      timeoutMs: 5000,
+    });
+
+    // Send a SIGN_REQUEST to create a pending request
+    const payload = Buffer.alloc(20);
+    const { requestId, client } = await sendRequestAndCapture(
+      socketPath,
+      SSH_AGENTC_SIGN_REQUEST,
+      payload,
+      requests,
+    );
+
+    // Simulate what the WebSocket handler does for ssh-agent-cancel
+    const socketResponse = await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      client.on('data', (chunk) => {
+        chunks.push(chunk);
+        client.end();
+      });
+      client.on('end', () => resolve(Buffer.concat(chunks)));
+      client.on('error', reject);
+
+      // Route the cancel as the WebSocket handler would
+      bridge.handleCancel(requestId);
+    });
+
+    // Cancel should result in SSH_AGENT_FAILURE
+    const expected = Buffer.from([0, 0, 0, 1, SSH_AGENT_FAILURE]);
+    assert.deepEqual(socketResponse, expected, 'Cancel should return SSH_AGENT_FAILURE');
+  });
+
+  it('should silently drop ssh-agent-response with unknown requestId', async () => {
+    bridge = await createBridge({
+      sessionId: 'ws-route-unknown-1',
+      socketPath,
+      remoteContext: 'github.com:user/repo.git',
+      onRequest: (req) => { requests.push(req); },
+      timeoutMs: 5000,
+    });
+
+    // Call handleResponse with a non-existent requestId — should not throw
+    assert.doesNotThrow(() => {
+      bridge.handleResponse('non-existent-request-id', Buffer.from([14, 0]));
+    });
+  });
+
+  it('should silently drop ssh-agent-cancel with unknown requestId', async () => {
+    bridge = await createBridge({
+      sessionId: 'ws-route-unknown-2',
+      socketPath,
+      remoteContext: 'github.com:user/repo.git',
+      onRequest: (req) => { requests.push(req); },
+      timeoutMs: 5000,
+    });
+
+    // Call handleCancel with a non-existent requestId — should not throw
+    assert.doesNotThrow(() => {
+      bridge.handleCancel('non-existent-request-id');
+    });
   });
 });

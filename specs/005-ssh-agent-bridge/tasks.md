@@ -146,7 +146,7 @@
 
 ### Tests for User Story 6
 
-- [ ] T024 [P] [US6] Write test for WebSocket ssh-agent message routing in tests/unit/ssh-agent-bridge.test.ts — test that `ssh-agent-response` messages are routed to correct bridge's `handleResponse()`. Test that `ssh-agent-cancel` messages are routed to `handleCancel()`. Test that messages with unknown requestId are silently dropped
+- [x] T024 [P] [US6] Write test for WebSocket ssh-agent message routing in tests/unit/ssh-agent-bridge.test.ts — test that `ssh-agent-response` messages are routed to correct bridge's `handleResponse()`. Test that `ssh-agent-cancel` messages are routed to `handleCancel()`. Test that messages with unknown requestId are silently dropped
 
 ### Implementation for User Story 6
 

@@ -69,6 +69,12 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Key pattern: send requests without auto-responding (unlike other tests), then poll `requests` arrays until both `onRequest` callbacks fire, then respond manually. This validates that pending requests are bridge-scoped.
 - Bridge2 is cleaned up via `try/finally` since the `afterEach` hook only destroys `bridge` (the first one).
 
+### T024 — WebSocket message routing test pattern
+- Tests simulate the WebSocket handler flow: create a bridge, send a request to generate a pending requestId (without auto-responding), then call `handleResponse`/`handleCancel` directly as the WebSocket handler would.
+- `sendRequestAndCapture` helper connects to the Unix socket, sends a message, and polls until the `onRequest` callback fires. Returns both the requestId and the live client socket so the test can listen for the response data.
+- The base64 encode/decode round-trip is tested explicitly: `responseData.toString('base64')` → `Buffer.from(base64Data, 'base64')` to match what T025's WebSocket handler will do.
+- Unknown requestId tests verify that `handleResponse`/`handleCancel` silently return without throwing (no pending request = no-op).
+
 ### T013 — Bridge implementation patterns
 - `createBridge` uses closure-based state (pendingRequests map, server) rather than a class — keeps the public interface minimal (just the SSHAgentBridge interface methods).
 - Stale socket removal uses `unlink` with ENOENT suppression before `server.listen()`.
