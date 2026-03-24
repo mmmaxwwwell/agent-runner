@@ -114,7 +114,7 @@
 
 ### Tests for User Story 4
 
-- [ ] T024 [P] [US4] Write tests for transcript parser in tests/unit/transcript-parser.test.ts — test parsing Claude CLI stream-json format, test extraction of assistant text blocks as `## Agent`, test extraction of user stdin as `## User`, test tool calls are omitted or summarized, test incremental append (no overwrites), test handling of malformed JSON lines
+- [x] T024 [P] [US4] Write tests for transcript parser in tests/unit/transcript-parser.test.ts — test parsing Claude CLI stream-json format, test extraction of assistant text blocks as `## Agent`, test extraction of user stdin as `## User`, test tool calls are omitted or summarized, test incremental append (no overwrites), test handling of malformed JSON lines
 
 ### Implementation for User Story 4
 

@@ -118,3 +118,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The `runPhase` callback in `projects.ts` uses `interview` session type for all phases (interview, plan, tasks, analyze). This is because `interview` type allows optional prompts, while `task-run` requires them. When T027 adds prompts for plan/tasks/analyze phases, the session type for those can switch to `task-run`.
 - The sandbox availability check call at route entry (line 226) intentionally doesn't pass a prompt — it's only checking sandbox availability, not launching a session.
 
+### T024 — Transcript parser test design
+- Tests assume Claude CLI stream-json format emits objects like `{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "..."}]}}` for assistant turns and `{"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "..."}]}}` for user turns. T025 must parse this format (or adjust tests if the actual CLI format differs).
+- Each output.jsonl line is a `SessionLogEntry` wrapping the CLI event in its `content` field. The parser must: (1) parse the outer JSONL entry, (2) filter to `stream === 'stdout'`, (3) parse `content` as JSON to get the CLI event.
+- Tests use `waitFor()` polling helper with 2s timeout for async polling behavior. T025's poll interval should be fast enough for tests (50-100ms).
+- The restart/no-duplicate test creates a new `TranscriptParser` on the same files. T025 should use byte-offset tracking (like session-stream.ts) to resume from where it left off, and check the existing transcript file size to avoid re-processing.
+- The stub exports `TranscriptParser` class with `start()`/`stop()` methods. `stop()` is a no-op in the stub (safe to call). `start()` throws to fail tests.
+
