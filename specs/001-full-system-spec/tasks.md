@@ -37,7 +37,7 @@
 
 **⚠️ CRITICAL**: If the server won't start or the PWA won't load, nothing else matters
 
-- [ ] T007 Run `nix develop -c npm run build` and fix all TypeScript compilation errors until clean build
+- [x] T007 Run `nix develop -c npm run build` and fix all TypeScript compilation errors until clean build
 - [ ] T008 Run `nix develop -c npm run dev`, hit `http://localhost:3000` in a browser, fix until the PWA dashboard loads and shows discovered directories. Fix any server startup crashes, missing routes, WebSocket connection failures, or client rendering errors
 - [ ] T009 Verify `GET /api/health` returns 200 with correct fields. Verify `GET /api/projects` returns registered + discovered arrays. Fix any routing or handler issues
 
