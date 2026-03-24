@@ -14,3 +14,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Empty directories for package structure (yubikey/, bridge/, config/) are created but won't be tracked by git until files are added in later tasks.
 - The android/ directory is at the repo root level, separate from the Node.js server code.
 
+### T002 — AndroidManifest.xml decisions
+- Used `Theme.Material3.DayNight.NoActionBar` — relies on the Material 1.11.0 dependency from T001. NoActionBar since WebView will be fullscreen.
+- `usesCleartextTraffic="true"` is needed for local dev (HTTP to localhost). Production should use HTTPS but this flag doesn't hurt.
+- `configChanges="orientation|screenSize|keyboardHidden"` on MainActivity prevents WebView from being destroyed on rotation (WebView state loss is painful).
+- Created adaptive icon resources (mipmap-anydpi-v26) with a placeholder vector foreground. Replace with real icon later.
+- Added minimal `strings.xml` with just `app_name` — T003 will add the rest. This is needed for the manifest `@string/app_name` reference to resolve.
+
