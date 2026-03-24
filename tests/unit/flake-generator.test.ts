@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { detectStack, generateFlakeContent, ensureFlakeNix } from '../../src/services/flake-generator.ts';
+import { detectStack, detectArch, generateFlakeContent, ensureFlakeNix } from '../../src/services/flake-generator.ts';
 
 describe('detectStack', () => {
   let tmpDir: string;
@@ -54,6 +54,42 @@ describe('detectStack', () => {
     writeFileSync(join(tmpDir, 'package.json'), '{}');
     writeFileSync(join(tmpDir, 'requirements.txt'), 'flask');
     assert.equal(detectStack(tmpDir), 'node');
+  });
+});
+
+describe('detectArch', () => {
+  it('should map x64 linux to x86_64-linux', () => {
+    assert.equal(detectArch('x64', 'linux'), 'x86_64-linux');
+  });
+
+  it('should map arm64 linux to aarch64-linux', () => {
+    assert.equal(detectArch('arm64', 'linux'), 'aarch64-linux');
+  });
+
+  it('should map x64 darwin to x86_64-darwin', () => {
+    assert.equal(detectArch('x64', 'darwin'), 'x86_64-darwin');
+  });
+
+  it('should map arm64 darwin to aarch64-darwin', () => {
+    assert.equal(detectArch('arm64', 'darwin'), 'aarch64-darwin');
+  });
+
+  it('should fall back to x86_64-linux for unknown arch', () => {
+    assert.equal(detectArch('ia32', 'linux'), 'x86_64-linux');
+  });
+
+  it('should fall back to x86_64-linux for unknown platform', () => {
+    assert.equal(detectArch('x64', 'win32'), 'x86_64-linux');
+  });
+
+  it('should fall back to x86_64-linux for unknown arch and platform', () => {
+    assert.equal(detectArch('mips', 'freebsd'), 'x86_64-linux');
+  });
+
+  it('should use process.arch and process.platform when called without arguments', () => {
+    const result = detectArch();
+    assert.equal(typeof result, 'string');
+    assert.ok(result.includes('-'), 'result should be in format arch-platform');
   });
 });
 

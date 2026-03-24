@@ -13,3 +13,7 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `readProjects()` handles legacy defaulting for both `status` and `description` via the spread+nullish-coalesce pattern. Future new fields on `Project` should follow the same pattern: add to the `Omit` type union, make optional in the cast, and default in the `.map()`.
 - Existing tests don't assert on the `description` field, so adding it was backwards-compatible with no test changes needed.
 
+### T004 — detectArch test design
+- `detectArch()` accepts optional `arch` and `platform` params (defaulting to `process.arch`/`process.platform`) so tests can exercise all mappings without mocking globals. T007 should implement with this signature: `detectArch(arch?: string, platform?: string): string`.
+- Tests cover: x64/arm64 × linux/darwin (4 valid combos), unknown arch fallback, unknown platform fallback, both unknown fallback, and no-args defaults to process values.
+
