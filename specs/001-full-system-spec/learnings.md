@@ -183,3 +183,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 ### T034 — All Android unit tests green
 - **All 94 tests pass across 6 files with zero code changes**: SignRequestHandler (9), ServerConfig (14), KeyRegistry (24), KeystoreSigningBackend (23), MockSigningBackend (16), SshKeyFormatter (8). The multi-key architecture (T020–T033) was implemented correctly — no fix-validate loop iterations needed.
 - **Phase 9 checkpoint met on first run**: No validation failures, no phase-fix tasks needed.
+
+### T035 — TestRunListener for Android instrumented tests
+- **`androidTest` source set uses `kotlin/` not `java/`**: Consistent with main and debug source sets, files go in `src/androidTest/kotlin/com/agentrunner/`.
+- **Listener registration via gradle**: `testInstrumentationRunnerArguments["listener"] = "com.agentrunner.helpers.TestRunListener"` in `build.gradle.kts` automatically hooks the listener into all instrumented test runs.
+- **`InstrumentationRegistry` requires `androidx.test:runner`**: The `InstrumentationRegistry.getInstrumentation().targetContext` call needs the `androidx.test:runner:1.5.2` dependency explicitly declared as `androidTestImplementation`.
+- **Device storage path**: Results go to `context.getExternalFilesDir(null)/test-logs/android-integration/<timestamp>/` — this path is accessible via `adb pull` without root. Falls back to `context.filesDir` if external storage unavailable.
+- **`screencap` command**: Available on all Android devices without special permissions. Captures the current screen as PNG. Works from within instrumented tests via `Runtime.getRuntime().exec()`.
+- **Logcat PID filtering**: `logcat -d -t 200 --pid=<pid>` captures last 200 log lines for the current process only, avoiding noise from other apps.
