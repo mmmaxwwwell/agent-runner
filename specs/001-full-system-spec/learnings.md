@@ -26,3 +26,13 @@ Each entry should include a timestamp and the task ID that produced the learning
 - OpenSSH 10.0 has algorithm negotiation issues with `ssh2`'s server. Integration tests should use the `ssh2` Client library rather than shelling out to `ssh`/`git clone`. The `info.clientPrivateKey` field provides the SEC1-formatted key for ssh2 Client use.
 - The test SSH server creates a temp bare git repo with an initial commit and cleans it up on `stop()`. The repo path changes each run (uses `mkdtempSync`).
 
+### T008 — Server smoke test
+- Server starts cleanly with `nix develop -c npm run dev` — no startup crashes.
+- Data dir defaults to `~/.local/share/agent-runner/`. Auto-creates `projects.json` and `push-subscriptions.json` if missing.
+- VAPID keys auto-generated and saved to `vapid-keys.json` in data dir on first run.
+- `ensureAgentFramework()` runs on startup (git clone/pull of agent-framework repo into data dir) — can be slow on first run.
+- `GET /api/projects` returns `{ registered: [], discovered: [...] }` — discovered array scans `~/git` by default (env `AGENT_RUNNER_PROJECTS_DIR`).
+- WebSocket upgrade for `/ws/dashboard` works correctly.
+- PWA assets (app.js, sw.js, manifest.json, index.html) all served from `public/` directory.
+- No code changes were needed — everything worked out of the box after T007's build fix.
+
