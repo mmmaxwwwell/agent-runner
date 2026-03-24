@@ -167,11 +167,21 @@ export function registerForOnboarding(dataDir: string, input: { name: string; di
   return project;
 }
 
+const VALID_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
+  onboarding: ['active', 'error'],
+  error: ['onboarding'],
+  active: [],
+};
+
 export function updateProjectStatus(dataDir: string, id: string, status: ProjectStatus): Project {
   const projects = readProjects(dataDir);
   const project = projects.find(p => p.id === id);
   if (!project) {
     throw new Error(`Project not found: ${id}`);
+  }
+  const allowed = VALID_TRANSITIONS[project.status];
+  if (!allowed.includes(status)) {
+    throw new Error(`Invalid status transition: ${project.status} → ${status}`);
   }
   project.status = status;
   writeProjects(dataDir, projects);

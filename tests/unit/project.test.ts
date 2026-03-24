@@ -262,14 +262,6 @@ describe('project model', () => {
   });
 
   describe('updateProjectStatus', () => {
-    it('should update status from active to onboarding', () => {
-      const project = createProject(dataDir, { name: 'test', dir: validProjectDir });
-      assert.equal(project.status, 'active');
-
-      const updated = updateProjectStatus(dataDir, project.id, 'onboarding');
-      assert.equal(updated.status, 'onboarding');
-    });
-
     it('should update status from onboarding to active', () => {
       const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
       assert.equal(project.status, 'onboarding');
@@ -278,14 +270,43 @@ describe('project model', () => {
       assert.equal(updated.status, 'active');
     });
 
-    it('should update status to error', () => {
+    it('should update status from onboarding to error', () => {
       const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
       const updated = updateProjectStatus(dataDir, project.id, 'error');
       assert.equal(updated.status, 'error');
     });
 
-    it('should persist the status change to projects.json', () => {
+    it('should update status from error to onboarding (retry)', () => {
+      const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
+      updateProjectStatus(dataDir, project.id, 'error');
+
+      const updated = updateProjectStatus(dataDir, project.id, 'onboarding');
+      assert.equal(updated.status, 'onboarding');
+    });
+
+    it('should throw on invalid transition from active', () => {
       const project = createProject(dataDir, { name: 'test', dir: validProjectDir });
+      assert.throws(
+        () => updateProjectStatus(dataDir, project.id, 'error'),
+        /invalid status transition/i,
+      );
+      assert.throws(
+        () => updateProjectStatus(dataDir, project.id, 'onboarding'),
+        /invalid status transition/i,
+      );
+    });
+
+    it('should throw on invalid transition from error to active', () => {
+      const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
+      updateProjectStatus(dataDir, project.id, 'error');
+      assert.throws(
+        () => updateProjectStatus(dataDir, project.id, 'active'),
+        /invalid status transition/i,
+      );
+    });
+
+    it('should persist the status change to projects.json', () => {
+      const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
       updateProjectStatus(dataDir, project.id, 'error');
 
       const raw = readFileSync(projectsJsonPath, 'utf-8');
@@ -294,12 +315,12 @@ describe('project model', () => {
     });
 
     it('should return the full updated project', () => {
-      const project = createProject(dataDir, { name: 'test', dir: validProjectDir });
-      const updated = updateProjectStatus(dataDir, project.id, 'onboarding');
+      const project = registerForOnboarding(dataDir, { name: 'test', dir: validProjectDir });
+      const updated = updateProjectStatus(dataDir, project.id, 'active');
       assert.equal(updated.id, project.id);
       assert.equal(updated.name, 'test');
       assert.equal(updated.dir, validProjectDir);
-      assert.equal(updated.status, 'onboarding');
+      assert.equal(updated.status, 'active');
     });
 
     it('should throw for unknown project id', () => {
@@ -310,17 +331,16 @@ describe('project model', () => {
     });
 
     it('should not affect other projects', () => {
-      const p1 = createProject(dataDir, { name: 'keep', dir: validProjectDir });
+      const p1 = registerForOnboarding(dataDir, { name: 'keep', dir: validProjectDir });
 
       const secondDir = join(tmpDir, 'second');
       mkdirSync(secondDir, { recursive: true });
-      writeFileSync(join(secondDir, 'tasks.md'), '# Tasks\n\n- [ ] 1.1 Task\n');
-      const p2 = createProject(dataDir, { name: 'change', dir: secondDir });
+      const p2 = registerForOnboarding(dataDir, { name: 'change', dir: secondDir });
 
       updateProjectStatus(dataDir, p2.id, 'error');
 
       const found = getProject(dataDir, p1.id);
-      assert.equal(found!.status, 'active');
+      assert.equal(found!.status, 'onboarding');
     });
   });
 
