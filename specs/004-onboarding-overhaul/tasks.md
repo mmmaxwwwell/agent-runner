@@ -19,7 +19,7 @@
 
 - [x] T001 Update default data directory from `~/.agent-runner/` to `~/.local/share/agent-runner/` in src/lib/config.ts — change `resolveDataDir()` fallback, add `agentFrameworkDir` derived property to Config interface
 - [x] T002 Add `AGENT_FRAMEWORK_REPO` constant (`https://github.com/mmmaxwwwell/agent-framework`) to src/lib/config.ts
-- [ ] T003 Add `description: string | null` field to Project interface in src/models/project.ts — update `createProject()` and `registerForOnboarding()` to accept and persist it, default to null
+- [x] T003 Add `description: string | null` field to Project interface in src/models/project.ts — update `createProject()` and `registerForOnboarding()` to accept and persist it, default to null
 
 **Checkpoint**: Config and model foundations ready
 

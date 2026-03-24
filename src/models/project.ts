@@ -7,6 +7,7 @@ export type ProjectStatus = "active" | "onboarding" | "error";
 export interface Project {
   id: string;
   name: string;
+  description: string | null;
   dir: string;
   taskFile: string;
   promptFile: string;
@@ -17,6 +18,7 @@ export interface Project {
 export interface CreateProjectInput {
   name: string;
   dir: string;
+  description?: string | null;
 }
 
 export interface DiscoveredDirectory {
@@ -40,8 +42,8 @@ function readProjects(dataDir: string): Project[] {
   const path = projectsJsonPath(dataDir);
   if (!existsSync(path)) return [];
   const raw = readFileSync(path, 'utf-8');
-  const projects = JSON.parse(raw) as Array<Omit<Project, 'status'> & { status?: ProjectStatus }>;
-  return projects.map(p => ({ ...p, status: p.status ?? 'active' }));
+  const projects = JSON.parse(raw) as Array<Omit<Project, 'status' | 'description'> & { status?: ProjectStatus; description?: string | null }>;
+  return projects.map(p => ({ ...p, description: p.description ?? null, status: p.status ?? 'active' }));
 }
 
 function writeProjects(dataDir: string, projects: Project[]): void {
@@ -107,6 +109,7 @@ export function createProject(dataDir: string, input: CreateProjectInput): Proje
   const project: Project = {
     id: randomUUID(),
     name: name.trim(),
+    description: input.description ?? null,
     dir: absDir,
     taskFile: 'tasks.md',
     promptFile: detectPromptFile(absDir),
@@ -120,7 +123,7 @@ export function createProject(dataDir: string, input: CreateProjectInput): Proje
   return project;
 }
 
-export function registerForOnboarding(dataDir: string, input: { name: string; dir: string }): Project {
+export function registerForOnboarding(dataDir: string, input: { name: string; dir: string; description?: string | null }): Project {
   const { name, dir } = input;
 
   // Validate name
@@ -150,6 +153,7 @@ export function registerForOnboarding(dataDir: string, input: { name: string; di
   const project: Project = {
     id: randomUUID(),
     name: name.trim(),
+    description: input.description ?? null,
     dir: absDir,
     taskFile: 'tasks.md',
     promptFile: detectPromptFile(absDir),
