@@ -2,6 +2,12 @@ package com.agentrunner
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import android.webkit.ConsoleMessage
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
@@ -10,6 +16,10 @@ import com.agentrunner.config.ServerConfig
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+
+    companion object {
+        private const val TAG = "AgentRunner"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,9 +41,37 @@ class MainActivity : AppCompatActivity() {
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            userAgentString = "$userAgentString AgentRunner-Android"
         }
 
-        webView.webViewClient = WebViewClient()
+        webView.webViewClient = object : WebViewClient() {
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame == true) {
+                    Log.e(TAG, "WebView error: ${error?.description} (code ${error?.errorCode})")
+                }
+            }
+        }
+
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                consoleMessage?.let {
+                    val logLevel = when (it.messageLevel()) {
+                        ConsoleMessage.MessageLevel.ERROR -> Log.ERROR
+                        ConsoleMessage.MessageLevel.WARNING -> Log.WARN
+                        ConsoleMessage.MessageLevel.DEBUG -> Log.DEBUG
+                        else -> Log.INFO
+                    }
+                    Log.println(logLevel, TAG, "${it.message()} [${it.sourceId()}:${it.lineNumber()}]")
+                }
+                return true
+            }
+        }
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)

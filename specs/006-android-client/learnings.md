@@ -43,3 +43,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Intent extra from ServerConfigActivity takes priority over SharedPreferences — this ensures a freshly-entered URL is used immediately without a round-trip through prefs.
 - `onBackPressed()` is deprecated but still the simplest way to intercept back for WebView navigation. T008+ tasks that add more WebView features should build on this class.
 
+### T008 — WebView PWA compatibility settings
+- `MIXED_CONTENT_ALWAYS_ALLOW` is needed for local dev where server runs on HTTP. This allows mixed content loading.
+- User agent is appended with "AgentRunner-Android" (not replaced) so the PWA can detect native context via `navigator.userAgent.includes("AgentRunner-Android")`.
+- Did NOT override `onReceivedSslError` to auto-proceed — Google Play rejects apps that bypass SSL validation. SSL errors show the default WebView error page, which is correct behavior.
+- `WebChromeClient.onConsoleMessage()` forwards JS console output to Logcat under tag "AgentRunner", mapping console levels to Log levels.
+- `onReceivedError` is logged but only for main frame requests to avoid noise from subresource failures. T010 will add the user-facing error page with retry button.
+
