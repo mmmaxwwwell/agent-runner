@@ -17,9 +17,18 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.agentrunner.bridge.AgentWebSocket
+import com.agentrunner.bridge.SignRequest
+import com.agentrunner.bridge.SignRequestDialog
+import com.agentrunner.bridge.SignRequestHandler
+import com.agentrunner.bridge.SignRequestListener
 import com.agentrunner.config.ServerConfig
+import com.agentrunner.yubikey.YubikeyManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog.Callback {
 
     private lateinit var webView: WebView
     private var errorView: View? = null
@@ -27,8 +36,16 @@ class MainActivity : AppCompatActivity() {
     var currentSessionId: String? = null
         private set
 
+    private lateinit var yubikeyManager: YubikeyManager
+    private var agentWebSocket: AgentWebSocket? = null
+    private var signRequestHandler: SignRequestHandler? = null
+    private var signDialog: SignRequestDialog? = null
+
+    private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
     companion object {
         private const val TAG = "AgentRunner"
+        private const val SIGN_DIALOG_TAG = "sign_request_dialog"
         private val SESSION_HASH_PATTERN = Regex("""#/sessions/([0-9a-fA-F\-]{36})""")
     }
 
@@ -44,6 +61,8 @@ class MainActivity : AppCompatActivity() {
             finish()
             return
         }
+
+        yubikeyManager = YubikeyManager(applicationContext)
 
         val container = FrameLayout(this)
         setContentView(container)
@@ -70,6 +89,7 @@ class MainActivity : AppCompatActivity() {
                 val newSessionId = fragment?.let { SESSION_HASH_PATTERN.find("#$it")?.groupValues?.get(1) }
                 if (newSessionId != currentSessionId) {
                     Log.d(TAG, "Session navigation: $currentSessionId -> $newSessionId")
+                    onSessionChanged(currentSessionId, newSessionId)
                     currentSessionId = newSessionId
                 }
             }
@@ -140,6 +160,78 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::yubikeyManager.isInitialized) {
+            yubikeyManager.startDiscovery(this)
+        }
+    }
+
+    override fun onPause() {
+        if (::yubikeyManager.isInitialized) {
+            yubikeyManager.stopDiscovery(this)
+        }
+        super.onPause()
+    }
+
+    private fun onSessionChanged(oldSessionId: String?, newSessionId: String?) {
+        // Disconnect from old session
+        if (oldSessionId != null) {
+            agentWebSocket?.disconnect()
+            agentWebSocket = null
+            signRequestHandler = null
+        }
+
+        // Connect to new session
+        if (newSessionId != null && serverUrl != null) {
+            val ws = AgentWebSocket(serverUrl!!)
+            val handler = SignRequestHandler(yubikeyManager, ws, this, activityScope)
+            ws.onSignRequest = { request ->
+                runOnUiThread { handler.onSignRequest(request) }
+            }
+            agentWebSocket = ws
+            signRequestHandler = handler
+            ws.connect(newSessionId)
+            Log.d(TAG, "AgentWebSocket connected for session $newSessionId")
+        }
+    }
+
+    // --- SignRequestListener implementation ---
+
+    override fun onShowSignDialog(request: SignRequest, pinRequired: Boolean) {
+        val dialog = SignRequestDialog.newInstance(request.context, pinRequired)
+        dialog.configure(this, yubikeyManager.status)
+        dialog.show(supportFragmentManager, SIGN_DIALOG_TAG)
+        signDialog = dialog
+    }
+
+    override fun onDismissDialog() {
+        signDialog?.dismissAllowingStateLoss()
+        signDialog = null
+    }
+
+    override fun onPinError(message: String, retriesRemaining: Int) {
+        signDialog?.showPinError(message, retriesRemaining)
+    }
+
+    override fun onPinBlocked(message: String) {
+        signDialog?.showPinBlocked(message)
+    }
+
+    override fun onSignError(message: String) {
+        signDialog?.showSignError(message)
+    }
+
+    // --- SignRequestDialog.Callback implementation ---
+
+    override fun onPinSubmitted(pin: CharArray) {
+        signRequestHandler?.onPinEntered(pin)
+    }
+
+    override fun onSignCancelled() {
+        signRequestHandler?.onCancel()
+    }
+
     private fun showErrorView(errorDetail: String? = null) {
         if (errorView != null) return
 
@@ -189,6 +281,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        agentWebSocket?.disconnect()
+        agentWebSocket = null
+        signRequestHandler = null
+        if (::yubikeyManager.isInitialized) {
+            yubikeyManager.clearPin()
+        }
         if (::webView.isInitialized) {
             webView.destroy()
         }

@@ -118,6 +118,13 @@ Each entry should include a timestamp and the task ID that produced the learning
 - USB device reference is stored and used for `openConnection`. NFC device is stored similarly but is transient (tap-based).
 - `stopDiscovery` nulls `nfcDevice` but not `usbDevice` — USB device is nulled via its `onClosed` callback.
 
+### T019 — MainActivity sign flow wiring
+- `onSessionChanged` is called BEFORE `currentSessionId` is updated — this allows it to disconnect the old session and connect the new one in sequence.
+- `runOnUiThread` wraps `handler.onSignRequest` in the WebSocket callback because OkHttp invokes callbacks on a background thread (see T016 learnings) and SignRequestHandler/UI must run on the main thread.
+- `activityScope` uses `SupervisorJob` so a failure in one sign request coroutine doesn't cancel the whole scope.
+- `yubikeyManager` init is guarded by `::yubikeyManager.isInitialized` in lifecycle methods because `onCreate` returns early (before init) when `serverUrl` is null.
+- `SignRequestDialog.Callback` and `SignRequestListener` are both implemented by MainActivity, which acts as the mediator between the dialog UI and the handler logic.
+
 ### T018 — SignRequestDialog design decisions
 - `SignRequestDialog.Callback` interface has two methods: `onPinSubmitted(pin: CharArray)` and `onSignCancelled()`. The host (MainActivity in T019) implements this and delegates to `SignRequestHandler.onPinEntered()` / `onCancel()`.
 - `configure(callback, yubikeyStatus)` must be called before `show()` — these references don't survive rotation (unlike Bundle arguments). T026 (rotation handling) will need to re-configure.
