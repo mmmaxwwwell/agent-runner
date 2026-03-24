@@ -174,3 +174,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **`org.json` classes are stubs in Android unit tests**: Android's `org.json.JSONObject`/`JSONArray` throw `RuntimeException("not mocked")` in local JVM tests. Fix: add `testImplementation("org.json:json:20231013")` to `build.gradle.kts` — this provides the real JSON.org reference implementation, which shadows the Android stubs for unit tests.
 - **`android.util.Base64` must be mocked**: Use `mockkStatic(Base64::class)` and delegate to `java.util.Base64`. Use `withoutPadding()` consistently since we can't reliably check Android flag constants (they're 0 in stubs).
 - **KeyRegistry needs real file I/O in tests**: Mock only `Context.filesDir` to a temp directory. The JSON serialization/deserialization is tested through actual file read/write, which provides higher confidence than mocking the JSON layer.
+
+### T033 — MockSigningBackend unit tests
+- **MockSigningBackend lives in `src/debug/` but tests in `src/test/`**: Gradle's `testDebugUnitTest` variant has access to both main and debug source sets, so `MockSigningBackend` is visible from `src/test/` without any special configuration.
+- **No heavy mocking needed**: Unlike `KeystoreSigningBackend` which requires mocking Android Keystore, KeyGenParameterSpec.Builder, and BiometricPrompt, `MockSigningBackend` uses standard Java crypto (`KeyPairGenerator`, `Signature`) which works natively in JVM tests. Only `android.util.Base64` and `android.util.Log` need mocking.
+- **ECDSA signatures are non-deterministic**: Each `Signature.sign()` call produces a different result due to random nonce, so tests can't compare signature bytes directly. Verify structure (DER-encoded, starts with 0x30) instead.
