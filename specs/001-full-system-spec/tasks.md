@@ -84,7 +84,7 @@
 - [x] T015 [US1] Register a project with a task list. Start a task run via the API. Verify: sandboxed process spawns, tasks are worked on, auto-loop continues when unchecked tasks remain, session completes when all tasks done per FR-003–FR-006
 - [x] T016 [US2] While a task run is active, connect to `/ws/sessions/:id` and verify live output streaming. Disconnect, reconnect with `lastSeq`, verify replay per FR-008
 - [x] T017 [US6] Run a project with a task that triggers `[?]`. Verify: session transitions to waiting-for-input, push notification sent. Submit input via API, verify session resumes per FR-006, FR-009
-- [ ] T018 [US9] Start a session for a project with an SSH remote. Verify: Unix socket created at correct path, `SSH_AUTH_SOCK` set in sandbox. Send a mock SSH sign request through the socket, verify it arrives on the WebSocket as `ssh-agent-request` per FR-059–FR-065
+- [x] T018 [US9] Start a session for a project with an SSH remote. Verify: Unix socket created at correct path, `SSH_AUTH_SOCK` set in sandbox. Send a mock SSH sign request through the socket, verify it arrives on the WebSocket as `ssh-agent-request` per FR-059–FR-065
 
 **Checkpoint**: All core user flows work end-to-end on the server
 
