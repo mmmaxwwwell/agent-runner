@@ -118,3 +118,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - USB device reference is stored and used for `openConnection`. NFC device is stored similarly but is transient (tap-based).
 - `stopDiscovery` nulls `nfcDevice` but not `usbDevice` — USB device is nulled via its `onClosed` callback.
 
+### T018 — SignRequestDialog design decisions
+- `SignRequestDialog.Callback` interface has two methods: `onPinSubmitted(pin: CharArray)` and `onSignCancelled()`. The host (MainActivity in T019) implements this and delegates to `SignRequestHandler.onPinEntered()` / `onCancel()`.
+- `configure(callback, yubikeyStatus)` must be called before `show()` — these references don't survive rotation (unlike Bundle arguments). T026 (rotation handling) will need to re-configure.
+- PIN input uses `numberPassword` inputType (numeric, masked). Submitted via IME_ACTION_DONE on the keyboard. PIN char array is created from the text and the EditText is cleared immediately.
+- Public methods `showPinError`, `showPinBlocked`, `showSignError` are called by the SignRequestListener implementation to update UI. They guard with `isAdded` to avoid crashes if the fragment is detached.
+- `isCancelable = false` + `setCanceledOnTouchOutside(false)` ensures back press and outside touch don't dismiss — user must use the Cancel button.
+
