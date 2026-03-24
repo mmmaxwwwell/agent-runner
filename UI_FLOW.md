@@ -171,7 +171,7 @@ stateDiagram-v2
 | Path | Used By | Messages Received |
 |------|---------|-------------------|
 | `/ws/dashboard` | Dashboard | `project-update` (projectId, activeSession, taskSummary, workflow), `onboarding-step` (projectId, step, status, error) |
-| `/ws/sessions/:id` | SessionView, SpecKitChat | `output`, `state`, `progress`, `phase`, `sync`, `error` |
+| `/ws/sessions/:id` | SessionView, SpecKitChat | `output`, `state`, `progress`, `phase`, `sync`, `error`, `ssh-agent-request` (server→client) |
 
 ---
 
@@ -314,6 +314,10 @@ stateDiagram-v2
   - `state` — session state changes (state, question, taskId)
   - `progress` — task summary updates
   - `sync` — sequence sync after replay
+  - `ssh-agent-request` — SSH signing/key-listing request from sandboxed agent (see SSH Agent Bridge section)
+- Sends:
+  - `ssh-agent-response` — user-authorized SSH agent response (base64-encoded)
+  - `ssh-agent-cancel` — user-cancelled SSH agent request
 
 **Navigation Out**:
 - `#/projects/:projectId` — back via header (uses projectId from session metadata)
@@ -665,6 +669,102 @@ sequenceDiagram
     S->>WS: broadcastProjectUpdate(activeSession: null)
     S-->>C: 200 { id, state: "failed", exitCode: -1 }
 ```
+
+### SSH Agent Bridge Lifecycle
+
+When a session's project has an SSH remote, the server creates an SSH agent bridge that relays signing requests from the sandboxed agent process to the WebSocket client.
+
+```mermaid
+sequenceDiagram
+    participant A as Agent (Sandboxed)
+    participant B as SSH Agent Bridge
+    participant S as Server
+    participant WS as WebSocket
+    participant C as Client
+
+    Note over A,C: === Bridge Setup (session start) ===
+
+    S->>S: detectSSHRemote(projectDir)
+    S->>B: createBridge({ sessionId, dataDir, remoteContext, onRequest })
+    B->>B: Create Unix socket at<br/>&lt;dataDir&gt;/sessions/&lt;sessionId&gt;/agent.sock
+    S->>A: Spawn process with SSH_AUTH_SOCK=agent.sock
+
+    Note over A,C: === Sign Request Flow ===
+
+    A->>B: SSH agent sign request (type 13) via Unix socket
+    B->>B: Parse sign request, extract context<br/>(remote URL, username, key algorithm)
+    B->>S: onRequest({ requestId, messageType: 13, context, data })
+    S->>WS: ssh-agent-request message
+    WS-->>C: { type: "ssh-agent-request", requestId, messageType: 13,<br/>context: "Sign request for git push to ...", data: "base64..." }
+
+    alt User approves (e.g., Yubikey touch)
+        C->>WS: { type: "ssh-agent-response", requestId, data: "base64..." }
+        WS->>S: Route to bridge
+        S->>B: handleResponse(requestId, responseBuffer)
+        B->>A: SSH agent response via Unix socket
+        A->>A: git push completes
+    else User cancels
+        C->>WS: { type: "ssh-agent-cancel", requestId }
+        WS->>S: Route to bridge
+        S->>B: handleCancel(requestId)
+        B->>A: SSH_AGENT_FAILURE (type 5) via Unix socket
+        A->>A: git push fails
+    else Timeout (60s)
+        B->>A: SSH_AGENT_FAILURE (type 5) via Unix socket
+    end
+
+    Note over A,C: === Bridge Teardown (session end) ===
+
+    S->>B: destroy()
+    B->>B: Fail all pending requests
+    B->>B: Close Unix socket server, unlink socket file
+```
+
+#### SSH Agent WebSocket Message Types
+
+Messages sent on the existing `/ws/sessions/:id` connection:
+
+**Server → Client: `ssh-agent-request`**
+
+Sent when the sandboxed agent makes an SSH agent protocol request (key listing or signing).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"ssh-agent-request"` | Message type identifier |
+| `requestId` | string (UUID) | Unique ID for correlating response |
+| `messageType` | `11 \| 13` | SSH agent message type (11 = list keys, 13 = sign) |
+| `context` | string | Human-readable description of the operation |
+| `data` | string | Base64-encoded raw SSH agent protocol message bytes |
+
+**Client → Server: `ssh-agent-response`**
+
+Sent by the client after the user authorizes the operation.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"ssh-agent-response"` | Message type identifier |
+| `requestId` | string (UUID) | Must match a pending request |
+| `data` | string | Base64-encoded SSH agent protocol response bytes |
+
+**Client → Server: `ssh-agent-cancel`**
+
+Sent by the client when the user cancels the operation.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"ssh-agent-cancel"` | Message type identifier |
+| `requestId` | string (UUID) | Must match a pending request |
+
+#### SSH Agent Bridge Behavior
+
+- **Whitelisted message types**: Only types 11 (REQUEST_IDENTITIES) and 13 (SIGN_REQUEST) are forwarded. All others receive SSH_AGENT_FAILURE (type 5) immediately.
+- **Timeout**: Pending requests time out after 60 seconds with SSH_AGENT_FAILURE.
+- **WebSocket disconnect**: If the last WebSocket client disconnects while a request is pending, all pending requests immediately receive SSH_AGENT_FAILURE.
+- **Unknown requestId**: Responses or cancels with an unknown requestId are silently dropped.
+- **Socket permissions**: The Unix socket is created with mode 0600 (owner-only access).
+- **Concurrent sessions**: Each session gets its own bridge instance with an independent socket and pending request map — no cross-talk.
+
+---
 
 ### Push Notification Subscription
 
