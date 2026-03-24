@@ -49,7 +49,60 @@ export function parseSignRequest(payload: Buffer): {
   username?: string;
   keyAlgorithm?: string;
 } | null {
-  throw new Error('parseSignRequest not yet implemented');
+  // Parse: string key_blob, string data, uint32 flags
+  const keyBlobResult = readSSHString(payload, 0);
+  if (!keyBlobResult) return null;
+
+  const dataResult = readSSHString(payload, keyBlobResult.bytesRead);
+  if (!dataResult) return null;
+
+  const flagsOffset = keyBlobResult.bytesRead + dataResult.bytesRead;
+  if (payload.length < flagsOffset + 4) return null;
+  const flags = payload.readUInt32BE(flagsOffset);
+
+  let username: string | undefined;
+  let keyAlgorithm: string | undefined;
+
+  // Try to parse data as SSH userauth structure:
+  // string session_id, byte 50, string username, string service,
+  // string "publickey", boolean TRUE, string algorithm, string key_blob
+  const dataBuf = dataResult.data;
+  const sessionIdResult = readSSHString(dataBuf, 0);
+  if (sessionIdResult) {
+    const markerOffset = sessionIdResult.bytesRead;
+    if (markerOffset < dataBuf.length && dataBuf[markerOffset] === 50) {
+      let off = markerOffset + 1;
+      const usernameResult = readSSHString(dataBuf, off);
+      if (usernameResult) {
+        off += usernameResult.bytesRead;
+        const serviceResult = readSSHString(dataBuf, off);
+        if (serviceResult) {
+          off += serviceResult.bytesRead;
+          const methodResult = readSSHString(dataBuf, off);
+          if (methodResult) {
+            off += methodResult.bytesRead;
+            // skip boolean TRUE byte
+            if (off < dataBuf.length) {
+              off += 1;
+              const algoResult = readSSHString(dataBuf, off);
+              if (algoResult) {
+                username = usernameResult.data.toString();
+                keyAlgorithm = algoResult.data.toString();
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    keyBlob: keyBlobResult.data,
+    data: dataResult.data,
+    flags,
+    username,
+    keyAlgorithm,
+  };
 }
 
 /**
