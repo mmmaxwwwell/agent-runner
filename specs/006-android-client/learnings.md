@@ -21,3 +21,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Created adaptive icon resources (mipmap-anydpi-v26) with a placeholder vector foreground. Replace with real icon later.
 - Added minimal `strings.xml` with just `app_name` — T003 will add the rest. This is needed for the manifest `@string/app_name` reference to resolve.
 
+### T004 — ServerConfig test conventions
+- SharedPreferences name: `"agent_runner_prefs"`, key: `"server_url"`. T005 must use these exact strings.
+- `ServerConfig.isValidUrl()` is a static validation method — tests expect it on the companion object.
+- `load()` returns null for both missing key AND empty string — T005 should handle both cases.
+- MockK `relaxed = true` on the editor avoids needing to stub every chained builder method.
+

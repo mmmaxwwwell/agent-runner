@@ -33,7 +33,7 @@
 
 ### Tests for Foundational Phase
 
-- [ ] T004 [P] Write tests for ServerConfig in app/src/test/kotlin/com/agentrunner/config/ServerConfigTest.kt — test save/load from SharedPreferences, test null when no saved URL, test URL validation
+- [x] T004 [P] Write tests for ServerConfig in app/src/test/kotlin/com/agentrunner/config/ServerConfigTest.kt — test save/load from SharedPreferences, test null when no saved URL, test URL validation
 
 ### Implementation for Foundational Phase
 
