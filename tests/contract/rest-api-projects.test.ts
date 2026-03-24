@@ -62,6 +62,7 @@ function startServer(): Promise<void> {
         AGENT_RUNNER_PROJECTS_DIR: projectsDir,
         VAPID_PUBLIC_KEY: 'BEK2EYfxuvIVaN3AD8zmJySnpAbJH0d0krsfVWou2UE0OOmBv8Wuslzb_jwDureGGeoJ1guHi4HgyqAGHyAGI0I',
         VAPID_PRIVATE_KEY: 'lyVcDma4tQXDj6SKHTHSv9MsUZB4juXzJK_JnaDyX2E',
+        ALLOW_UNSANDBOXED: 'true',
         LOG_LEVEL: 'info',
       },
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -316,6 +317,57 @@ describe('REST API: Projects Contract Tests', () => {
       });
       assert.equal(status, 404);
       assert.ok(body.error);
+    });
+  });
+
+  describe('POST /api/projects/onboard (newProject: true)', () => {
+    it('should return 201 with correct response shape', async () => {
+      const { status, body } = await api('/api/projects/onboard', {
+        method: 'POST',
+        body: { name: 'contract-new-project', newProject: true },
+      });
+
+      assert.equal(status, 201);
+      assert.ok(body.projectId, 'Response must include projectId');
+      assert.ok(body.sessionId, 'Response must include sessionId');
+      assert.equal(body.name, 'contract-new-project');
+      assert.equal(body.path, join(projectsDir, 'contract-new-project'));
+      assert.equal(body.status, 'onboarding');
+
+      // Verify only expected fields are present
+      const keys = Object.keys(body).sort();
+      assert.deepEqual(keys, ['name', 'path', 'projectId', 'sessionId', 'status']);
+    });
+
+    it('should return 409 on duplicate name when project is active', async () => {
+      // 'test-project' was registered via POST /api/projects (active status)
+      const { status, body } = await api('/api/projects/onboard', {
+        method: 'POST',
+        body: { name: 'test-project', newProject: true },
+      });
+
+      assert.equal(status, 409);
+      assert.ok(body.error, 'Should have error message');
+    });
+
+    it('should return 400 when name contains invalid characters', async () => {
+      const { status, body } = await api('/api/projects/onboard', {
+        method: 'POST',
+        body: { name: 'invalid name!@#', newProject: true },
+      });
+
+      assert.equal(status, 400);
+      assert.ok(body.error, 'Should have error message');
+    });
+
+    it('should return 400 when name is missing', async () => {
+      const { status, body } = await api('/api/projects/onboard', {
+        method: 'POST',
+        body: { newProject: true },
+      });
+
+      assert.equal(status, 400);
+      assert.ok(body.error, 'Should have error message');
     });
   });
 });

@@ -79,7 +79,7 @@
 
 ### Tests for User Story 2
 
-- [ ] T018 [P] [US2] Write contract test for unified onboard endpoint with `newProject: true` in tests/contract/rest-api-projects.test.ts — verify 201 response shape, verify 409 on duplicate name, verify 400 on invalid name characters
+- [x] T018 [P] [US2] Write contract test for unified onboard endpoint with `newProject: true` in tests/contract/rest-api-projects.test.ts — verify 201 response shape, verify 409 on duplicate name, verify 400 on invalid name characters
 
 ### Implementation for User Story 2
 

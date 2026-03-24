@@ -88,6 +88,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The `broadcastOnboardingStep()` function follows the same pattern as `broadcastProjectUpdate()` — iterates `dashboardClients` with `safeSend()`.
 - Only the unified onboard endpoint in `projects.ts` wires the callbacks. If other callers of `runOnboardingPipeline()` need broadcasts, they must provide their own callbacks.
 
+### T018 — Contract test for newProject onboard
+- The contract test file needed `ALLOW_UNSANDBOXED: 'true'` env var added to the server spawn config — without it, the onboard endpoint returns 503.
+- The 409 duplicate test must use a project in "active" status (registered via `POST /api/projects`). Projects in "onboarding" status allow re-onboarding (returns 200/201), so using a recently-onboarded project for the 409 test will fail.
+- The response shape assertion (`Object.keys(body).sort()`) verifies exactly 5 fields: `name`, `path`, `projectId`, `sessionId`, `status` — no extra fields allowed.
+
 ### T017 — Project status transition validation
 - `VALID_TRANSITIONS` map enforces: `onboarding→active`, `onboarding→error`, `error→onboarding`. The `active` status is terminal — no transitions allowed from it.
 - The `"not affect other projects"` test was updated from `createProject` (active) to `registerForOnboarding` (onboarding) since active→error is no longer valid. Future tests that need to call `updateProjectStatus` must start from `registerForOnboarding` unless testing the rejection path.
