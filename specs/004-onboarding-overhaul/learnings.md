@@ -69,3 +69,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The idempotent re-onboard tests expect the unified endpoint to allow re-onboarding projects in "onboarding" or "error" status (returning 200/201) while rejecting "active" projects (409). T015 must handle this distinction.
 - The `sessionId` field in the response is a key contract addition — the unified endpoint should launch an interview session and return its ID alongside projectId.
 
+### T014 — Onboarding pipeline implementation
+- `createOnboardingSteps()` uses a `PipelineState` closure to share `projectId` and `sessionId` between steps (register sets projectId, launch-interview sets sessionId). `runOnboardingPipeline()` independently resolves these from the filesystem after execution to avoid coupling to the closure state.
+- The `install-specify` check always returns `false` — `uv tool install` is idempotent so it's safe to always run. Can't easily check `which specify` inside sandbox synchronously.
+- `runOnboardingPipeline()` resolves `projectId` from `listProjects()` after the register step (both execute and skip paths) to stay decoupled from step internals.
+- `sessionId` is resolved post-pipeline via `listSessionsByProject()` looking for a running session.
+- The integration tests in T013 (`onboard-api.test.ts`) still fail — they depend on T015's unified endpoint changes.
+
