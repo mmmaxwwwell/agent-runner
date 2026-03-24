@@ -27,3 +27,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `load()` returns null for both missing key AND empty string — T005 should handle both cases.
 - MockK `relaxed = true` on the editor avoids needing to stub every chained builder method.
 
+### T005 — ServerConfig implementation
+- No Gradle wrapper (`gradlew`) exists in the project yet — can't run unit tests from CLI. Future tasks that need to verify tests will need to either add the wrapper or verify manually.
+- `isValidUrl()` trims whitespace before checking — this means `"   "` correctly returns false.
+- `removePrefix` chain works because a URL can only start with one of the two prefixes, so the other `removePrefix` is a no-op.
+
