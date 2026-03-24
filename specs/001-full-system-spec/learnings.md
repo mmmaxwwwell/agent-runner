@@ -103,3 +103,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Kotlin type mismatch in YubikeyManager**: `ApduException.sw` returns `Short`, but the code compared it with `Int` literals and used `and` bitwise operations. Fix: `e.sw.toInt()` to convert to Int before comparisons.
 - **4 unit test failures remain**: `SignRequestHandlerTest.kt` has 4 failing tests related to PIN handling and concurrent sign requests. These are for Phase 9 (T030) to fix.
 - **Android build command**: `cd android && nix develop /home/max/git/agent-runner -c ./gradlew assembleDebug` — must `cd` into `android/` first since the shellHook's `cd android` fails when already in `android/`.
+
+### T020 — SigningBackend interface
+- **Android source lives under `kotlin/` not `java/`**: Task description says `.../java/.../signing/` but the project uses `src/main/kotlin/com/agentrunner/`. Created the `signing` package there.
+- **KeyEntry data class co-created with interface**: The `SigningBackend` interface references `KeyEntry` in its method signatures. Created `KeyEntry.kt` in the same `signing` package with all fields from data-model.md. T021 (KeyRegistry) will build CRUD and JSON serialization on top of this type.
+- **KeyType enum with JSON serialization**: Data model uses kebab-case strings (`"yubikey-piv"`, `"android-keystore"`). Created `KeyType` enum with `toJsonValue()`/`fromJsonValue()` helpers for JSON round-tripping.

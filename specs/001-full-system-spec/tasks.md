@@ -104,7 +104,7 @@
 
 **Purpose**: Refactor from single-Yubikey to multi-key signing with interface-based injection
 
-- [ ] T020 [P] [US10] Create `SigningBackend` interface in `android/app/src/main/java/.../signing/SigningBackend.kt`: `suspend fun listKeys(): List<KeyEntry>`, `suspend fun sign(keyId: String, data: ByteArray): ByteArray`, `fun canSign(keyEntry: KeyEntry): Boolean` per FR-104
+- [x] T020 [P] [US10] Create `SigningBackend` interface in `android/app/src/main/java/.../signing/SigningBackend.kt`: `suspend fun listKeys(): List<KeyEntry>`, `suspend fun sign(keyId: String, data: ByteArray): ByteArray`, `fun canSign(keyEntry: KeyEntry): Boolean` per FR-104
 - [ ] T021 [P] [US10] Create `KeyRegistry` in `android/app/src/main/java/.../signing/KeyRegistry.kt`: read/write `keys.json` from app-private storage, CRUD operations for `KeyEntry`, export public key in SSH authorized_keys format per FR-098, data-model.md KeyEntry
 - [ ] T022 [US10] Refactor `YubikeyManager.kt` into `YubikeySigningBackend.kt` implementing `SigningBackend`: USB/NFC detection, PIV slot 9a, ECDSA P-256 signing, PIN management, register key to `KeyRegistry` on detection per FR-070–FR-075, FR-104
 - [ ] T023 [P] [US10] Implement `KeystoreSigningBackend.kt` in `android/app/src/main/java/.../signing/`: generate ECDSA P-256 keypair in Android Keystore, sign with `BiometricPrompt` gate (optional setting, default enabled), SSH signature format wrapping, register key to `KeyRegistry` per FR-101–FR-102, FR-104, research.md §10
