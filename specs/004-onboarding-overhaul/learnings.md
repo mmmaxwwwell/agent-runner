@@ -98,6 +98,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `NewProjectValidationError` has a `code` field (`'invalid-name' | 'duplicate-name' | 'directory-exists'`) that the route maps to HTTP 400 or 409 status codes.
 - The validation returns `existingProject` when re-onboarding is allowed (status "onboarding" or "error"), which the caller uses to reuse the existing project's dir/name.
 
+### T021 — Interview wrapper prompt validation
+- The interview wrapper lives at `<agentFrameworkDir>/.claude/skills/spec-kit/interview-wrapper.md` in the external agent-framework repo, not in this codebase. It's accessible inside the sandbox via `BindReadOnlyPaths=${agentFrameworkDir}` (sandbox.ts line 125).
+- T022 needs to read this file's content and pass it as the `-p` prompt flag to claude. The path at runtime is `join(config.agentFrameworkDir, '.claude/skills/spec-kit/interview-wrapper.md')`.
+
 ### T017 — Project status transition validation
 - `VALID_TRANSITIONS` map enforces: `onboarding→active`, `onboarding→error`, `error→onboarding`. The `active` status is terminal — no transitions allowed from it.
 - The `"not affect other projects"` test was updated from `createProject` (active) to `registerForOnboarding` (onboarding) since active→error is no longer valid. Future tests that need to call `updateProjectStatus` must start from `registerForOnboarding` unless testing the rejection path.
