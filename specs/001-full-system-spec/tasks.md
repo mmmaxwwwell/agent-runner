@@ -49,7 +49,7 @@
 
 **Purpose**: Bottom-up — ensure every service, model, route, and utility works correctly in isolation
 
-- [ ] T010 Run `nix develop -c npm run test:unit` and make all unit tests pass. Read `test-logs/unit/` for failures, fix code (not tests — tests are the spec), re-run until green. This covers all 18 unit test files: config, logger, project, session, task-parser, session-logger, process-manager, sandbox, discovery, onboarding, flake-generator, agent-framework, spec-kit, transcript-parser, ssh-agent-protocol, ssh-agent-bridge, push, disk-monitor per FR-082–FR-086
+- [x] T010 Run `nix develop -c npm run test:unit` and make all unit tests pass. Read `test-logs/unit/` for failures, fix code (not tests — tests are the spec), re-run until green. This covers all 18 unit test files: config, logger, project, session, task-parser, session-logger, process-manager, sandbox, discovery, onboarding, flake-generator, agent-framework, spec-kit, transcript-parser, ssh-agent-protocol, ssh-agent-bridge, push, disk-monitor per FR-082–FR-086
 
 **Checkpoint**: All unit tests green
 

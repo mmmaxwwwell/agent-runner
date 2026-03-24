@@ -42,3 +42,6 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Discovered items include extra `type: "discovered"` field not in the contract, and `hasSpecKit` is an object `{ spec, plan, tasks }` instead of a boolean. These are enhancements over the contract — contract tests in Phase 5 will validate compatibility.
 - No code changes needed — both endpoints work correctly out of the box.
 
+### T010 — Unit tests all green
+- All 367 unit tests (18 test files) passed on first run with zero failures and zero code changes needed.
+- The codebase was already in good shape from Phases 1–2 work. Phase 3 checkpoint met immediately.
