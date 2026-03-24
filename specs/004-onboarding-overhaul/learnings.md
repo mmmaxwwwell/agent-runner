@@ -166,3 +166,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The `deps` wiring in the route follows the same pattern as `add-feature` but uses `task-run` session type for all phases (planning phases always have prompts).
 - The `allowUnsandboxed` flag comes from `cfg.allowUnsandboxed` (server config) since there's no request body for this endpoint.
 
+### T032 — Git remote setup UI modal
+- The `GitRemoteModal` is rendered inside `DiscoveredCard` (as a fixed-position overlay) rather than lifted to `Dashboard`. This keeps the state local — each card manages its own modal visibility.
+- The modal uses `onClick` on the backdrop to cancel and `stopPropagation` on the dialog body to prevent backdrop clicks from bubbling through.
+- `onInput` is used instead of `onChange` for the text input because Preact's `onChange` behaves differently from React's — `onInput` fires on every keystroke as expected.
+

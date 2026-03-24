@@ -72,15 +72,123 @@ function ProjectCard({ project }: { project: RegisteredProject }) {
   );
 }
 
+type GitRemoteOption = 'skip' | 'remote-url' | 'create-github';
+
+function GitRemoteModal({ dirName, onConfirm, onCancel }: {
+  dirName: string;
+  onConfirm: (option: GitRemoteOption, remoteUrl?: string) => void;
+  onCancel: () => void;
+}) {
+  const [option, setOption] = useState<GitRemoteOption>('skip');
+  const [remoteUrl, setRemoteUrl] = useState('');
+
+  const handleSubmit = () => {
+    if (option === 'remote-url' && !remoteUrl.trim()) return;
+    onConfirm(option, option === 'remote-url' ? remoteUrl.trim() : undefined);
+  };
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.6)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}
+    >
+      <div
+        onClick={(e: Event) => e.stopPropagation()}
+        style={{
+          background: '#1a1a2e', border: '1px solid #333', borderRadius: '8px',
+          padding: '24px', width: '400px', maxWidth: '90vw',
+        }}
+      >
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>
+          Git Remote Setup — {dirName}
+        </h3>
+
+        <label style={{ display: 'block', marginBottom: '12px', cursor: 'pointer' }}>
+          <input
+            type="radio" name="git-remote" checked={option === 'skip'}
+            onChange={() => setOption('skip')}
+            style={{ marginRight: '8px' }}
+          />
+          Skip — no remote
+        </label>
+
+        <label style={{ display: 'block', marginBottom: '8px', cursor: 'pointer' }}>
+          <input
+            type="radio" name="git-remote" checked={option === 'remote-url'}
+            onChange={() => setOption('remote-url')}
+            style={{ marginRight: '8px' }}
+          />
+          Enter remote URL
+        </label>
+        {option === 'remote-url' && (
+          <input
+            type="text" value={remoteUrl}
+            onInput={(e: Event) => setRemoteUrl((e.target as HTMLInputElement).value)}
+            placeholder="git@github.com:user/repo.git"
+            style={{
+              width: '100%', padding: '6px 8px', marginBottom: '12px',
+              background: '#12121f', border: '1px solid #555', borderRadius: '4px',
+              color: '#eee', fontSize: '0.85rem', boxSizing: 'border-box',
+            }}
+          />
+        )}
+
+        <label style={{ display: 'block', marginBottom: '16px', cursor: 'pointer' }}>
+          <input
+            type="radio" name="git-remote" checked={option === 'create-github'}
+            onChange={() => setOption('create-github')}
+            style={{ marginRight: '8px' }}
+          />
+          Create GitHub repo (via gh CLI)
+        </label>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: '6px 16px', borderRadius: '4px', border: '1px solid #555',
+              background: 'transparent', color: '#aaa', cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={option === 'remote-url' && !remoteUrl.trim()}
+            style={{
+              padding: '6px 16px', borderRadius: '4px', border: '1px solid #7c8dff',
+              background: '#7c8dff22', color: '#7c8dff', cursor: 'pointer',
+            }}
+          >
+            Onboard
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnboarded: (dir: DiscoveredDirectory, resp: OnboardResponse) => void }) {
   const [busy, setBusy] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
-  const handleOnboard = async () => {
+  const handleOnboard = async (option: GitRemoteOption, remoteUrl?: string) => {
+    setShowModal(false);
     setBusy(true);
     setErrMsg(null);
     try {
-      const resp = await post<OnboardResponse>('/projects/onboard', { name: dir.name, path: dir.path });
+      const body: Record<string, unknown> = { name: dir.name, path: dir.path };
+      if (option === 'remote-url' && remoteUrl) {
+        body.remoteUrl = remoteUrl;
+      } else if (option === 'create-github') {
+        body.createGithubRepo = true;
+      }
+      const resp = await post<OnboardResponse>('/projects/onboard', body);
       onOnboarded(dir, resp);
     } catch (err: unknown) {
       setErrMsg(err instanceof Error ? err.message : 'Onboard failed');
@@ -104,7 +212,7 @@ function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnbo
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{dir.name}</span>
         <button
-          onClick={handleOnboard}
+          onClick={() => setShowModal(true)}
           disabled={busy}
           style={{
             fontSize: '0.8rem',
@@ -150,6 +258,13 @@ function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnbo
       )}
       {errMsg && (
         <div style={{ color: '#ff8a80', fontSize: '0.8rem', marginTop: '8px' }}>{errMsg}</div>
+      )}
+      {showModal && (
+        <GitRemoteModal
+          dirName={dir.name}
+          onConfirm={handleOnboard}
+          onCancel={() => setShowModal(false)}
+        />
       )}
     </div>
   );

@@ -635,22 +635,168 @@
       }
     );
   }
+  function GitRemoteModal({ dirName, onConfirm, onCancel }) {
+    const [option, setOption] = d2("skip");
+    const [remoteUrl, setRemoteUrl] = d2("");
+    const handleSubmit = () => {
+      if (option === "remote-url" && !remoteUrl.trim()) return;
+      onConfirm(option, option === "remote-url" ? remoteUrl.trim() : void 0);
+    };
+    return /* @__PURE__ */ u3(
+      "div",
+      {
+        onClick: onCancel,
+        style: {
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1e3
+        },
+        children: /* @__PURE__ */ u3(
+          "div",
+          {
+            onClick: (e3) => e3.stopPropagation(),
+            style: {
+              background: "#1a1a2e",
+              border: "1px solid #333",
+              borderRadius: "8px",
+              padding: "24px",
+              width: "400px",
+              maxWidth: "90vw"
+            },
+            children: [
+              /* @__PURE__ */ u3("h3", { style: { margin: "0 0 16px 0", fontSize: "1rem" }, children: [
+                "Git Remote Setup \u2014 ",
+                dirName
+              ] }),
+              /* @__PURE__ */ u3("label", { style: { display: "block", marginBottom: "12px", cursor: "pointer" }, children: [
+                /* @__PURE__ */ u3(
+                  "input",
+                  {
+                    type: "radio",
+                    name: "git-remote",
+                    checked: option === "skip",
+                    onChange: () => setOption("skip"),
+                    style: { marginRight: "8px" }
+                  }
+                ),
+                "Skip \u2014 no remote"
+              ] }),
+              /* @__PURE__ */ u3("label", { style: { display: "block", marginBottom: "8px", cursor: "pointer" }, children: [
+                /* @__PURE__ */ u3(
+                  "input",
+                  {
+                    type: "radio",
+                    name: "git-remote",
+                    checked: option === "remote-url",
+                    onChange: () => setOption("remote-url"),
+                    style: { marginRight: "8px" }
+                  }
+                ),
+                "Enter remote URL"
+              ] }),
+              option === "remote-url" && /* @__PURE__ */ u3(
+                "input",
+                {
+                  type: "text",
+                  value: remoteUrl,
+                  onInput: (e3) => setRemoteUrl(e3.target.value),
+                  placeholder: "git@github.com:user/repo.git",
+                  style: {
+                    width: "100%",
+                    padding: "6px 8px",
+                    marginBottom: "12px",
+                    background: "#12121f",
+                    border: "1px solid #555",
+                    borderRadius: "4px",
+                    color: "#eee",
+                    fontSize: "0.85rem",
+                    boxSizing: "border-box"
+                  }
+                }
+              ),
+              /* @__PURE__ */ u3("label", { style: { display: "block", marginBottom: "16px", cursor: "pointer" }, children: [
+                /* @__PURE__ */ u3(
+                  "input",
+                  {
+                    type: "radio",
+                    name: "git-remote",
+                    checked: option === "create-github",
+                    onChange: () => setOption("create-github"),
+                    style: { marginRight: "8px" }
+                  }
+                ),
+                "Create GitHub repo (via gh CLI)"
+              ] }),
+              /* @__PURE__ */ u3("div", { style: { display: "flex", justifyContent: "flex-end", gap: "8px" }, children: [
+                /* @__PURE__ */ u3(
+                  "button",
+                  {
+                    onClick: onCancel,
+                    style: {
+                      padding: "6px 16px",
+                      borderRadius: "4px",
+                      border: "1px solid #555",
+                      background: "transparent",
+                      color: "#aaa",
+                      cursor: "pointer"
+                    },
+                    children: "Cancel"
+                  }
+                ),
+                /* @__PURE__ */ u3(
+                  "button",
+                  {
+                    onClick: handleSubmit,
+                    disabled: option === "remote-url" && !remoteUrl.trim(),
+                    style: {
+                      padding: "6px 16px",
+                      borderRadius: "4px",
+                      border: "1px solid #7c8dff",
+                      background: "#7c8dff22",
+                      color: "#7c8dff",
+                      cursor: "pointer"
+                    },
+                    children: "Onboard"
+                  }
+                )
+              ] })
+            ]
+          }
+        )
+      }
+    );
+  }
   function DiscoveredCard({ dir, onOnboarded }) {
     const [busy, setBusy] = d2(false);
     const [errMsg, setErrMsg] = d2(null);
-    const handleOnboard = async () => {
+    const [showModal, setShowModal] = d2(false);
+    const handleOnboard = async (option, remoteUrl) => {
+      setShowModal(false);
       setBusy(true);
       setErrMsg(null);
       try {
-        const resp = await post("/projects/onboard", { name: dir.name, path: dir.path });
+        const body = { name: dir.name, path: dir.path };
+        if (option === "remote-url" && remoteUrl) {
+          body.remoteUrl = remoteUrl;
+        } else if (option === "create-github") {
+          body.createGithubRepo = true;
+        }
+        const resp = await post("/projects/onboard", body);
         onOnboarded(dir, resp);
       } catch (err) {
         setErrMsg(err instanceof Error ? err.message : "Onboard failed");
         setBusy(false);
       }
     };
-    const { isGitRepo, hasSpecKit } = dir;
-    const hasBadges = isGitRepo || hasSpecKit.spec || hasSpecKit.plan || hasSpecKit.tasks;
+    const { isGitRepo, hasNixFlake, hasSpecKit } = dir;
+    const hasBadges = isGitRepo || hasNixFlake || hasSpecKit.spec || hasSpecKit.plan || hasSpecKit.tasks;
     return /* @__PURE__ */ u3(
       "div",
       {
@@ -667,7 +813,7 @@
             /* @__PURE__ */ u3(
               "button",
               {
-                onClick: handleOnboard,
+                onClick: () => setShowModal(true),
                 disabled: busy,
                 style: {
                   fontSize: "0.8rem",
@@ -684,11 +830,20 @@
           ] }),
           hasBadges && /* @__PURE__ */ u3("div", { style: { display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }, children: [
             isGitRepo && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#2a3a2a", color: "#81c784", border: "1px solid #4caf5044" }, children: "git" }),
+            hasNixFlake && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#2a2a3a", color: "#b39ddb", border: "1px solid #7c4dff44" }, children: "nix" }),
             hasSpecKit.spec && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#1a2a3a", color: "#90caf9", border: "1px solid #2196f344" }, children: "spec" }),
             hasSpecKit.plan && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#1a2a3a", color: "#90caf9", border: "1px solid #2196f344" }, children: "plan" }),
             hasSpecKit.tasks && /* @__PURE__ */ u3("span", { style: { fontSize: "0.7rem", padding: "1px 6px", borderRadius: "3px", background: "#1a2a3a", color: "#90caf9", border: "1px solid #2196f344" }, children: "tasks" })
           ] }),
-          errMsg && /* @__PURE__ */ u3("div", { style: { color: "#ff8a80", fontSize: "0.8rem", marginTop: "8px" }, children: errMsg })
+          errMsg && /* @__PURE__ */ u3("div", { style: { color: "#ff8a80", fontSize: "0.8rem", marginTop: "8px" }, children: errMsg }),
+          showModal && /* @__PURE__ */ u3(
+            GitRemoteModal,
+            {
+              dirName: dir.name,
+              onConfirm: handleOnboard,
+              onCancel: () => setShowModal(false)
+            }
+          )
         ]
       }
     );
