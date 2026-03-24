@@ -147,10 +147,10 @@ A sandboxed agent needs to push code to GitHub. It runs `git push`, which trigge
 **Acceptance Scenarios**:
 
 1. **Given** a sandboxed agent runs `git push` with an SSH remote, **When** git requests SSH auth, **Then** the server intercepts via the custom SSH_AUTH_SOCK, parses the request, and sends a sign request over WebSocket.
-2. **Given** the client receives a sign request, **When** it's displayed with operation details, **Then** the user can authorize via Yubikey touch or cancel.
-3. **Given** the user touches their Yubikey, **When** the signed response reaches the server, **Then** git push completes.
+2. **Given** the client receives a sign request, **When** it's displayed with operation details, **Then** the user can authorize the signing request or cancel.
+3. **Given** the user authorizes signing, **When** the signed response reaches the server, **Then** git push completes.
 4. **Given** no client is connected, **When** the agent attempts git push, **Then** the SSH agent returns failure immediately (no hang).
-5. **Given** a key listing request (`SSH_AGENTC_REQUEST_IDENTITIES`), **When** the server receives it, **Then** it forwards to the client and returns the Yubikey's public key(s).
+5. **Given** a key listing request (`SSH_AGENTC_REQUEST_IDENTITIES`), **When** the server receives it, **Then** it forwards to the client and returns the client's registered public key(s).
 6. **Given** a non-whitelisted SSH agent message type, **When** the bridge receives it, **Then** it returns `SSH_AGENT_FAILURE` without forwarding.
 
 ---
@@ -251,7 +251,7 @@ The entire application has full unit test coverage for all services, models, and
 - **FR-004**: System MUST support two session types: interactive interviews (bidirectional communication) and autonomous task runs (output-only with automatic looping).
 - **FR-005**: System MUST automatically start a new task-run session when the previous run completes and unchecked tasks remain.
 - **FR-006**: System MUST detect when an agent marks a task `[?]` and transition the session to waiting-for-input state.
-- **FR-007**: System MUST log all agent output to persistent JSONL files (one JSON object per chunk: timestamp, stream type stdout/stderr/system, content) that survive restarts and disconnections.
+- **FR-007**: System MUST log all agent output to persistent JSONL files (one JSON object per chunk: `seq` monotonically increasing, `ts` unix milliseconds, `stream` stdout/stderr/system, `content`) that survive restarts and disconnections. `seq` enables replay from any point.
 - **FR-008**: System MUST support real-time output streaming to connected clients and log replay for clients that connect/reconnect mid-session.
 - **FR-009**: System MUST send push notifications when a task is blocked, a project completes, or a session fails.
 - **FR-010**: System MUST accept user input via text or voice transcription and deliver it to interview sessions. Voice transcription MUST support browser-native Web Speech API and Google Speech-to-Text API, switchable at runtime.
@@ -352,8 +352,8 @@ The entire application has full unit test coverage for all services, models, and
 - **FR-069**: Native layer MUST open its own WebSocket connection to the session endpoint for SSH agent messages. WebView's web app remains unmodified.
 - **FR-070**: App MUST detect Yubikey via USB-C (`android.hardware.usb`) and NFC (`android.nfc`).
 - **FR-071**: App MUST use `yubikit-android` SDK (PIV module) for signing and key listing.
-- **FR-072**: For sign requests (`messageType: 13`), display a modal with operation context, sign via PIV slot 9a on Yubikey touch, return signed result.
-- **FR-073**: For key listing (`messageType: 11`), query PIV slot 9a and respond automatically (no modal).
+- **FR-072**: For sign requests (`messageType: 13`), match the requested key blob against `KeyRegistry`, route to the appropriate `SigningBackend`, display sign modal with key picker per FR-103, and return the signed result.
+- **FR-073**: For key listing (`messageType: 11`), query `KeyRegistry` for currently-available keys per FR-100 and respond automatically (no modal).
 - **FR-074**: PIV signing MUST detect key type at runtime. Initially only ECDSA P-256 supported — other types return clear error.
 - **FR-075**: PIN management: prompt on first sign, cache in memory only (cleared on app destruction), never persisted. Show remaining retries on wrong PIN. Show locked error if PIN blocked.
 - **FR-076**: Sign modal MUST remain visible until Yubikey touch completes, user cancels, or request times out. Multiple requests queued, shown one at a time.
@@ -370,7 +370,7 @@ The entire application has full unit test coverage for all services, models, and
 - **FR-101**: Android Keystore signing backend MUST generate ECDSA P-256 keypairs, store them in hardware-backed Keystore when available, and produce SSH-format signatures.
 - **FR-102**: Android Keystore signing MUST require biometric authentication (fingerprint/face) before each sign operation. Biometric requirement is an optional setting (enabled by default).
 - **FR-103**: Sign modal MUST show a key picker when multiple keys can fulfill the request. Auto-select if only one key matches the requested key blob. User can always override the selection.
-- **FR-104**: Signing architecture MUST use interface-based dependency injection: `SigningBackend` interface with `YubikeySigningBackend`, `KeystoreSigningBackend`, and `MockSigningBackend` (debug/test builds) implementations.
+- **FR-104**: Signing architecture MUST use interface-based dependency injection: `SigningBackend` interface with `YubikeySigningBackend`, `KeystoreSigningBackend`, and `MockSigningBackend` (debug/test builds) implementations. `SignRequestHandler` routes sign requests by looking up the requested key blob in `KeyRegistry` and dispatching to the backend matching `KeyEntry.type` — no composite pattern needed. `MainActivity` (or `Application` subclass) creates all backend instances at startup; debug builds include `MockSigningBackend` alongside the others.
 - **FR-105**: Debug build flavor MUST include `MockSigningBackend` that auto-signs with a test ECDSA P-256 keypair (generated idempotently) for development and testing without hardware.
 
 #### Android Integration Testing
@@ -449,11 +449,11 @@ The entire application has full unit test coverage for all services, models, and
 - **SC-011**: Clean `transcript.md` generated in real-time with clear user/agent turn separation.
 - **SC-012**: If interview crashes and restarts, agent recovers context from disk without user repeating themselves.
 - **SC-013**: `nix develop` works inside sandbox for all supported stacks on both `x86_64-linux` and `aarch64-linux`.
-- **SC-014**: A sandboxed agent can successfully `git push` to a GitHub SSH remote using Yubikey authentication relayed through the WebSocket bridge.
+- **SC-014**: A sandboxed agent can successfully `git push` to a GitHub SSH remote using Yubikey or app key authentication relayed through the WebSocket bridge.
 - **SC-015**: Client displays human-readable description of what is being signed before authorization.
 - **SC-016**: If no client connected or client cancels, git push fails gracefully (no hang, no crash).
 - **SC-017**: Android app loads PWA dashboard with all features working identically to browser.
-- **SC-018**: Yubikey status indicator reflects connection state within 2 seconds.
+- **SC-018**: Key status indicators reflect connection state within 2 seconds (Yubikey hardware detection, app key availability).
 - **SC-019**: App survives configuration changes (rotation, background/foreground) without losing state.
 - **SC-020**: All unit tests pass, covering every service, model, route, WebSocket handler, and utility module.
 - **SC-021**: All end-to-end tests pass, covering every flow documented in `UI_FLOW.md`.

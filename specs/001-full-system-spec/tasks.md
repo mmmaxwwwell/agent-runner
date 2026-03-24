@@ -3,7 +3,11 @@
 **Input**: Design documents from `/specs/001-full-system-spec/`
 **Prerequisites**: plan.md, spec.md, data-model.md, research.md, contracts/, quickstart.md
 
-**Approach**: Fix-validate loop. Code exists but has never been run end-to-end. Each phase: run tests → read `test-logs/` failures → fix code → re-run until green. Then validate real flows.
+**Approach**: Fix-validate loop. Code exists but has never been run end-to-end. Each phase: run tests → read `test-logs/` failures → fix code (not tests — tests are the spec) → re-run until green. Then validate real flows.
+
+**Constitution VII compliance**: For existing code (Phases 2–6), the fix-validate loop treats existing tests as the spec — fix code until tests pass. For new code (Phases 1, 8–11), tests MUST be written first and fail before implementation per Constitution VII.
+
+**Manual validation only**: FR-018–FR-021 (voice client: continuous recognition, interim results, mic toggle, silence timeout) require browser + microphone and cannot be automated. Validate manually after Phase 6.
 
 **Tests**: YES — FR-082 through FR-116 require comprehensive test coverage with structured test log output.
 
@@ -75,8 +79,8 @@
 
 **Purpose**: Actually exercise the real flows that have never worked. Run the server, hit endpoints, verify the full chain.
 
-- [ ] T013 [US3] Start server with `npm run dev`. Use the PWA to onboard a discovered directory. Verify the full pipeline: register → generate flake → git init → specify init → interview session launches. Fix until the entire flow completes without errors per FR-052–FR-054
-- [ ] T014 [US4] Start server. Use the PWA "New Project" flow — enter a name, verify directory creation, initialization, and interview session launch per FR-057, FR-052
+- [ ] T013 [US3] Start server with `npm run dev`. Use the PWA to onboard a discovered directory. Verify the full pipeline: register → optional remote setup UI (provide URL or `gh repo create` per FR-056) → generate flake → git init → specify init → interview session launches. After interview completes, verify project description is updated in `projects.json` per FR-058. Fix until the entire flow completes without errors per FR-052–FR-058
+- [ ] T014 [US4] Start server. Use the PWA "New Project" flow — enter a name, verify directory creation, optional remote setup UI per FR-056, initialization, and interview session launch. After interview completes, verify project description updated per FR-058. Fix per FR-052, FR-056–FR-058
 - [ ] T015 [US1] Register a project with a task list. Start a task run via the API. Verify: sandboxed process spawns, tasks are worked on, auto-loop continues when unchecked tasks remain, session completes when all tasks done per FR-003–FR-006
 - [ ] T016 [US2] While a task run is active, connect to `/ws/sessions/:id` and verify live output streaming. Disconnect, reconnect with `lastSeq`, verify replay per FR-008
 - [ ] T017 [US6] Run a project with a task that triggers `[?]`. Verify: session transitions to waiting-for-input, push notification sent. Submit input via API, verify session resumes per FR-006, FR-009
@@ -149,7 +153,7 @@
 
 - [ ] T040 [US10] Write `WebViewDashboardTest.kt` in `android/app/src/androidTest/java/.../`: app launches, WebView loads PWA from server, dashboard renders with project list (DOM inspection via `evaluateJavascript`), navigation to project detail works per FR-068, FR-106
 - [ ] T041 [US10] Write `SignRequestFlowTest.kt` in `android/app/src/androidTest/java/.../`: mock server sends `ssh-agent-request` over WebSocket, sign modal appears with correct context, MockSigningBackend auto-signs, `ssh-agent-response` sent back, modal dismisses per FR-072, FR-103, FR-106
-- [ ] T042 [US10] Write `SshBridgeEndToEndTest.kt` in `android/app/src/androidTest/java/.../`: full loop — test SSH server running on host, server starts session with project pointing to test bare repo, agent-equivalent triggers `git push`, SSH bridge relays to Android, MockSigningBackend signs, response flows back, push succeeds to local bare repo per FR-109
+- [ ] T042 [US10] Write `SshBridgeEndToEndTest.kt` in `android/app/src/androidTest/java/.../`: full loop — test SSH server running on host, server starts session with project pointing to test bare repo, real `git push` via real `ssh` (both available in nix flake) triggers SSH auth through the bridge socket, server relays to Android over WebSocket, MockSigningBackend signs, response flows back, push succeeds to local bare repo per FR-109
 - [ ] T043 [US10] Write `KeyManagementTest.kt` in `android/app/src/androidTest/java/.../`: open key management, add app key (verify keypair generated), verify key appears in list, export public key, remove key, verify removed per FR-099
 - [ ] T044 [US10] Run `npm run test:android:integration` and make all Android integration tests pass. Read `test-logs/android-integration/` for failures, fix code, re-run until green
 
