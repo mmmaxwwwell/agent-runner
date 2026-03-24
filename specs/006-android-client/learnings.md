@@ -43,6 +43,12 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Intent extra from ServerConfigActivity takes priority over SharedPreferences — this ensures a freshly-entered URL is used immediately without a round-trip through prefs.
 - `onBackPressed()` is deprecated but still the simplest way to intercept back for WebView navigation. T008+ tasks that add more WebView features should build on this class.
 
+### T009 — URL hash monitoring
+- `doUpdateVisitedHistory()` is called for hash changes (unlike `shouldOverrideUrlLoading()` which only fires for full navigations). This is the right callback for SPA hash-based routing.
+- `Uri.parse(url).fragment` returns the fragment WITHOUT the leading `#`, so the regex needs to prepend `#` when matching against `SESSION_HASH_PATTERN`.
+- `currentSessionId` is exposed as a `var` with `private set` so T019 (AgentWebSocket wiring) can read it to know which session to connect to.
+- UUID pattern `[0-9a-fA-F\-]{36}` matches standard UUID format (8-4-4-4-12 with hyphens = 36 chars).
+
 ### T008 — WebView PWA compatibility settings
 - `MIXED_CONTENT_ALWAYS_ALLOW` is needed for local dev where server runs on HTTP. This allows mixed content loading.
 - User agent is appended with "AgentRunner-Android" (not replaced) so the PWA can detect native context via `navigator.userAgent.includes("AgentRunner-Android")`.
