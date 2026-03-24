@@ -126,3 +126,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **`setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG)`**: The `0` timeout means per-use authentication (every sign requires biometric). This is the most secure option for SSH signing.
 - **SSH public key blob reuse**: `SshKeyFormatter.toSshPublicKeyBlob()` accepts `X509Certificate` which is exactly what `KeyStore.getCertificate(alias)` returns for Keystore-generated keys. No additional conversion needed.
 - **Added `androidx.biometric:biometric:1.1.0`** dependency to `build.gradle.kts`.
+
+### T024 — MockSigningBackend
+- **Debug source set uses `kotlin/` not `java/`**: Consistent with main source set, the debug source lives at `src/debug/kotlin/com/agentrunner/signing/`, not `src/debug/java/...`.
+- **`SshKeyFormatter.toSshPublicKeyBlob()` requires X509Certificate**: Since MockSigningBackend generates keys via standard Java crypto (not Android Keystore), there's no X509Certificate. Built the SSH public key blob manually using the same format: string("ecdsa-sha2-nistp256") + string("nistp256") + string(0x04 || x || y).
+- **PKCS8 for persistence**: Standard Java `KeyPairGenerator` produces PKCS8-encoded private keys via `privateKey.encoded`. These reload fine via `PKCS8EncodedKeySpec` + `KeyFactory.getInstance("EC")`.
+- **KeyType.MOCK added**: The `KeyType` enum needed a `MOCK` variant with JSON value `"mock"`. This is a main source set change since `KeyRegistry` (in main) must be able to deserialize mock key entries.

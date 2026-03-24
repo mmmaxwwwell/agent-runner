@@ -28,17 +28,20 @@ data class KeyEntry(
 
 enum class KeyType {
     YUBIKEY_PIV,
-    ANDROID_KEYSTORE;
+    ANDROID_KEYSTORE,
+    MOCK;
 
     fun toJsonValue(): String = when (this) {
         YUBIKEY_PIV -> "yubikey-piv"
         ANDROID_KEYSTORE -> "android-keystore"
+        MOCK -> "mock"
     }
 
     companion object {
         fun fromJsonValue(value: String): KeyType = when (value) {
             "yubikey-piv" -> YUBIKEY_PIV
             "android-keystore" -> ANDROID_KEYSTORE
+            "mock" -> MOCK
             else -> throw IllegalArgumentException("Unknown key type: $value")
         }
     }
