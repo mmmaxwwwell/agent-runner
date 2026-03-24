@@ -164,6 +164,23 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
                 startActivity(Intent(this@MainActivity, ServerConfigActivity::class.java))
             }
         }
+
+        @JavascriptInterface
+        fun getYubikeyStatus(): String {
+            return when (yubikeyManager.status.value) {
+                YubikeyStatus.CONNECTED_USB -> "connected_usb"
+                YubikeyStatus.CONNECTED_NFC -> "connected_nfc"
+                YubikeyStatus.ERROR -> "error"
+                else -> "disconnected"
+            }
+        }
+
+        @JavascriptInterface
+        fun getYubikeySerial(): String {
+            // Serial number requires opening a SmartCardConnection which is expensive/async.
+            // Return empty string for now — serial is shown in the native overlay if available.
+            return ""
+        }
     }
 
     override fun onResume() {

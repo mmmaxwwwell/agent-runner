@@ -132,6 +132,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Serial number display is not implemented — YubikeyManager doesn't expose serial from its LiveData (would require opening a SmartCardConnection). The `yubikey_connected_serial` string resource exists for future use if serial is added.
 - Two drawable backgrounds: dark semi-transparent for disconnected, green semi-transparent for connected. Both use 16dp corner radius for pill shape.
 
+### T021 — JavaScript bridge Yubikey status methods
+- `getYubikeyStatus()` reads `yubikeyManager.status.value` synchronously — LiveData's `.value` returns the last posted value on any thread, safe from `@JavascriptInterface` (which runs on WebView background thread).
+- `getYubikeySerial()` returns empty string — retrieving serial requires opening a SmartCardConnection (async/blocking I/O), which can't be done synchronously in a `@JavascriptInterface` method. The native overlay shows status; serial can be added later if the PWA needs it.
+- Return values match the contract in `contracts/javascript-bridge.md` exactly: `"disconnected"`, `"connected_usb"`, `"connected_nfc"`, `"error"`, and `""` for serial.
+
 ### T018 — SignRequestDialog design decisions
 - `SignRequestDialog.Callback` interface has two methods: `onPinSubmitted(pin: CharArray)` and `onSignCancelled()`. The host (MainActivity in T019) implements this and delegates to `SignRequestHandler.onPinEntered()` / `onCancel()`.
 - `configure(callback, yubikeyStatus)` must be called before `show()` — these references don't survive rotation (unlike Bundle arguments). T026 (rotation handling) will need to re-configure.
