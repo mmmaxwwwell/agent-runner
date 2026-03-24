@@ -35,3 +35,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Introduced `flakeShell(packages)` helper to DRY up the five identical flake templates. All templates now call `flakeShell()` which calls `detectArch()` at generation time. Future templates should use this pattern.
 - `detectArch()` is called at flake generation time (not module load time), so the system string is always current. This matters if the code is ever used in a cross-compilation context.
 
+### T008 — buildCommand refactor with overloaded signature
+- The new `buildCommand()` supports both the new signature (`projectDir, sessionType, options`) and the legacy signature (`projectDir, claudeArgs[], allowUnsandboxed, options?`) via runtime dispatch on `Array.isArray(secondArg)`. This keeps all existing callers and tests working until T009/T035 migrate them.
+- The nix shell wrapper structure is: `nix shell <claude-code-ref> <uv-ref> --command nix develop <projectDir> --command claude <flags>`. The `nix` before `shell` is part of `systemd-run`'s trailing command (sandboxed) or the top-level command (unsandboxed).
+- `BindPaths` uses space-separated paths in a single `--property=BindPaths=` arg. `BindReadOnlyPaths` is a separate property.
+- The pre-existing build error (`src/services/agent-framework.ts` TS5097) is from T006's stub — not related to sandbox changes. T010 will fix it when implementing the real service.
+
