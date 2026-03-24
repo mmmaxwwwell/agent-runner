@@ -3,3 +3,4 @@ logs/
 dist/
 tests/fixtures/test-key.pem
 tests/fixtures/test-key.pub
+test-logs/
