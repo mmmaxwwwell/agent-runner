@@ -395,14 +395,15 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     const dirPath = parsed.path;
     const name = (parsed.name && typeof parsed.name === 'string') ? parsed.name.trim() : dirPath.split('/').pop() || 'unnamed';
 
-    // Ensure the project has a flake.nix so nix develop works
-    const flakeGenerated = ensureFlakeNix(dirPath);
-    if (flakeGenerated) {
-      log.info({ dir: dirPath }, 'Generated flake.nix for project');
-    }
-
     try {
       const project = registerForOnboarding(cfg.dataDir, { name, dir: dirPath });
+
+      // Ensure the project has a flake.nix so nix develop works
+      const flakeGenerated = ensureFlakeNix(dirPath);
+      if (flakeGenerated) {
+        log.info({ dir: dirPath }, 'Generated flake.nix for project');
+      }
+
       log.info({ projectId: project.id, name, dir: dirPath }, 'Project onboarded');
       sendJson(res, 201, {
         projectId: project.id,

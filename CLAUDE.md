@@ -5,6 +5,11 @@ Auto-generated from all feature plans. Last updated: 2026-03-23
 ## Active Technologies
 - TypeScript 5.9 on Node.js 22 (via Nix flake) + `ws` (WebSocket), `web-push` (push notifications), `pino` (logging), `preact` (PWA client), `esbuild` (client bundler) (002-bugfixes-ui-flow-tests)
 - Filesystem — `~/.agent-runner/projects.json`, session metadata in `sessions/{id}/meta.json`, output in `sessions/{id}/output.jsonl` (002-bugfixes-ui-flow-tests)
+- Filesystem — `~/.local/share/agent-runner/projects.json`, session metadata in `sessions/{id}/meta.json`, output in `sessions/{id}/output.jsonl` (004-onboarding-overhaul)
+- TypeScript 5.9 on Node.js 22 (via Nix flake) + `ws` (WebSocket), `net` (Node.js built-in for Unix sockets), `crypto` (UUID generation) (005-ssh-agent-bridge)
+- Unix socket files at `<dataDir>/sessions/<sessionId>/agent.sock` (005-ssh-agent-bridge)
+- Kotlin, Android API 26+ (Android 8.0 Oreo) + `yubikit-android` 3.0.1 (USB/NFC transport + PIV), Android WebView, `java-websocket` or OkHttp (native WebSocket) (006-android-client)
+- Android SharedPreferences (server URL) (006-android-client)
 
 - TypeScript on Node.js 22 (via Nix flake, compiled with `tsc`, dev with `tsx`) + `ws` (WebSocket), `web-push` (push notifications), `pino` (structured logging), `tsx` (dev) (001-agent-runner-server-pwa)
 
@@ -34,9 +39,10 @@ Never run `npm`, `node`, `tsx`, `uv`, or `specify` directly — always go throug
 TypeScript on Node.js 22 (via Nix flake, compiled with `tsc`, dev with `tsx`): Follow standard conventions
 
 ## Recent Changes
-- 002-bugfixes-ui-flow-tests: Added TypeScript 5.9 on Node.js 22 (via Nix flake) + `ws` (WebSocket), `web-push` (push notifications), `pino` (logging), `preact` (PWA client), `esbuild` (client bundler)
+- 006-android-client: Added Kotlin, Android API 26+ (Android 8.0 Oreo) + `yubikit-android` 3.0.1 (USB/NFC transport + PIV), Android WebView, `java-websocket` or OkHttp (native WebSocket)
+- 005-ssh-agent-bridge: Added TypeScript 5.9 on Node.js 22 (via Nix flake) + `ws` (WebSocket), `net` (Node.js built-in for Unix sockets), `crypto` (UUID generation)
+- 004-onboarding-overhaul: Added TypeScript 5.9 on Node.js 22 (via Nix flake) + `ws` (WebSocket), `web-push` (push notifications), `pino` (logging), `preact` (PWA client), `esbuild` (client bundler)
 
-- 001-agent-runner-server-pwa: Added TypeScript on Node.js 22 (via Nix flake, compiled with `tsc`, dev with `tsx`) + `ws` (WebSocket), `web-push` (push notifications), `pino` (structured logging), `tsx` (dev)
 
 <!-- MANUAL ADDITIONS START -->
 

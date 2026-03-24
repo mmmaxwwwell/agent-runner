@@ -1,8 +1,8 @@
 <!--
   Sync Impact Report
-  Version change: 1.0.0 → 1.1.0
-  Amended: Sandbox-First Security (two-gate override), Platform Constraints (Preact+JSX+esbuild, cloud voice proxy)
-  Templates requiring updates: plan.md, tasks.md, data-model.md, rest-api.md (all updated in same commit)
+  Version change: 1.2.0 → 1.3.0
+  Amended: Sandbox-First Security (added SSH agent socket to allowed infrastructure bind paths)
+  Templates requiring updates: None (spec/plan/tasks already use new paths)
   Follow-up TODOs: None
 -->
 
@@ -12,11 +12,11 @@
 
 ### I. Sandbox-First Security
 
-Every agent process MUST be sandboxed via `systemd-run --user --scope` with `ProtectHome=tmpfs` and `BindPaths=<project-dir>`. An agent MUST NOT have access to files outside its project directory. Unsandboxed execution requires two gates: (1) the server MUST be started with `ALLOW_UNSANDBOXED=true` environment variable, AND (2) the session start request MUST include `allowUnsandboxed: true`. If either gate is missing, the server MUST refuse to start the session. Unsandboxed execution MUST produce a visible warning in both server logs and session output. Security boundaries are non-negotiable — convenience never justifies weakening the sandbox.
+Every agent process MUST be sandboxed via `systemd-run --user --scope` with `ProtectHome=tmpfs` and `BindPaths=<project-dir>`. An agent MUST NOT have access to files outside its project directory, except for infrastructure paths required by the runtime: nix cache (`~/.cache/nix`), uv tool storage (`~/.local/share/uv`), the agent-framework directory (read-only via `BindReadOnlyPaths`), and per-session SSH agent bridge sockets (`<dataDir>/sessions/<sessionId>/agent.sock`). Unsandboxed execution requires two gates: (1) the server MUST be started with `ALLOW_UNSANDBOXED=true` environment variable, AND (2) the session start request MUST include `allowUnsandboxed: true`. If either gate is missing, the server MUST refuse to start the session. Unsandboxed execution MUST produce a visible warning in both server logs and session output. Security boundaries are non-negotiable — convenience never justifies weakening the sandbox.
 
 ### II. Markdown-as-Database
 
-Agent-framework markdown files (task lists, notes, prompts) are the single source of truth for project state. The server MUST NOT maintain a parallel database. The only server-side state file is the project registry (`~/.agent-runner/projects.json`). Session metadata (`meta.json`) and output logs are append-only artifacts, not authoritative state.
+Agent-framework markdown files (task lists, notes, prompts) are the single source of truth for project state. The server MUST NOT maintain a parallel database. The only server-side state file is the project registry (`<dataDir>/projects.json`). Session metadata (`meta.json`) and output logs are append-only artifacts, not authoritative state.
 
 ### III. Thin Client
 
@@ -52,7 +52,7 @@ New modules MUST have tests written before implementation. Tests MUST fail befor
 - One task per invocation. Complete, test, commit, then stop.
 - Conventional commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
 - `npm run build` and `npm test` MUST pass before marking a task complete.
-- Runtime data directory (`~/.agent-runner/`) is never modified during development — only by the running server.
+- Runtime data directory (`~/.local/share/agent-runner/` by default) is never modified during development — only by the running server.
 - Changes to the API surface (REST or WebSocket) MUST update the prompt file's API design section.
 
 ## Governance
@@ -61,4 +61,4 @@ This constitution governs all development decisions for Agent Runner. When a pro
 
 Complexity MUST be justified. Any deviation from the simplicity principle requires documenting what simpler alternative was considered and why it was rejected.
 
-**Version**: 1.1.0 | **Ratified**: 2026-03-22 | **Last Amended**: 2026-03-22
+**Version**: 1.3.0 | **Ratified**: 2026-03-22 | **Last Amended**: 2026-03-23
