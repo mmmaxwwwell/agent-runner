@@ -156,3 +156,7 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Backward-compatible SignRequestHandler**: Added `keyRegistry` and `backends` as optional constructor parameters with defaults (`null` and `emptyList()`). When both are provided, `processListKeys` uses the new KeyRegistry+canSign path; otherwise falls back to direct `yubikey.listKeys()`. This keeps existing tests passing until T028/T030 update them.
 - **YubikeySigningBackend.onYubikeyConnected() is suspend**: Must be called from a coroutine scope. The Yubikey status observer in `setupYubikeyStatusOverlay` launches a coroutine via `activityScope.launch` to call it.
 - **clearPin delegation**: `onDestroy` now calls `yubikeySigningBackend.clearPin()` instead of `yubikeyManager.clearPin()` directly — the backend delegates to the manager, keeping the abstraction consistent.
+
+### T029 — Android build verification
+- **Phase 8 builds cleanly with zero fixes**: All multi-key architecture changes (T020-T028) compiled on first try. No additional code changes needed for T029.
+- **Gradle caching effective**: After initial compilation in T019, subsequent builds are fast (~1s) since Kotlin compilation is UP-TO-DATE.
