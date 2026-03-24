@@ -57,7 +57,7 @@
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Write tests for onboarding pipeline in tests/unit/onboarding.test.ts — test idempotent step check/execute pattern, test each step's check function (flake exists → skip, .git exists → skip, .specify exists → skip, specify installed → skip), test error handling sets project status to `"error"`, test full pipeline with all steps already done skips everything
+- [x] T012 [P] [US1] Write tests for onboarding pipeline in tests/unit/onboarding.test.ts — test idempotent step check/execute pattern, test each step's check function (flake exists → skip, .git exists → skip, .specify exists → skip, specify installed → skip), test error handling sets project status to `"error"`, test full pipeline with all steps already done skips everything
 - [ ] T013 [P] [US1] Write integration test for unified onboard endpoint in tests/integration/onboard-api.test.ts — test POST /api/projects/onboard with discovered dir, test with newProject flag, test duplicate rejection (409), test idempotent re-onboard
 
 ### Implementation for User Story 1

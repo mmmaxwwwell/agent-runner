@@ -56,3 +56,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The `runPhase()` callbacks in `projects.ts` let the error propagate — the workflow orchestrator already handles phase failures.
 - `ensureAgentFramework()` is synchronous (`execFileSync`), so no need for `await`. This is fine for the startup path and the per-session pull (fast for existing clones), but could block the event loop briefly.
 
+### T012 — Onboarding pipeline test design
+- Created `OnboardingContext` interface as the single config object passed to `createOnboardingSteps()` and `runOnboardingPipeline()`. It holds `dataDir`, `projectDir`, `projectName`, `projectId?`, `agentFrameworkDir`, `allowUnsandboxed`, and optional `onStepStart`/`onStepComplete` callbacks. T014 should implement this exact interface.
+- Step `check()` functions take no arguments — they close over the context. This keeps the step interface clean: `{ name, check, execute }`.
+- `install-specify` step check is NOT tested with a filesystem check (it requires `which specify` in a nix shell). Unit tests only cover filesystem-based checks. The install-specify check will need integration testing.
+- Error handling tests expect `runOnboardingPipeline()` to catch step failures and update project status to `'error'` via `updateProjectStatus()` before re-throwing.
+- The stub at `src/services/onboarding.ts` exports types and throws "Not implemented" — T014 replaces the function bodies.
+
