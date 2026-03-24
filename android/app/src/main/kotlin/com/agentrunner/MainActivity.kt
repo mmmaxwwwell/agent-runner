@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
     private var serverUrl: String? = null
     var currentSessionId: String? = null
         private set
+    private var pendingNavigateHash: String? = null
 
     private lateinit var yubikeyManager: YubikeyManager
     private lateinit var pushManager: PushNotificationManager
@@ -71,8 +72,9 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         yubikeyManager = YubikeyManager(applicationContext)
         pushManager = PushNotificationManager(applicationContext)
 
-        // Handle deep link from notification tap
-        handleNotificationIntent(intent)
+        // Save deep link hash for after WebView is ready
+        pendingNavigateHash = intent.getStringExtra(PushNotificationManager.EXTRA_NAVIGATE_HASH)
+        intent.removeExtra(PushNotificationManager.EXTRA_NAVIGATE_HASH)
 
         val container = FrameLayout(this)
         setContentView(container)
@@ -159,7 +161,13 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
         } else {
-            webView.loadUrl(serverUrl!!)
+            val hash = pendingNavigateHash
+            pendingNavigateHash = null
+            if (hash != null) {
+                webView.loadUrl("${serverUrl}${hash}")
+            } else {
+                webView.loadUrl(serverUrl!!)
+            }
         }
     }
 

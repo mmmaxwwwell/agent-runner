@@ -158,3 +158,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Deep link navigation from notifications uses `EXTRA_NAVIGATE_HASH` intent extra. The hash is appended to the server URL and loaded in WebView. The extra is cleared after navigation to prevent re-navigation on rotation.
 - SharedPreferences name for push: `"agent_runner_push"` (separate from server config's `"agent_runner_prefs"`).
 
+### T025 — Notification tap deep link navigation
+- Cold start (app killed) vs warm start (activity in background) require different handling: `onCreate` must defer the hash until after WebView creation; `onNewIntent` can navigate immediately since WebView already exists.
+- T024 had already implemented most of T025's requirements (`showNotification` with PendingIntent, `handleNotificationIntent`, `onNewIntent`), but had a bug: `handleNotificationIntent` was called in `onCreate` before WebView was initialized, so cold-start deep links silently failed.
+- Fix: store the hash in `pendingNavigateHash` field during `onCreate`, then use it when loading the initial URL.
+

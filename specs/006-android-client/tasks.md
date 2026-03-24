@@ -125,7 +125,7 @@
 ### Implementation for User Story 5
 
 - [x] T024 [US5] Register for web-push from native layer — call POST /api/push/subscribe from native code using the server's VAPID public key. Store subscription in SharedPreferences. Handle notification display via Android NotificationManager with notification channel
-- [ ] T025 [US5] Handle notification tap navigation — on notification tap: launch MainActivity with deep link intent containing project/session URL hash. MainActivity loads WebView and navigates to the correct hash route
+- [x] T025 [US5] Handle notification tap navigation — on notification tap: launch MainActivity with deep link intent containing project/session URL hash. MainActivity loads WebView and navigates to the correct hash route
 
 **Checkpoint**: Push notifications work and deep-link to correct views
 
