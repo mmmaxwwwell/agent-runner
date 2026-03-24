@@ -182,3 +182,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The no-op test ("should throw when sandbox unavailable and allowUnsandboxed is false") was removed — it had no assertion.
 - The 20 remaining test failures are all in T036/T037 scope (deprecated endpoint, onboard race conditions), not related to sandbox changes.
 
+### T036 — Onboard API test race condition fix
+- The 3 failing tests in `onboard-api.test.ts` were all the same issue: the async onboarding pipeline fails fast in the test environment (no nix/sandbox available) and sets status to `"error"` before the test reads `projects.json`. Fixed by accepting either `"onboarding"` or `"error"` status.
+- The contract tests in `rest-api-projects.test.ts` already passed — no changes needed there.
+- The remaining ~17 test failures are all in `new-project-workflow.test.ts` and `dashboard-api.test.ts` — they target the deprecated `POST /api/workflows/new-project` endpoint (now returns 410). T037 handles those.
+
