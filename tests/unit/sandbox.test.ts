@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { homedir } from 'node:os';
 
 // The module under test — will be implemented in T024
 import { buildCommand, isAvailable } from '../../src/services/sandbox.ts';
@@ -12,7 +13,210 @@ describe('sandbox', () => {
     process.env = { ...originalEnv };
   });
 
-  describe('buildCommand', () => {
+  describe('buildCommand (new signature — session-type presets)', () => {
+    const projectDir = '/home/user/my-project';
+    const agentFrameworkDir = '/home/user/.local/share/agent-runner/agent-framework';
+    const defaultOpts = { agentFrameworkDir, sandboxAvailable: true };
+    const home = homedir();
+
+    // Helper to get args after 'claude' in the command
+    function getClaudeArgs(args: string[]): string[] {
+      const claudeIdx = args.lastIndexOf('claude');
+      return claudeIdx === -1 ? [] : args.slice(claudeIdx + 1);
+    }
+
+    describe('common preset flags', () => {
+      it('should include --output-format stream-json for interview sessions', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(claudeArgs.includes('--output-format'), 'Missing --output-format flag');
+        const fmtIdx = claudeArgs.indexOf('--output-format');
+        assert.equal(claudeArgs[fmtIdx + 1], 'stream-json', 'output-format should be stream-json');
+      });
+
+      it('should include --output-format stream-json for task-run sessions', () => {
+        const result = buildCommand(projectDir, 'task-run', { ...defaultOpts, prompt: 'do the task' });
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(claudeArgs.includes('--output-format'), 'Missing --output-format flag');
+        const fmtIdx = claudeArgs.indexOf('--output-format');
+        assert.equal(claudeArgs[fmtIdx + 1], 'stream-json');
+      });
+
+      it('should include --dangerously-skip-permissions for interview sessions', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(claudeArgs.includes('--dangerously-skip-permissions'), 'Missing --dangerously-skip-permissions');
+      });
+
+      it('should include --dangerously-skip-permissions for task-run sessions', () => {
+        const result = buildCommand(projectDir, 'task-run', { ...defaultOpts, prompt: 'do the task' });
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(claudeArgs.includes('--dangerously-skip-permissions'), 'Missing --dangerously-skip-permissions');
+      });
+
+      it('should include --model opus for interview sessions', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(claudeArgs.includes('--model'), 'Missing --model flag');
+        const modelIdx = claudeArgs.indexOf('--model');
+        assert.equal(claudeArgs[modelIdx + 1], 'opus');
+      });
+
+      it('should include --model opus for task-run sessions', () => {
+        const result = buildCommand(projectDir, 'task-run', { ...defaultOpts, prompt: 'do the task' });
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(claudeArgs.includes('--model'), 'Missing --model flag');
+        const modelIdx = claudeArgs.indexOf('--model');
+        assert.equal(claudeArgs[modelIdx + 1], 'opus');
+      });
+    });
+
+    describe('interview session type', () => {
+      it('should support optional -p flag when prompt is provided', () => {
+        const prompt = 'Interview the user about their project';
+        const result = buildCommand(projectDir, 'interview', { ...defaultOpts, prompt });
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(claudeArgs.includes('-p'), 'Missing -p flag when prompt is provided');
+        const pIdx = claudeArgs.indexOf('-p');
+        assert.equal(claudeArgs[pIdx + 1], prompt);
+      });
+
+      it('should not include -p flag when no prompt is provided', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(!claudeArgs.includes('-p'), '-p flag should not be present without prompt');
+      });
+    });
+
+    describe('task-run session type', () => {
+      it('should require -p flag with prompt', () => {
+        const prompt = 'Execute the task plan';
+        const result = buildCommand(projectDir, 'task-run', { ...defaultOpts, prompt });
+        const claudeArgs = getClaudeArgs(result.args);
+        assert.ok(claudeArgs.includes('-p'), 'Missing -p flag for task-run');
+        const pIdx = claudeArgs.indexOf('-p');
+        assert.equal(claudeArgs[pIdx + 1], prompt);
+      });
+
+      it('should throw when task-run has no prompt', () => {
+        assert.throws(
+          () => buildCommand(projectDir, 'task-run', defaultOpts),
+          /prompt.*required|required.*prompt/i,
+          'task-run without prompt should throw',
+        );
+      });
+    });
+
+    describe('sandbox BindPaths', () => {
+      it('should include ~/.cache/nix in BindPaths', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const bindProp = result.args.find(a => a.startsWith('--property=BindPaths='));
+        assert.ok(bindProp, 'Missing BindPaths property');
+        assert.ok(
+          bindProp!.includes(`${home}/.cache/nix`),
+          `BindPaths should include ${home}/.cache/nix`,
+        );
+      });
+
+      it('should include ~/.local/share/uv in BindPaths', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const bindProp = result.args.find(a => a.startsWith('--property=BindPaths='));
+        assert.ok(bindProp, 'Missing BindPaths property');
+        assert.ok(
+          bindProp!.includes(`${home}/.local/share/uv`),
+          `BindPaths should include ${home}/.local/share/uv`,
+        );
+      });
+
+      it('should include project directory in BindPaths', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const bindProp = result.args.find(a => a.startsWith('--property=BindPaths='));
+        assert.ok(bindProp, 'Missing BindPaths property');
+        assert.ok(bindProp!.includes(projectDir), 'BindPaths should include project directory');
+      });
+    });
+
+    describe('sandbox BindReadOnlyPaths', () => {
+      it('should include agentFrameworkDir in BindReadOnlyPaths', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const bindROProp = result.args.find(a => a.startsWith('--property=BindReadOnlyPaths='));
+        assert.ok(bindROProp, 'Missing BindReadOnlyPaths property');
+        assert.ok(
+          bindROProp!.includes(agentFrameworkDir),
+          'BindReadOnlyPaths should include agentFrameworkDir',
+        );
+      });
+    });
+
+    describe('nix shell wrapper', () => {
+      it('should wrap inner command with nix shell for claude-code and uv', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+
+        // Find 'nix' 'shell' in args (the outer nix shell wrapper)
+        const shellIdx = result.args.indexOf('shell');
+        assert.ok(shellIdx !== -1, 'Missing nix shell in args');
+        assert.equal(result.args[shellIdx - 1], 'nix', 'shell should be preceded by nix');
+
+        // Should include claude-code and uv flake refs
+        const claudeCodeRef = result.args.find(a => a.includes('nixpkgs') && a.includes('claude-code'));
+        assert.ok(claudeCodeRef, 'Missing claude-code nix flake reference');
+
+        const uvRef = result.args.find(a => a.includes('nixpkgs') && a.includes('#uv'));
+        assert.ok(uvRef, 'Missing uv nix flake reference');
+      });
+
+      it('should have nix develop inside the nix shell --command', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+
+        // Structure: ... nix shell <refs> --command nix develop <projectDir> --command claude ...
+        const args = result.args;
+        const shellIdx = args.indexOf('shell');
+        assert.ok(shellIdx !== -1, 'Missing shell');
+
+        // Find --command after shell (the nix shell's --command)
+        const shellCommandIdx = args.indexOf('--command', shellIdx);
+        assert.ok(shellCommandIdx !== -1, 'Missing --command after nix shell');
+
+        // After --command should be nix develop
+        assert.equal(args[shellCommandIdx + 1], 'nix', 'Inner command should start with nix');
+        assert.equal(args[shellCommandIdx + 2], 'develop', 'Inner command should be nix develop');
+        assert.equal(args[shellCommandIdx + 3], projectDir, 'nix develop should target project dir');
+
+        // Then --command claude
+        const innerCommandIdx = args.indexOf('--command', shellCommandIdx + 1);
+        assert.ok(innerCommandIdx !== -1, 'Missing inner --command for claude');
+        assert.equal(args[innerCommandIdx + 1], 'claude', 'Inner --command should invoke claude');
+      });
+    });
+
+    describe('unsandboxed mode (new signature)', () => {
+      it('should use nix shell wrapper even when unsandboxed', () => {
+        process.env['ALLOW_UNSANDBOXED'] = 'true';
+        const result = buildCommand(projectDir, 'interview', {
+          agentFrameworkDir,
+          sandboxAvailable: false,
+          allowUnsandboxed: true,
+        });
+
+        assert.equal(result.command, 'nix');
+        assert.equal(result.args[0], 'shell');
+        assert.equal(result.unsandboxed, true);
+      });
+
+      it('should throw when sandbox unavailable and allowUnsandboxed not set', () => {
+        process.env['ALLOW_UNSANDBOXED'] = 'false';
+        assert.throws(
+          () => buildCommand(projectDir, 'interview', {
+            agentFrameworkDir,
+            sandboxAvailable: false,
+          }),
+          /sandbox/i,
+        );
+      });
+    });
+  });
+
+  describe('buildCommand (legacy signature)', () => {
     it('should return systemd-run command with sandbox properties when available', () => {
       const result = buildCommand('/home/user/my-project', ['--task-file', 'tasks.md'], false);
 

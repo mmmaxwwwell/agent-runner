@@ -34,7 +34,7 @@
 ### Tests for Foundational Phase
 
 - [x] T004 [P] Write tests for architecture detection function (x64→x86_64-linux, arm64→aarch64-linux, fallback) in tests/unit/flake-generator.test.ts
-- [ ] T005 [P] Write tests for `buildCommand()` session-type presets in tests/unit/sandbox.test.ts — test new signature, verify both presets include `--output-format stream-json --dangerously-skip-permissions --model opus`, verify interview supports optional `-p`, verify task-run requires `-p`, verify `BindPaths` includes `~/.cache/nix` and `~/.local/share/uv`, verify `BindReadOnlyPaths` includes agentFrameworkDir, verify `nix shell` wrapper around `nix develop`
+- [x] T005 [P] Write tests for `buildCommand()` session-type presets in tests/unit/sandbox.test.ts — test new signature, verify both presets include `--output-format stream-json --dangerously-skip-permissions --model opus`, verify interview supports optional `-p`, verify task-run requires `-p`, verify `BindPaths` includes `~/.cache/nix` and `~/.local/share/uv`, verify `BindReadOnlyPaths` includes agentFrameworkDir, verify `nix shell` wrapper around `nix develop`
 - [ ] T006 [P] Write tests for agent framework clone/pull service in tests/unit/agent-framework.test.ts — test `ensureAgentFramework()` clones when missing, pulls when exists, handles git failures gracefully
 
 ### Implementation for Foundational Phase

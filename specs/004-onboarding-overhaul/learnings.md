@@ -17,3 +17,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `detectArch()` accepts optional `arch` and `platform` params (defaulting to `process.arch`/`process.platform`) so tests can exercise all mappings without mocking globals. T007 should implement with this signature: `detectArch(arch?: string, platform?: string): string`.
 - Tests cover: x64/arm64 × linux/darwin (4 valid combos), unknown arch fallback, unknown platform fallback, both unknown fallback, and no-args defaults to process values.
 
+### T005 — buildCommand new signature test design
+- Tests use a `getClaudeArgs()` helper that finds args after the last `'claude'` in the args array — this works regardless of sandbox wrapping depth. T008 should ensure `claude` appears exactly once in args.
+- Tests use `args.lastIndexOf('claude')` not `indexOf` because the nix shell wrapper adds multiple command layers. T008 implementation should match.
+- The new signature passes `sessionType: 'interview' | 'task-run'` as second arg. Tests expect `task-run` without prompt to throw with `/prompt.*required|required.*prompt/i`.
+- `BindPaths` is expected as a single `--property=BindPaths=` arg containing space-separated paths (project dir + `~/.cache/nix` + `~/.local/share/uv`). `BindReadOnlyPaths` is a separate property containing agentFrameworkDir.
+- The nix shell wrapper structure: `nix shell <claude-code-ref> <uv-ref> --command nix develop <projectDir> --command claude <flags>`. Tests check for two `--command` args in sequence.
+
