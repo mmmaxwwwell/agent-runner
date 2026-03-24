@@ -37,6 +37,8 @@ class SignRequestHandler(
     private var currentRequest: SignRequest? = null
     private var currentJob: Job? = null
     private var intentionallyCancelled = false
+    private var processedCount = 0
+    private var totalReceived = 0
 
     // Channel for receiving PIN from UI
     private val pinChannel = Channel<CharArray>(Channel.CONFLATED)
@@ -47,8 +49,14 @@ class SignRequestHandler(
      */
     fun onSignRequest(request: SignRequest) {
         requestQueue.add(request)
+        totalReceived++
         if (currentRequest == null) {
             processNext()
+        } else {
+            // Update badge on existing dialog to reflect new queue size
+            val total = totalReceived - processedCount
+            val position = 1 // current request is always position 1
+            listener.onQueueUpdated(position, total)
         }
     }
 
@@ -69,6 +77,29 @@ class SignRequestHandler(
         webSocket.sendCancel(request.requestId)
         listener.onDismissDialog()
         finishCurrent()
+    }
+
+    /**
+     * Cancel all pending and current sign requests (e.g., on WebSocket disconnect).
+     * Sends cancel for the current request and drops all queued requests.
+     */
+    fun cancelAll() {
+        val request = currentRequest
+        if (request != null) {
+            intentionallyCancelled = true
+            currentJob?.cancel()
+            webSocket.sendCancel(request.requestId)
+            listener.onDismissDialog()
+        }
+        // Cancel all queued requests
+        while (requestQueue.isNotEmpty()) {
+            val queued = requestQueue.poll()!!
+            webSocket.sendCancel(queued.requestId)
+        }
+        currentRequest = null
+        currentJob = null
+        processedCount = 0
+        totalReceived = 0
     }
 
     /**
@@ -123,7 +154,9 @@ class SignRequestHandler(
 
     private fun processSign(request: SignRequest) {
         val pinRequired = !yubikey.hasCachedPin()
-        listener.onShowSignDialog(request, pinRequired)
+        val total = totalReceived - processedCount
+        val position = 1 // current is always position 1
+        listener.onShowSignDialog(request, pinRequired, position, total)
         intentionallyCancelled = false
 
         currentJob = scope.launch {
@@ -202,6 +235,12 @@ class SignRequestHandler(
     private fun finishCurrent() {
         currentRequest = null
         currentJob = null
+        processedCount++
+        // Reset counters when queue is drained
+        if (requestQueue.isEmpty()) {
+            processedCount = 0
+            totalReceived = 0
+        }
         processNext()
     }
 

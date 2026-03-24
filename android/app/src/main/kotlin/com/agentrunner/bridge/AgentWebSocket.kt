@@ -25,6 +25,7 @@ class AgentWebSocket(private val serverUrl: String) {
     }
 
     var onSignRequest: ((SignRequest) -> Unit)? = null
+    var onDisconnect: (() -> Unit)? = null
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS) // No read timeout for WebSocket
@@ -115,11 +116,17 @@ class AgentWebSocket(private val serverUrl: String) {
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d(TAG, "WebSocket closed: $code $reason")
+                if (!intentionalDisconnect) {
+                    onDisconnect?.invoke()
+                }
                 scheduleReconnect()
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.w(TAG, "WebSocket failure: ${t.message}")
+                if (!intentionalDisconnect) {
+                    onDisconnect?.invoke()
+                }
                 scheduleReconnect()
             }
         })

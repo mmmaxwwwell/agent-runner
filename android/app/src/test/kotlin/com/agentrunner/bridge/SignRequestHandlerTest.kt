@@ -89,21 +89,21 @@ class SignRequestHandlerTest {
         advanceUntilIdle()
 
         // First request should show dialog
-        verify(exactly = 1) { listener.onShowSignDialog(any(), any()) }
+        verify(exactly = 1) { listener.onShowSignDialog(any(), any(), any(), any()) }
 
         // Second request arrives while first is pending
         handler.onSignRequest(makeSignRequest(requestId = "req-2"))
         advanceUntilIdle()
 
         // Still only one dialog shown (second is queued)
-        verify(exactly = 1) { listener.onShowSignDialog(any(), any()) }
+        verify(exactly = 1) { listener.onShowSignDialog(any(), any(), any(), any()) }
 
         // Complete first sign
         firstSignDeferred.complete(byteArrayOf(0x01, 0x02))
         advanceUntilIdle()
 
         // Now second dialog should appear
-        verify(exactly = 2) { listener.onShowSignDialog(any(), any()) }
+        verify(exactly = 2) { listener.onShowSignDialog(any(), any(), any(), any()) }
     }
 
     // --- Cancel ---
@@ -183,7 +183,7 @@ class SignRequestHandlerTest {
         advanceUntilIdle()
 
         // Should NOT show dialog for list keys
-        verify(exactly = 0) { listener.onShowSignDialog(any(), any()) }
+        verify(exactly = 0) { listener.onShowSignDialog(any(), any(), any(), any()) }
 
         // Should send response via WebSocket
         verify { webSocket.sendResponse(eq("req-list"), any()) }
@@ -202,7 +202,7 @@ class SignRequestHandlerTest {
         advanceUntilIdle()
 
         // Dialog should show with pinRequired = true
-        verify { listener.onShowSignDialog(any(), eq(true)) }
+        verify { listener.onShowSignDialog(any(), eq(true), any(), any()) }
     }
 
     @Test
@@ -215,7 +215,7 @@ class SignRequestHandlerTest {
         advanceUntilIdle()
 
         // Dialog shows with PIN required
-        verify { listener.onShowSignDialog(any(), eq(true)) }
+        verify { listener.onShowSignDialog(any(), eq(true), any(), any()) }
 
         // User enters PIN
         handler.onPinEntered("123456".toCharArray())
@@ -232,7 +232,7 @@ class SignRequestHandlerTest {
         advanceUntilIdle()
 
         // Dialog should show with pinRequired = false (PIN cached)
-        verify { listener.onShowSignDialog(any(), eq(false)) }
+        verify { listener.onShowSignDialog(any(), eq(false), any(), any()) }
     }
 
     @Test

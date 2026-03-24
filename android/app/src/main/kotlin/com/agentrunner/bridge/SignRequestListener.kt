@@ -5,8 +5,11 @@ package com.agentrunner.bridge
  * Implemented by the activity/fragment hosting the sign dialog.
  */
 interface SignRequestListener {
-    /** Show the sign request dialog. [pinRequired] indicates whether PIN input field should be visible. */
-    fun onShowSignDialog(request: SignRequest, pinRequired: Boolean)
+    /** Show the sign request dialog. [pinRequired] indicates whether PIN input field should be visible. [queuePosition] is 1-based, [queueTotal] is total pending+current. */
+    fun onShowSignDialog(request: SignRequest, pinRequired: Boolean, queuePosition: Int = 1, queueTotal: Int = 1)
+
+    /** Update the queue badge on the current dialog (e.g., "Request 2 of 3"). */
+    fun onQueueUpdated(queuePosition: Int, queueTotal: Int)
 
     /** Dismiss the currently visible sign dialog. */
     fun onDismissDialog()

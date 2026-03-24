@@ -137,7 +137,7 @@
 
 - [x] T026 [P] Handle activity recreation (rotation, backgrounding) in MainActivity — save/restore WebView state, current sessionId, AgentWebSocket connection state. Ensure sign modal survives rotation (DialogFragment handles this). Re-establish WebSocket on activity restore
 - [x] T027 [P] Handle Yubikey disconnect mid-signing — in YubikeyManager, detect USB onClosed during active sign operation. In SignRequestHandler, auto-cancel pending request and show error in modal. Handle NFC loss during signing similarly
-- [ ] T028 [P] Handle multiple queued sign requests — in SignRequestHandler, ensure queue is processed FIFO. Show count badge on modal ("Request 1 of 3"). Cancel all pending on WebSocket disconnect
+- [x] T028 [P] Handle multiple queued sign requests — in SignRequestHandler, ensure queue is processed FIFO. Show count badge on modal ("Request 1 of 3"). Cancel all pending on WebSocket disconnect
 - [ ] T029 Handle WebSocket disconnect during sign modal — dismiss modal, show connection error toast, fail pending requests. On reconnect, pending sign requests are NOT replayed (server already timed out)
 - [ ] T030 Add ProGuard/R8 rules for Yubico SDK in app/proguard-rules.pro — ensure yubikit classes are not minified. Add keep rules for @JavascriptInterface methods
 

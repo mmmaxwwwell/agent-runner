@@ -306,6 +306,9 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         ws.onSignRequest = { request ->
             runOnUiThread { handler.onSignRequest(request) }
         }
+        ws.onDisconnect = {
+            runOnUiThread { handler.cancelAll() }
+        }
         agentWebSocket = ws
         signRequestHandler = handler
         ws.connect(sessionId)
@@ -322,11 +325,15 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
     // --- SignRequestListener implementation ---
 
-    override fun onShowSignDialog(request: SignRequest, pinRequired: Boolean) {
-        val dialog = SignRequestDialog.newInstance(request.context, pinRequired)
+    override fun onShowSignDialog(request: SignRequest, pinRequired: Boolean, queuePosition: Int, queueTotal: Int) {
+        val dialog = SignRequestDialog.newInstance(request.context, pinRequired, queuePosition, queueTotal)
         dialog.configure(this, yubikeyManager.status)
         dialog.show(supportFragmentManager, SIGN_DIALOG_TAG)
         signDialog = dialog
+    }
+
+    override fun onQueueUpdated(queuePosition: Int, queueTotal: Int) {
+        signDialog?.showQueueBadge(queuePosition, queueTotal)
     }
 
     override fun onDismissDialog() {

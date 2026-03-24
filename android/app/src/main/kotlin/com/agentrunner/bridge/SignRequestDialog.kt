@@ -36,6 +36,7 @@ class SignRequestDialog : DialogFragment() {
     private var yubikeyStatus: LiveData<YubikeyStatus>? = null
 
     private lateinit var contextText: TextView
+    private lateinit var queueBadge: TextView
     private lateinit var pinInputLayout: TextInputLayout
     private lateinit var pinEditText: TextInputEditText
     private lateinit var pinErrorText: TextView
@@ -47,15 +48,21 @@ class SignRequestDialog : DialogFragment() {
     companion object {
         private const val ARG_CONTEXT = "context"
         private const val ARG_PIN_REQUIRED = "pin_required"
+        private const val ARG_QUEUE_POSITION = "queue_position"
+        private const val ARG_QUEUE_TOTAL = "queue_total"
 
         fun newInstance(
             operationContext: String,
-            pinRequired: Boolean
+            pinRequired: Boolean,
+            queuePosition: Int = 1,
+            queueTotal: Int = 1
         ): SignRequestDialog {
             return SignRequestDialog().apply {
                 arguments = Bundle().apply {
                     putString(ARG_CONTEXT, operationContext)
                     putBoolean(ARG_PIN_REQUIRED, pinRequired)
+                    putInt(ARG_QUEUE_POSITION, queuePosition)
+                    putInt(ARG_QUEUE_TOTAL, queueTotal)
                 }
             }
         }
@@ -94,6 +101,7 @@ class SignRequestDialog : DialogFragment() {
         super.onViewCreated(view, savedInstanceState)
 
         contextText = view.findViewById(R.id.contextText)
+        queueBadge = view.findViewById(R.id.queueBadge)
         pinInputLayout = view.findViewById(R.id.pinInputLayout)
         pinEditText = view.findViewById(R.id.pinEditText)
         pinErrorText = view.findViewById(R.id.pinErrorText)
@@ -102,8 +110,11 @@ class SignRequestDialog : DialogFragment() {
 
         pinRequired = arguments?.getBoolean(ARG_PIN_REQUIRED, false) ?: false
         val operationContext = arguments?.getString(ARG_CONTEXT) ?: ""
+        val queuePosition = arguments?.getInt(ARG_QUEUE_POSITION, 1) ?: 1
+        val queueTotal = arguments?.getInt(ARG_QUEUE_TOTAL, 1) ?: 1
 
         contextText.text = operationContext
+        updateQueueBadge(queuePosition, queueTotal)
 
         if (pinRequired) {
             pinInputLayout.visibility = View.VISIBLE
@@ -147,6 +158,23 @@ class SignRequestDialog : DialogFragment() {
                 }
             }
             YubikeyStatus.ERROR -> getString(R.string.sign_request_connect_yubikey)
+        }
+    }
+
+    /**
+     * Update the queue count badge (e.g., "Request 1 of 3").
+     */
+    fun showQueueBadge(position: Int, total: Int) {
+        if (!isAdded) return
+        updateQueueBadge(position, total)
+    }
+
+    private fun updateQueueBadge(position: Int, total: Int) {
+        if (total > 1) {
+            queueBadge.text = getString(R.string.sign_request_queue_badge, position, total)
+            queueBadge.visibility = View.VISIBLE
+        } else {
+            queueBadge.visibility = View.GONE
         }
     }
 

@@ -176,3 +176,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `onSignError` is called before `onDismissDialog` in the disconnect handler — this briefly shows the error before the dialog dismisses. Matches the pattern used for PIN blocked errors.
 - The IOException catch in `signWithPinLoop` re-throws to let the outer `processSign` handler deal with it (send cancel, show error, dismiss, finish).
 
+### T028 — Multiple queued sign requests
+- Queue badge uses `processedCount` and `totalReceived` counters rather than tracking position per-request. Position is always 1 (current request), total is `totalReceived - processedCount`. Counters reset when queue drains.
+- `cancelAll()` cancels current job + sends cancel for all queued requests. Called from `AgentWebSocket.onDisconnect` callback (invoked on OkHttp background thread, so wrapped in `runOnUiThread` in MainActivity).
+- `AgentWebSocket.onDisconnect` fires on `onClosed` and `onFailure` but NOT on intentional disconnect (when `disconnect()` is called). This prevents double-cancel when navigating away from a session.
+- `SignRequestListener.onQueueUpdated(position, total)` was added to update the badge on an already-visible dialog when new requests arrive. `onShowSignDialog` also received `queuePosition` and `queueTotal` params with default values of 1 to maintain backward compatibility.
+- The `queueBadge` TextView is placed between the title and context text in the dialog layout, hidden by default (gone), shown only when total > 1.
+
