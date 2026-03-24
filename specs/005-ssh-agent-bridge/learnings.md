@@ -54,6 +54,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The input resume route (`POST /api/sessions/:id/input`) reuses the existing bridge if still alive, or creates a new one. This matters because the bridge socket server is independent of the child process.
 - Fixed pre-existing build errors in `ssh-agent-bridge.ts`: import extension `.ts` → `.js` (TS5097), and added explicit `Buffer` type annotation on socket data handler (TS2345).
 
+### T016 — Wiring bridge into projects.ts workflow phases
+- `setupBridge`, `cleanupBridge`, and `injectSSHAuthSock` are now exported from `sessions.ts` for reuse. Both `runPhase` callbacks in `projects.ts` (add-feature and start-planning) follow the same pattern as the session routes.
+- Each workflow phase gets its own bridge (tied to the phase's `sessionId`), created before spawn and cleaned up after `waitForExit()`. This means the bridge is ephemeral per-phase, not per-workflow.
+- The shared `activeBridges` map in `sessions.ts` means WebSocket handlers can find bridges regardless of whether they were created by session routes or project workflow routes.
+
 ### T013 — Bridge implementation patterns
 - `createBridge` uses closure-based state (pendingRequests map, server) rather than a class — keeps the public interface minimal (just the SSHAgentBridge interface methods).
 - Stale socket removal uses `unlink` with ENOENT suppression before `server.listen()`.

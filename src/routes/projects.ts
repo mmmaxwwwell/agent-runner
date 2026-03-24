@@ -14,6 +14,7 @@ import { spawnProcess } from '../services/process-manager.js';
 import { createSessionLogger } from '../services/session-logger.js';
 import { broadcastPhaseTransition } from '../ws/session-stream.js';
 import { broadcastProjectUpdate, broadcastOnboardingStep } from '../ws/dashboard.js';
+import { setupBridge, cleanupBridge, injectSSHAuthSock } from './sessions.js';
 import { runOnboardingPipeline, validateNewProjectName, NewProjectValidationError, type OnboardingContext } from '../services/onboarding.js';
 import { randomUUID } from 'node:crypto';
 
@@ -306,6 +307,13 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           allowUnsandboxed,
           prompt,
         });
+
+        // Set up SSH agent bridge if project has SSH remote
+        const bridgeSocketPath = await setupBridge(sessionId, projectDir, cfg.dataDir);
+        if (bridgeSocketPath) {
+          injectSSHAuthSock(sandboxCmd, bridgeSocketPath);
+        }
+
         const logPath = join(cfg.dataDir, 'sessions', sessionId, 'output.jsonl');
         const logger = createSessionLogger(logPath);
         const handle = spawnProcess({
@@ -314,9 +322,11 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           sessionId,
           logger,
           dataDir: cfg.dataDir,
+          env: sandboxCmd.env,
         });
 
         const result = await handle.waitForExit();
+        await cleanupBridge(sessionId);
         return { exitCode: result.exitCode };
       },
       analyzeHasIssues: async (_projectDir: string): Promise<boolean> => {
@@ -663,6 +673,13 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           allowUnsandboxed: cfg.allowUnsandboxed,
           prompt,
         });
+
+        // Set up SSH agent bridge if project has SSH remote
+        const bridgeSocketPath = await setupBridge(sessionId, projectDir, cfg.dataDir);
+        if (bridgeSocketPath) {
+          injectSSHAuthSock(sandboxCmd, bridgeSocketPath);
+        }
+
         const logPath = join(cfg.dataDir, 'sessions', sessionId, 'output.jsonl');
         const logger = createSessionLogger(logPath);
         const handle = spawnProcess({
@@ -671,9 +688,11 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           sessionId,
           logger,
           dataDir: cfg.dataDir,
+          env: sandboxCmd.env,
         });
 
         const result = await handle.waitForExit();
+        await cleanupBridge(sessionId);
         return { exitCode: result.exitCode };
       },
       analyzeHasIssues: async (_projectDir: string): Promise<boolean> => {

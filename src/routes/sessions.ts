@@ -32,7 +32,7 @@ export function getActiveBridge(sessionId: string): SSHAgentBridge | undefined {
  * Create an SSH agent bridge for a session if the project has an SSH remote.
  * Returns the socket path if bridge was created, undefined otherwise.
  */
-async function setupBridge(sessionId: string, projectDir: string, dataDir: string): Promise<string | undefined> {
+export async function setupBridge(sessionId: string, projectDir: string, dataDir: string): Promise<string | undefined> {
   const remote = detectSSHRemote(projectDir);
   if (!remote) return undefined;
 
@@ -56,7 +56,7 @@ async function setupBridge(sessionId: string, projectDir: string, dataDir: strin
 }
 
 /** Destroy and remove the SSH agent bridge for a session. */
-async function cleanupBridge(sessionId: string): Promise<void> {
+export async function cleanupBridge(sessionId: string): Promise<void> {
   const bridge = activeBridges.get(sessionId);
   if (bridge) {
     activeBridges.delete(sessionId);
@@ -72,7 +72,7 @@ async function cleanupBridge(sessionId: string): Promise<void> {
  * Inject SSH_AUTH_SOCK into a SandboxCommand. For sandboxed processes,
  * also adds --setenv and BindPaths so the socket is accessible inside the sandbox.
  */
-function injectSSHAuthSock(sandboxCmd: SandboxCommand, socketPath: string): void {
+export function injectSSHAuthSock(sandboxCmd: SandboxCommand, socketPath: string): void {
   sandboxCmd.env = { ...sandboxCmd.env, SSH_AUTH_SOCK: socketPath };
 
   if (!sandboxCmd.unsandboxed) {
