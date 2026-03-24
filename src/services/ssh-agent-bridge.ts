@@ -50,6 +50,36 @@ const WHITELISTED_TYPES = new Set([
 
 const FAILURE_RESPONSE = Buffer.from([0, 0, 0, 1, SSH_AGENT_FAILURE]);
 
+/**
+ * Build a human-readable context string describing an SSH agent request.
+ * For type 13 (sign): includes remote URL, username, and key algorithm from parsed sign request.
+ * For type 11 (list keys): "List SSH keys for <remote>".
+ * Fallback: "SSH sign request from sandboxed agent".
+ */
+export function buildRequestContext(
+  messageType: number,
+  remoteContext: string | null,
+  signRequest?: { username?: string; keyAlgorithm?: string } | null,
+): string {
+  if (messageType === SSH_AGENTC_SIGN_REQUEST) {
+    if (!remoteContext) return 'SSH sign request from sandboxed agent';
+    const parts = [`Sign request for git push to ${remoteContext}`];
+    if (signRequest?.username) parts.push(`user: ${signRequest.username}`);
+    if (signRequest?.keyAlgorithm) parts.push(`algo: ${signRequest.keyAlgorithm}`);
+    return parts.length > 1
+      ? `${parts[0]} (${parts.slice(1).join(', ')})`
+      : parts[0];
+  }
+
+  if (messageType === SSH_AGENTC_REQUEST_IDENTITIES) {
+    return remoteContext
+      ? `List SSH keys for ${remoteContext}`
+      : 'SSH sign request from sandboxed agent';
+  }
+
+  return 'SSH sign request from sandboxed agent';
+}
+
 export async function createBridge(options: CreateBridgeOptions): Promise<SSHAgentBridge> {
   const { sessionId, socketPath, remoteContext, onRequest, timeoutMs = 60000 } = options;
   const pendingRequests = new Map<string, PendingRequest>();
@@ -73,18 +103,8 @@ export async function createBridge(options: CreateBridgeOptions): Promise<SSHAge
       const requestId = randomUUID();
 
       // Build context string
-      let context: string;
-      if (type === SSH_AGENTC_SIGN_REQUEST) {
-        const parsed = parseSignRequest(payload);
-        const parts = [`Sign request for git push to ${remoteContext}`];
-        if (parsed?.username) parts.push(`user: ${parsed.username}`);
-        if (parsed?.keyAlgorithm) parts.push(`algo: ${parsed.keyAlgorithm}`);
-        context = parts.length > 1
-          ? `${parts[0]} (${parts.slice(1).join(', ')})`
-          : parts[0];
-      } else {
-        context = `List SSH keys for ${remoteContext}`;
-      }
+      const parsed = type === SSH_AGENTC_SIGN_REQUEST ? parseSignRequest(payload) : null;
+      const context = buildRequestContext(type, remoteContext, parsed);
 
       // Build base64 data: type byte + payload (the full message body excluding length prefix)
       const messageBody = Buffer.concat([Buffer.from([type]), payload]);

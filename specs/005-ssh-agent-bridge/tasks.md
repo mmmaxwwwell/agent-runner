@@ -114,7 +114,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T021 [US4] Implement context string builder in src/services/ssh-agent-bridge.ts — `buildRequestContext(messageType, remoteContext, signRequest?)` returns human-readable string. For type 13: include remote URL, username, and key algorithm from parsed sign request. For type 11: "List SSH keys for git push to <remote>". Fallback: "SSH sign request from sandboxed agent"
+- [x] T021 [US4] Implement context string builder in src/services/ssh-agent-bridge.ts — `buildRequestContext(messageType, remoteContext, signRequest?)` returns human-readable string. For type 13: include remote URL, username, and key algorithm from parsed sign request. For type 11: "List SSH keys for git push to <remote>". Fallback: "SSH sign request from sandboxed agent"
 
 **Checkpoint**: Users can see meaningful descriptions of what they're authorizing
 
