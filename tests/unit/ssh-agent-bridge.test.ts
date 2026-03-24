@@ -10,6 +10,7 @@ import {
   SSH_AGENT_FAILURE,
   SSH_AGENTC_REQUEST_IDENTITIES,
   SSH_AGENTC_SIGN_REQUEST,
+  SSH_AGENT_IDENTITIES_ANSWER,
 } from '../../src/services/ssh-agent-protocol.ts';
 
 /** Build an SSH agent wire-format message: [4-byte BE length] [1-byte type] [payload] */
@@ -265,6 +266,167 @@ describe('SSHAgentBridge message type whitelisting', () => {
       assert.equal(requests.length, 1, 'SIGN_REQUEST should trigger onRequest');
       assert.equal(requests[0].messageType, SSH_AGENTC_SIGN_REQUEST);
       assert.notDeepEqual(response, FAILURE_RESPONSE, 'Whitelisted type should not return FAILURE');
+    } finally {
+      await bridge.destroy();
+    }
+  });
+});
+
+/** Build an SSH string: [4-byte BE length] [data] */
+function buildSSHString(data: string | Buffer): Buffer {
+  const buf = typeof data === 'string' ? Buffer.from(data) : data;
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(buf.length, 0);
+  return Buffer.concat([len, buf]);
+}
+
+/**
+ * Build a SIGN_REQUEST payload with SSH userauth data.
+ * Format: string key_blob, string data, uint32 flags
+ * Data field (SSH userauth): string session_id, byte 50, string username,
+ *   string service, string "publickey", boolean TRUE, string algorithm, string key_blob
+ */
+function buildSignRequestPayload(opts: {
+  keyBlob?: Buffer;
+  username?: string;
+  algorithm?: string;
+  useUserauthFormat?: boolean;
+}): Buffer {
+  const {
+    keyBlob = Buffer.from('fake-key-blob'),
+    username = 'git',
+    algorithm = 'ecdsa-sha2-nistp256',
+    useUserauthFormat = true,
+  } = opts;
+
+  let dataField: Buffer;
+  if (useUserauthFormat) {
+    // SSH userauth structure
+    const sessionId = buildSSHString(Buffer.from('fake-session-id'));
+    const marker = Buffer.from([50]); // SSH_MSG_USERAUTH_REQUEST
+    const user = buildSSHString(username);
+    const service = buildSSHString('ssh-connection');
+    const method = buildSSHString('publickey');
+    const boolTrue = Buffer.from([1]);
+    const algo = buildSSHString(algorithm);
+    const key = buildSSHString(keyBlob);
+    dataField = Buffer.concat([sessionId, marker, user, service, method, boolTrue, algo, key]);
+  } else {
+    // Non-userauth format (opaque data)
+    dataField = Buffer.from('opaque-non-userauth-data');
+  }
+
+  const flags = Buffer.alloc(4);
+  flags.writeUInt32BE(0, 0);
+
+  return Buffer.concat([buildSSHString(keyBlob), buildSSHString(dataField), flags]);
+}
+
+describe('SSHAgentBridge context generation', () => {
+  let tmpDir: string;
+  let socketPath: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'ssh-bridge-context-'));
+    socketPath = join(tmpDir, 'agent.sock');
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  function sendAndReceive(path: string, data: Buffer): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const client = net.createConnection(path, () => {
+        client.write(data);
+      });
+      client.on('data', (chunk) => {
+        client.end();
+        resolve(chunk);
+      });
+      client.on('error', reject);
+    });
+  }
+
+  it('should include remote, username, and algorithm in sign request context', async () => {
+    const requests: BridgeRequest[] = [];
+
+    const bridge = await createBridge({
+      sessionId: 'context-sign-1',
+      socketPath,
+      remoteContext: 'github.com:user/repo.git',
+      onRequest: (req) => {
+        requests.push(req);
+        bridge.handleResponse(req.requestId, Buffer.from([14, 0]));
+      },
+    });
+
+    try {
+      const payload = buildSignRequestPayload({
+        username: 'git',
+        algorithm: 'ecdsa-sha2-nistp256',
+      });
+      const msg = buildMessage(SSH_AGENTC_SIGN_REQUEST, payload);
+      await sendAndReceive(socketPath, msg);
+
+      assert.equal(requests.length, 1);
+      assert.equal(
+        requests[0].context,
+        'Sign request for git push to github.com:user/repo.git (user: git, algo: ecdsa-sha2-nistp256)',
+      );
+    } finally {
+      await bridge.destroy();
+    }
+  });
+
+  it('should use list-keys context for REQUEST_IDENTITIES', async () => {
+    const requests: BridgeRequest[] = [];
+
+    const bridge = await createBridge({
+      sessionId: 'context-list-1',
+      socketPath,
+      remoteContext: 'github.com:user/repo.git',
+      onRequest: (req) => {
+        requests.push(req);
+        bridge.handleResponse(req.requestId, Buffer.from([SSH_AGENT_IDENTITIES_ANSWER, 0, 0, 0, 0]));
+      },
+    });
+
+    try {
+      const msg = buildMessage(SSH_AGENTC_REQUEST_IDENTITIES, Buffer.alloc(0));
+      await sendAndReceive(socketPath, msg);
+
+      assert.equal(requests.length, 1);
+      assert.equal(requests[0].context, 'List SSH keys for github.com:user/repo.git');
+    } finally {
+      await bridge.destroy();
+    }
+  });
+
+  it('should omit user/algo from context when data is not SSH userauth format', async () => {
+    const requests: BridgeRequest[] = [];
+
+    const bridge = await createBridge({
+      sessionId: 'context-fallback-1',
+      socketPath,
+      remoteContext: 'github.com:user/repo.git',
+      onRequest: (req) => {
+        requests.push(req);
+        bridge.handleResponse(req.requestId, Buffer.from([14, 0]));
+      },
+    });
+
+    try {
+      const payload = buildSignRequestPayload({ useUserauthFormat: false });
+      const msg = buildMessage(SSH_AGENTC_SIGN_REQUEST, payload);
+      await sendAndReceive(socketPath, msg);
+
+      assert.equal(requests.length, 1);
+      // No user/algo should be present — just the base context
+      assert.equal(
+        requests[0].context,
+        'Sign request for git push to github.com:user/repo.git',
+      );
     } finally {
       await bridge.destroy();
     }

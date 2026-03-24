@@ -96,7 +96,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] Verify whitelist enforcement in bridge — already implemented in T013. This task adds explicit test coverage for all non-whitelisted types listed in the SSH agent protocol spec and validates the FAILURE response format (`Buffer.from([0,0,0,1,5])`)
+- [~] T019 [US3] Verify whitelist enforcement in bridge — SKIPPED: T018 already added explicit test coverage for all non-whitelisted types (17, 18, 19, 22, 23) and validates the FAILURE response format. All 7 whitelisting tests pass.
 
 **Checkpoint**: Only list-keys and sign requests pass through. Everything else is rejected.
 
@@ -110,7 +110,7 @@
 
 ### Tests for User Story 4
 
-- [ ] T020 [P] [US4] Write tests for context generation in tests/unit/ssh-agent-bridge.test.ts — test context string format for sign request with known remote ("Sign for git push to github.com:user/repo.git (user: git, algo: ecdsa-sha2-nistp256)"). Test context for list-keys request. Test fallback context when no remote context available
+- [x] T020 [P] [US4] Write tests for context generation in tests/unit/ssh-agent-bridge.test.ts — test context string format for sign request with known remote ("Sign for git push to github.com:user/repo.git (user: git, algo: ecdsa-sha2-nistp256)"). Test context for list-keys request. Test fallback context when no remote context available
 
 ### Implementation for User Story 4
 

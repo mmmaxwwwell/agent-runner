@@ -59,6 +59,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Each workflow phase gets its own bridge (tied to the phase's `sessionId`), created before spawn and cleaned up after `waitForExit()`. This means the bridge is ephemeral per-phase, not per-workflow.
 - The shared `activeBridges` map in `sessions.ts` means WebSocket handlers can find bridges regardless of whether they were created by session routes or project workflow routes.
 
+### T020 — Context generation test helpers
+- `buildSSHString(data)` and `buildSignRequestPayload(opts)` helpers in the test file construct valid SSH agent binary payloads for testing. `buildSignRequestPayload` supports both userauth format (with username/algorithm) and opaque non-userauth format.
+- The context string format for sign requests is: `"Sign request for git push to <remote> (user: <user>, algo: <algo>)"` — parenthetical part is omitted when userauth parsing fails.
+- For REQUEST_IDENTITIES: `"List SSH keys for <remote>"`.
+
 ### T013 — Bridge implementation patterns
 - `createBridge` uses closure-based state (pendingRequests map, server) rather than a class — keeps the public interface minimal (just the SSHAgentBridge interface methods).
 - Stale socket removal uses `unlink` with ENOENT suppression before `server.listen()`.
