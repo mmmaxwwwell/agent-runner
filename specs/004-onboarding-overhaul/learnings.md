@@ -63,3 +63,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Error handling tests expect `runOnboardingPipeline()` to catch step failures and update project status to `'error'` via `updateProjectStatus()` before re-throwing.
 - The stub at `src/services/onboarding.ts` exports types and throws "Not implemented" — T014 replaces the function bodies.
 
+### T013 — Unified onboard API integration tests
+- Tests for `newProject: true` with missing name and invalid name characters currently "pass" because the current endpoint falls through to `path` validation (400). Once T015 implements unified routing, these will validate for the correct reason. This is acceptable for TDD.
+- Two tests (`should return 400 when name is missing for newProject`, `should return 400 when name contains invalid characters for newProject`) pass for the wrong reason currently — T015 implementer should verify they validate the name, not the path.
+- The idempotent re-onboard tests expect the unified endpoint to allow re-onboarding projects in "onboarding" or "error" status (returning 200/201) while rejecting "active" projects (409). T015 must handle this distinction.
+- The `sessionId` field in the response is a key contract addition — the unified endpoint should launch an interview session and return its ID alongside projectId.
+
