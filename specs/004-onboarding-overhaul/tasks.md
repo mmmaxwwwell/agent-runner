@@ -150,7 +150,7 @@
 ### Implementation for User Story 6
 
 - [x] T030 [US6] Add git remote setup options to onboard endpoint in src/routes/projects.ts — accept `remoteUrl` and `createGithubRepo` fields in request body. Validate mutual exclusivity. Pass to onboarding pipeline
-- [ ] T031 [US6] Implement git-remote onboarding step in src/services/onboarding.ts — if remoteUrl provided: `git remote add origin <url>`. If createGithubRepo: run `gh repo create <name> --private --source .` inside sandbox. Check: skip if origin already configured. Handle `gh` not found or not authenticated with clear error
+- [x] T031 [US6] Implement git-remote onboarding step in src/services/onboarding.ts — if remoteUrl provided: `git remote add origin <url>`. If createGithubRepo: run `gh repo create <name> --private --source .` inside sandbox. Check: skip if origin already configured. Handle `gh` not found or not authenticated with clear error
 - [ ] T032 [US6] Add git remote setup UI to onboarding flow in src/client/components/dashboard.tsx — when user clicks Onboard, show a modal/dialog with: skip, enter remote URL, or create GitHub repo. Pass selection to POST /api/projects/onboard
 
 **Checkpoint**: Projects are git-initialized with optional remote configuration

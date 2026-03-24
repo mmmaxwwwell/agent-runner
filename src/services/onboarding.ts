@@ -152,6 +152,42 @@ export function createOnboardingSteps(ctx: OnboardingContext): OnboardingStep[] 
       },
     },
     {
+      name: 'git-remote',
+      check: () => {
+        // Skip if no remote setup requested
+        if (!ctx.remoteUrl && !ctx.createGithubRepo) return true;
+        // Skip if origin already configured
+        try {
+          execFileSync('git', ['-C', ctx.projectDir, 'remote', 'get-url', 'origin'], { stdio: 'pipe' });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      execute: async () => {
+        if (ctx.remoteUrl) {
+          execFileSync('git', ['-C', ctx.projectDir, 'remote', 'add', 'origin', ctx.remoteUrl], { stdio: 'pipe' });
+        } else if (ctx.createGithubRepo) {
+          try {
+            execFileSync('gh', ['repo', 'create', ctx.projectName, '--private', '--source', ctx.projectDir], {
+              stdio: 'pipe',
+              cwd: ctx.projectDir,
+              timeout: 30_000,
+            });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (/not found|command not found|ENOENT/.test(msg)) {
+              throw new Error('gh CLI not found. Install GitHub CLI (gh) to create repositories automatically.');
+            }
+            if (/not logged|authentication|auth/.test(msg)) {
+              throw new Error('gh CLI not authenticated. Run "gh auth login" first.');
+            }
+            throw new Error(`Failed to create GitHub repo: ${msg}`);
+          }
+        }
+      },
+    },
+    {
       name: 'install-specify',
       check: () => {
         // Cannot easily check `which specify` inside sandbox synchronously.

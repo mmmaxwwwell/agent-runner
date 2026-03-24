@@ -70,6 +70,7 @@ describe('onboarding pipeline', () => {
         'create-directory',
         'generate-flake',
         'git-init',
+        'git-remote',
         'install-specify',
         'specify-init',
         'launch-interview',

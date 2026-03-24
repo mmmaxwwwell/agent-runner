@@ -153,6 +153,12 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The onboard endpoint already parsed and validated `remoteUrl`/`createGithubRepo` (mutual exclusivity check) since T015. T030 only needed to add the fields to `OnboardingContext` and pass them through.
 - Added `'git-remote'` to `OnboardingStepName` union type since the REST API contract lists it as a valid step name. T031 will use this when implementing the actual step.
 
+### T031 — Git-remote onboarding step
+- The `git-remote` step is placed after `git-init` and before `install-specify` in the step array. The check skips entirely when neither `remoteUrl` nor `createGithubRepo` is set in context.
+- `gh repo create` runs outside sandbox (`execFileSync('gh', ...)`) because it needs the user's `gh` auth token and network access. The `--source` flag points to the project directory.
+- Error messages from `gh` failures are matched against regexes (`ENOENT`, `auth`) to provide actionable user-facing errors. The generic fallback includes the original message.
+- The onboarding unit test for step order needed updating to include `git-remote` in the expected array.
+
 ### T028 — Explicit user trigger for planning transition
 - Added `POST /api/projects/:id/start-planning` endpoint that: validates project is in "onboarding" status, verifies no active session (interview must be complete), transitions to "active", and launches plan → tasks → analyze phases async.
 - Created `startPlanningPhases()` in `spec-kit.ts` to run only post-interview phases (plan → tasks → analyze) with the same analyze remediation loop pattern as `runWorkflow()`. This avoids re-running the interview phase.
