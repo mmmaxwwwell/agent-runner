@@ -27,11 +27,16 @@ import com.agentrunner.bridge.SignRequestHandler
 import com.agentrunner.bridge.SignRequestListener
 import com.agentrunner.config.ServerConfig
 import com.agentrunner.push.PushNotificationManager
+import com.agentrunner.signing.KeyRegistry
+import com.agentrunner.signing.KeystoreSigningBackend
+import com.agentrunner.signing.SigningBackend
+import com.agentrunner.signing.YubikeySigningBackend
 import com.agentrunner.yubikey.YubikeyManager
 import com.agentrunner.yubikey.YubikeyStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog.Callback {
 
@@ -45,6 +50,10 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
     private lateinit var yubikeyManager: YubikeyManager
     private lateinit var pushManager: PushNotificationManager
+    private lateinit var keyRegistry: KeyRegistry
+    private lateinit var yubikeySigningBackend: YubikeySigningBackend
+    private lateinit var keystoreSigningBackend: KeystoreSigningBackend
+    private var signingBackends: List<SigningBackend> = emptyList()
     private var agentWebSocket: AgentWebSocket? = null
     private var signRequestHandler: SignRequestHandler? = null
     private var signDialog: SignRequestDialog? = null
@@ -75,6 +84,26 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
         yubikeyManager = YubikeyManager(applicationContext)
         pushManager = PushNotificationManager(applicationContext)
+        keyRegistry = KeyRegistry(applicationContext)
+
+        // Initialize signing backends
+        yubikeySigningBackend = YubikeySigningBackend(yubikeyManager, keyRegistry)
+        keystoreSigningBackend = KeystoreSigningBackend(this, keyRegistry)
+        val backends = mutableListOf<SigningBackend>(yubikeySigningBackend, keystoreSigningBackend)
+
+        // Debug builds include MockSigningBackend (class lives in src/debug/)
+        try {
+            val mockClass = Class.forName("com.agentrunner.signing.MockSigningBackend")
+            val constructor = mockClass.getConstructor(android.content.Context::class.java, KeyRegistry::class.java)
+            val mockBackend = constructor.newInstance(applicationContext, keyRegistry) as SigningBackend
+            mockClass.getMethod("initialize").invoke(mockBackend)
+            backends.add(mockBackend)
+            Log.d(TAG, "MockSigningBackend initialized (debug build)")
+        } catch (_: ClassNotFoundException) {
+            // Release build — MockSigningBackend not available
+        }
+
+        signingBackends = backends
 
         // Save deep link hash for after WebView is ready
         pendingNavigateHash = intent.getStringExtra(PushNotificationManager.EXTRA_NAVIGATE_HASH)
@@ -257,9 +286,18 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         // Observe Yubikey connection state
         yubikeyManager.status.observe(this) { status ->
             updateYubikeyStatus(status)
-            // Notify sign handler when Yubikey disconnects during an active sign operation
-            if (status == YubikeyStatus.DISCONNECTED) {
-                signRequestHandler?.onYubikeyDisconnected()
+            when (status) {
+                YubikeyStatus.CONNECTED_USB, YubikeyStatus.CONNECTED_NFC -> {
+                    // Register Yubikey keys in KeyRegistry on detection
+                    activityScope.launch {
+                        yubikeySigningBackend.onYubikeyConnected()
+                    }
+                }
+                YubikeyStatus.DISCONNECTED -> {
+                    // Notify sign handler when Yubikey disconnects during an active sign operation
+                    signRequestHandler?.onYubikeyDisconnected()
+                }
+                else -> { /* ERROR state — no action needed */ }
             }
         }
     }
@@ -310,7 +348,7 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
     private fun connectWebSocket(sessionId: String) {
         val ws = AgentWebSocket(serverUrl!!)
-        val handler = SignRequestHandler(yubikeyManager, ws, this, activityScope)
+        val handler = SignRequestHandler(yubikeyManager, ws, this, activityScope, keyRegistry, signingBackends)
         ws.onSignRequest = { request ->
             runOnUiThread { handler.onSignRequest(request) }
         }
@@ -436,8 +474,8 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         agentWebSocket?.disconnect()
         agentWebSocket = null
         signRequestHandler = null
-        if (::yubikeyManager.isInitialized) {
-            yubikeyManager.clearPin()
+        if (::yubikeySigningBackend.isInitialized) {
+            yubikeySigningBackend.clearPin()
         }
         if (::webView.isInitialized) {
             webView.destroy()

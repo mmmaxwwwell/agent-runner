@@ -1,6 +1,8 @@
 package com.agentrunner.bridge
 
 import android.util.Log
+import com.agentrunner.signing.KeyRegistry
+import com.agentrunner.signing.SigningBackend
 import com.agentrunner.yubikey.YubikeyManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -25,7 +27,9 @@ class SignRequestHandler(
     private val yubikey: YubikeyManager,
     private val webSocket: AgentWebSocket,
     private val listener: SignRequestListener,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val keyRegistry: KeyRegistry? = null,
+    private val backends: List<SigningBackend> = emptyList()
 ) {
     companion object {
         private const val TAG = "SignRequestHandler"
@@ -144,15 +148,31 @@ class SignRequestHandler(
     private fun processListKeys(request: SignRequest) {
         currentJob = scope.launch {
             try {
-                val keys = yubikey.listKeys()
-                // Build SSH_AGENT_IDENTITIES_ANSWER: byte 12 + uint32 nkeys + (string blob + string comment)*
                 val out = ByteArrayOutputStream()
                 out.write(12) // SSH_AGENT_IDENTITIES_ANSWER
-                out.writeUint32(keys.size)
-                for (key in keys) {
-                    out.writeSshString(key.blob)
-                    out.writeSshString(key.comment.toByteArray())
+
+                if (keyRegistry != null && backends.isNotEmpty()) {
+                    // New path: query KeyRegistry for all keys, filter to currently-available
+                    // per FR-100: app keys always available, Yubikey keys only when connected
+                    val allKeys = keyRegistry.listKeys()
+                    val availableKeys = allKeys.filter { entry ->
+                        backends.any { backend -> backend.canSign(entry) }
+                    }
+                    out.writeUint32(availableKeys.size)
+                    for (entry in availableKeys) {
+                        out.writeSshString(entry.publicKey)
+                        out.writeSshString(entry.publicKeyComment.toByteArray())
+                    }
+                } else {
+                    // Legacy path: direct YubikeyManager query
+                    val keys = yubikey.listKeys()
+                    out.writeUint32(keys.size)
+                    for (key in keys) {
+                        out.writeSshString(key.blob)
+                        out.writeSshString(key.comment.toByteArray())
+                    }
                 }
+
                 webSocket.sendResponse(request.requestId, out.toByteArray())
             } catch (e: Exception) {
                 if (e is CancellationException) throw e

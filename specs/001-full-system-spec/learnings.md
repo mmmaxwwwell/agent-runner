@@ -144,3 +144,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Auto-select behavior**: When 0 or 1 matching keys, no picker is shown. For 0 keys (legacy path with no `matchingKeys` provided), the dialog falls back to the original PIN-only behavior — ensures backward compatibility with `SignRequestHandler` which still calls `onShowSignDialog` without matching keys (T027/T028 will add that).
 - **`selectedKeyId` stored in handler**: `SignRequestHandler.onKeySelected(keyId)` stores the key ID but doesn't route to backends yet — T028 will use this to dispatch to the correct `SigningBackend`.
 - **PIN input conditional on key type**: Only shown for `YUBIKEY_PIV` when `pinRequired`. For `ANDROID_KEYSTORE`, biometric is handled by `KeystoreSigningBackend.sign()` internally. For `MOCK`, no user interaction needed.
+
+### T027 — SigningBackend injection in MainActivity
+- **Reflection for debug-only class**: `MockSigningBackend` lives in `src/debug/` and isn't available in release builds. Used `Class.forName("com.agentrunner.signing.MockSigningBackend")` + reflection to instantiate it conditionally. `ClassNotFoundException` naturally skips it in release.
+- **Backward-compatible SignRequestHandler**: Added `keyRegistry` and `backends` as optional constructor parameters with defaults (`null` and `emptyList()`). When both are provided, `processListKeys` uses the new KeyRegistry+canSign path; otherwise falls back to direct `yubikey.listKeys()`. This keeps existing tests passing until T028/T030 update them.
+- **YubikeySigningBackend.onYubikeyConnected() is suspend**: Must be called from a coroutine scope. The Yubikey status observer in `setupYubikeyStatusOverlay` launches a coroutine via `activityScope.launch` to call it.
+- **clearPin delegation**: `onDestroy` now calls `yubikeySigningBackend.clearPin()` instead of `yubikeyManager.clearPin()` directly — the backend delegates to the manager, keeping the abstraction consistent.
