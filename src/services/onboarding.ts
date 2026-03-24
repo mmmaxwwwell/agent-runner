@@ -11,6 +11,7 @@ import { buildCommand } from './sandbox.js';
 import { spawnProcess } from './process-manager.js';
 import { registerProcess } from './process-registry.js';
 import { createSessionLogger } from './session-logger.js';
+import { TranscriptParser } from './transcript-parser.js';
 
 export type OnboardingStepName =
   | 'register'
@@ -209,6 +210,14 @@ export function createOnboardingSteps(ctx: OnboardingContext): OnboardingStep[] 
 
         registerProcess(session.id, handle);
         state.sessionId = session.id;
+
+        // Start transcript parser — writes transcript.md alongside the interview
+        const transcriptPath = join(ctx.projectDir, 'transcript.md');
+        const parser = new TranscriptParser(logPath, transcriptPath);
+        parser.start();
+
+        // Stop the parser when the interview process exits
+        handle.waitForExit().then(() => parser.stop());
       },
     },
   ];

@@ -133,3 +133,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Only `assistant` and `user` event types are processed. `result` and other types are skipped.
 - Text blocks from mixed text+tool_use messages are extracted; tool_use blocks are silently dropped. Messages with only tool_use blocks produce no output.
 
+### T026 — Transcript parser integration with onboarding
+- Integrated in the `launch-interview` step of `onboarding.ts` (not spec-kit.ts) because the onboarding pipeline has direct access to the process handle, session ID, and data dir — everything needed to wire start/stop.
+- Transcript is written to `<projectDir>/transcript.md` (project root), not `specs/<feature>/transcript.md`, because the spec directory doesn't exist yet during onboarding — the interview agent creates it. T027 can refine the path when the feature name is known.
+- `handle.waitForExit().then(() => parser.stop())` is fire-and-forget — the promise is intentionally not awaited since the pipeline doesn't wait for the interview to finish.
+- The spec-kit workflow (`spec-kit.ts`) does NOT have transcript parser integration yet — it would need `dataDir` plumbed through to construct the output.jsonl path. This can be added when T027 updates the post-interview handoff.
+
