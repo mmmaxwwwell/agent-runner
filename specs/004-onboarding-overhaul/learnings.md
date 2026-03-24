@@ -187,6 +187,12 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `tests/integration/dashboard-api.test.ts` had one test using the deprecated endpoint to trigger WebSocket broadcasts. Replaced with `POST /api/projects/onboard` — but the onboard endpoint broadcasts `onboarding-step` messages (not `project-update`), so the assertion had to change from checking `project-update` to `onboarding-step` message type and shape.
 - Watch for variable name collisions when editing tests — the dashboard test already had `wfDir` declared in the same scope.
 
+### T038 — Quickstart sandbox validation
+- `claude-code` has an unfree license in nixpkgs. The sandbox command needs both `--setenv=NIXPKGS_ALLOW_UNFREE=1` (on `systemd-run`) and `--impure` (on `nix shell`) for it to evaluate. Without these, `nix shell` fails with "Refusing to evaluate package 'claude-code' because it has an unfree license".
+- `ProtectSystem=strict` makes `/tmp` read-only inside the sandbox. `PrivateTmp=yes` was already present in `buildCommand()` but was missing from the quickstart manual test commands. Always include `PrivateTmp=yes` when using `ProtectSystem=strict` with nix.
+- `systemd-run` does NOT propagate the caller's environment variables. Use `--setenv=VAR=VALUE` to pass env vars into the sandbox unit.
+- The quickstart test commands were missing a prerequisite (create /tmp/test-project with a flake.nix). Updated to include the setup step.
+
 ### T036 — Onboard API test race condition fix
 - The 3 failing tests in `onboard-api.test.ts` were all the same issue: the async onboarding pipeline fails fast in the test environment (no nix/sandbox available) and sets status to `"error"` before the test reads `projects.json`. Fixed by accepting either `"onboarding"` or `"error"` status.
 - The contract tests in `rest-api-projects.test.ts` already passed — no changes needed there.

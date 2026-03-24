@@ -165,6 +165,18 @@ describe('sandbox', () => {
         assert.ok(uvRef, 'Missing uv nix flake reference');
       });
 
+      it('should include --impure flag for unfree package support', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const shellIdx = result.args.indexOf('shell');
+        assert.equal(result.args[shellIdx + 1], '--impure', '--impure should follow shell');
+      });
+
+      it('should set NIXPKGS_ALLOW_UNFREE env var in sandboxed mode', () => {
+        const result = buildCommand(projectDir, 'interview', defaultOpts);
+        const setenvArg = result.args.find(a => a === '--setenv=NIXPKGS_ALLOW_UNFREE=1');
+        assert.ok(setenvArg, 'Missing --setenv=NIXPKGS_ALLOW_UNFREE=1 in sandboxed args');
+      });
+
       it('should have nix develop inside the nix shell --command', () => {
         const result = buildCommand(projectDir, 'interview', defaultOpts);
 
@@ -200,6 +212,7 @@ describe('sandbox', () => {
 
         assert.equal(result.command, 'nix');
         assert.equal(result.args[0], 'shell');
+        assert.equal(result.args[1], '--impure');
         assert.equal(result.unsandboxed, true);
       });
 

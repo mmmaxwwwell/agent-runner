@@ -77,9 +77,10 @@ export function buildCommand(
     'claude', ...claudeArgs,
   ];
 
-  // Outer wrapper: nix shell <refs> --command <innerCommand>
+  // Outer wrapper: nix shell --impure <refs> --command <innerCommand>
+  // --impure required so NIXPKGS_ALLOW_UNFREE env var is respected (claude-code has unfree license)
   const nixShellCommand = [
-    'shell', CLAUDE_CODE_REF, UV_REF, '--command',
+    'shell', '--impure', CLAUDE_CODE_REF, UV_REF, '--command',
     ...innerCommand,
   ];
 
@@ -90,6 +91,7 @@ export function buildCommand(
     const args = [
       '--user',
       '--pipe',
+      '--setenv=NIXPKGS_ALLOW_UNFREE=1',
       '--property=ProtectHome=tmpfs',
       `--property=BindPaths=${bindPaths}`,
       `--property=BindReadOnlyPaths=${agentFrameworkDir}`,

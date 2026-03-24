@@ -47,12 +47,27 @@ nix develop -c npm run lint
 ## Sandbox Testing (Manual)
 
 ```bash
+# Prerequisite: create a test project with a flake.nix
+mkdir -p /tmp/test-project
+cat > /tmp/test-project/flake.nix << 'FLAKE'
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  outputs = { nixpkgs, ... }:
+    let pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    in { devShells.x86_64-linux.default = pkgs.mkShell { packages = [ pkgs.nodejs_22 ]; }; };
+}
+FLAKE
+
 # Test nix shell composition inside sandbox
+# Note: --impure + NIXPKGS_ALLOW_UNFREE=1 required because claude-code has unfree license
+# Note: PrivateTmp=yes required so nix develop can create temp files
 systemd-run --user --pipe \
+  --setenv=NIXPKGS_ALLOW_UNFREE=1 \
   --property=ProtectHome=tmpfs \
   "--property=BindPaths=/tmp/test-project $HOME/.cache/nix $HOME/.local/share/uv" \
   --property=ProtectSystem=strict \
-  -- nix shell 'github:NixOS/nixpkgs/nixpkgs-unstable#claude-code' \
+  --property=PrivateTmp=yes \
+  -- nix shell --impure 'github:NixOS/nixpkgs/nixpkgs-unstable#claude-code' \
               'github:NixOS/nixpkgs/nixpkgs-unstable#uv' \
     --command nix develop /tmp/test-project --command claude --version
 
@@ -62,6 +77,7 @@ systemd-run --user --pipe \
   "--property=BindPaths=/tmp/test-project $HOME/.cache/nix" \
   "--property=BindReadOnlyPaths=$HOME/.local/share/agent-runner/agent-framework" \
   --property=ProtectSystem=strict \
+  --property=PrivateTmp=yes \
   -- cat $HOME/.local/share/agent-runner/agent-framework/ROUTER.md
 ```
 
