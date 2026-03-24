@@ -64,7 +64,7 @@ if ! command -v adb &>/dev/null; then
   exit 1
 fi
 
-DEVICE_COUNT=$(adb devices | grep -c -E '\t(device|emulator)')
+DEVICE_COUNT=$(adb devices | grep -cE $'\t(device|emulator)' || true)
 if [[ "$DEVICE_COUNT" -eq 0 ]]; then
   echo "ERROR: No Android device/emulator connected. Run 'adb devices' to check."
   exit 1

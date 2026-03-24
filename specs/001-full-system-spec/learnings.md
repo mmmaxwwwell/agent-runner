@@ -203,3 +203,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **`am instrument` output parsing**: Look for `OK (N tests)` for success, `FAILURES!!!` for failures. The `-w` flag waits for completion.
 - **Agent-framework dir must exist**: Server runs `git fetch` on startup. The temp data dir must contain a minimal git repo at `agent-framework/` to avoid clone attempts during tests.
 - **`-e class` filter for am instrument**: Can pass `-e class com.agentrunner` to scope tests to a package. Omit to run all instrumented tests.
+
+### T039 — Orchestration script verification
+- **`grep -c` exits 1 on no matches**: With `set -e`, `DEVICE_COUNT=$(grep -c ...)` exits the script before the `if` check when grep finds 0 matches. Must add `|| true` to suppress the non-zero exit.
+- **`\t` in single-quoted grep pattern**: `grep -E '\t...'` warns "stray \ before t" because `\t` isn't a recognized escape in POSIX extended regex for some grep versions. Use `$'\t...'` (ANSI-C quoting) to pass a literal tab character.
+- **Verified without device**: Server starts with test fixtures (health + projects endpoints work), both debug and test APKs build. The pipeline is correct — only needs a connected device/emulator to run the full end-to-end flow.
+- **Phase 10 checkpoint**: Requires a real Android device/emulator. All infrastructure components are verified independently but the integrated pipeline run awaits device availability.
