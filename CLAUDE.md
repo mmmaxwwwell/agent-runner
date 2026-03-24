@@ -1,6 +1,6 @@
 # agent-runner Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-23
+Auto-generated from all feature plans. Last updated: 2026-03-24
 
 ## Active Technologies
 - TypeScript 5.9 on Node.js 22 (via Nix flake) + `ws` (WebSocket), `web-push` (push notifications), `pino` (logging), `preact` (PWA client), `esbuild` (client bundler) (002-bugfixes-ui-flow-tests)
@@ -39,9 +39,9 @@ Never run `npm`, `node`, `tsx`, `uv`, or `specify` directly — always go throug
 TypeScript on Node.js 22 (via Nix flake, compiled with `tsc`, dev with `tsx`): Follow standard conventions
 
 ## Recent Changes
+- 001-full-system-spec: Consolidated specs 001–006 into unified system specification with comprehensive test coverage requirements
 - 006-android-client: Added Kotlin, Android API 26+ (Android 8.0 Oreo) + `yubikit-android` 3.0.1 (USB/NFC transport + PIV), Android WebView, `java-websocket` or OkHttp (native WebSocket)
 - 005-ssh-agent-bridge: Added TypeScript 5.9 on Node.js 22 (via Nix flake) + `ws` (WebSocket), `net` (Node.js built-in for Unix sockets), `crypto` (UUID generation)
-- 004-onboarding-overhaul: Added TypeScript 5.9 on Node.js 22 (via Nix flake) + `ws` (WebSocket), `web-push` (push notifications), `pino` (logging), `preact` (PWA client), `esbuild` (client bundler)
 
 
 <!-- MANUAL ADDITIONS START -->
