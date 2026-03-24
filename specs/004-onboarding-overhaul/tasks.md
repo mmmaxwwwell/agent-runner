@@ -118,7 +118,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T025 [US4] Create transcript parser service in src/services/transcript-parser.ts — `TranscriptParser` class with `start()`/`stop()` methods. Poll output.jsonl for new entries (reuse byte-offset pattern from src/ws/session-stream.ts). Parse Claude CLI stream-json: extract `assistant` message text blocks → `## Agent` sections, extract user stdin input → `## User` sections. Omit tool_use blocks. Append incrementally to transcript.md. Handle session where spec directory path is provided at construction
+- [x] T025 [US4] Create transcript parser service in src/services/transcript-parser.ts — `TranscriptParser` class with `start()`/`stop()` methods. Poll output.jsonl for new entries (reuse byte-offset pattern from src/ws/session-stream.ts). Parse Claude CLI stream-json: extract `assistant` message text blocks → `## Agent` sections, extract user stdin input → `## User` sections. Omit tool_use blocks. Append incrementally to transcript.md. Handle session where spec directory path is provided at construction
 - [ ] T026 [US4] Integrate transcript parser with interview session launch — in the onboarding pipeline (src/services/onboarding.ts) or spec-kit workflow (src/services/spec-kit.ts), start the transcript parser when the interview session begins, stop it when the session ends. The transcript path should be `specs/<feature-name>/transcript.md`
 
 **Checkpoint**: Transcript is generated in real-time alongside interview sessions

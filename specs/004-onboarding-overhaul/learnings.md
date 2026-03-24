@@ -125,3 +125,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The restart/no-duplicate test creates a new `TranscriptParser` on the same files. T025 should use byte-offset tracking (like session-stream.ts) to resume from where it left off, and check the existing transcript file size to avoid re-processing.
 - The stub exports `TranscriptParser` class with `start()`/`stop()` methods. `stop()` is a no-op in the stub (safe to call). `start()` throws to fail tests.
 
+### T025 — Transcript parser implementation
+- Uses synchronous byte-offset polling (same pattern as `session-stream.ts`'s `readAndBroadcast`). Poll interval is 80ms — fast enough for tests without excessive CPU.
+- Restart dedup: constructor checks if transcript already exists with content. If so, sets `byteOffset` to current output.jsonl size so it skips already-processed data.
+- Two-level JSON parsing: outer `SessionLogEntry` (from session-logger), then inner CLI event from `entry.content`. Both levels can fail independently — each wrapped in its own try/catch.
+- Only `stdout` stream entries are processed. `stderr` and `system` are skipped.
+- Only `assistant` and `user` event types are processed. `result` and other types are skipped.
+- Text blocks from mixed text+tool_use messages are extracted; tool_use blocks are silently dropped. Messages with only tool_use blocks produce no output.
+
