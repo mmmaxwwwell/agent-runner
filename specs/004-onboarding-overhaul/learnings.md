@@ -133,6 +133,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Only `assistant` and `user` event types are processed. `result` and other types are skipped.
 - Text blocks from mixed text+tool_use messages are extracted; tool_use blocks are silently dropped. Messages with only tool_use blocks produce no output.
 
+### T027 — Interview context prompts for post-interview phases
+- `buildPhasePrompt(phase)` is a private function in `spec-kit.ts` — each post-interview phase (plan, tasks, analyze) gets a prompt instructing the agent to read `spec.md`, `interview-notes.md`, and `transcript.md` before executing. The prompts reference `/speckit.plan`, `/speckit.tasks`, `/speckit.analyze` slash commands.
+- The route-level `runPhase` callback now uses `task-run` session type for plan/tasks/analyze phases (since they have required prompts) and `interview` for the interview phase. This was anticipated by T023's learning.
+- Existing spec-kit tests pass unchanged because the mock `runPhase` accepts but doesn't assert on the `prompt` parameter.
+
 ### T026 — Transcript parser integration with onboarding
 - Integrated in the `launch-interview` step of `onboarding.ts` (not spec-kit.ts) because the onboarding pipeline has direct access to the process handle, session ID, and data dir — everything needed to wire start/stop.
 - Transcript is written to `<projectDir>/transcript.md` (project root), not `specs/<feature>/transcript.md`, because the spec directory doesn't exist yet during onboarding — the interview agent creates it. T027 can refine the path when the feature name is known.

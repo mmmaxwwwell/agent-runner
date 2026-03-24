@@ -286,18 +286,22 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         });
       },
       runPhase: async (phase: string, projectDir: string, sessionId: string, prompt?: string): Promise<PhaseResult> => {
+        // Post-interview phases use task-run session type (prompt is required);
+        // interview phase uses interview type (prompt is optional)
+        const sessionType = phase === 'interview' ? 'interview' : 'task-run';
+
         // For the first phase, the session is already created
         // For subsequent phases, create a new session
         if (sessionId !== firstSessionId) {
-          createSession(cfg.dataDir, { projectId: project.id, type: 'interview' });
+          createSession(cfg.dataDir, { projectId: project.id, type: sessionType });
         }
 
         // Ensure agent framework is up-to-date before each session (FR-004)
         ensureAgentFramework(cfg.dataDir);
 
         // Pass through the prompt from the workflow (interview wrapper for interview phase,
-        // future prompts for plan/tasks/analyze phases per T027)
-        const sandboxCmd = buildCommand(projectDir, 'interview', {
+        // context-loading prompts for plan/tasks/analyze phases per T027/FR-042)
+        const sandboxCmd = buildCommand(projectDir, sessionType, {
           agentFrameworkDir: cfg.agentFrameworkDir,
           allowUnsandboxed,
           prompt,

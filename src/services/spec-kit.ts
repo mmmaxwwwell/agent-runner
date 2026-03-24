@@ -8,6 +8,36 @@ const INTERVIEW_WRAPPER_PATH = '.claude/skills/spec-kit/interview-wrapper.md';
 
 const MAX_ANALYZE_ITERATIONS = 5;
 
+/**
+ * Build a prompt for post-interview phases (plan, tasks, analyze) that instructs
+ * the agent to read interview context files before executing the phase.
+ */
+function buildPhasePrompt(phase: string): string {
+  const contextInstructions = `Before executing this phase, read the following files from the spec directory for full interview context:
+- spec.md — the feature specification written during the interview
+- interview-notes.md — summary of key decisions, rejected alternatives, and user priorities
+- transcript.md — full conversation record from the interview session
+
+Use the information from these files to inform your work in this phase.`;
+
+  switch (phase) {
+    case 'plan':
+      return `${contextInstructions}
+
+Now execute the spec-kit plan phase: generate plan.md, data-model.md, and research.md based on the specification and interview context. Use /speckit.plan to drive the planning workflow.`;
+    case 'tasks':
+      return `${contextInstructions}
+
+Now execute the spec-kit tasks phase: generate tasks.md with dependency-ordered, phased tasks based on the plan and specification. Use /speckit.tasks to drive the task generation workflow.`;
+    case 'analyze':
+      return `${contextInstructions}
+
+Now execute the spec-kit analyze phase: perform a cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md. Use /speckit.analyze to drive the analysis workflow. If issues are found, fix them.`;
+    default:
+      return contextInstructions;
+  }
+}
+
 export interface PhaseResult {
   exitCode: number;
 }
@@ -92,8 +122,9 @@ async function runWorkflow(projectDir: string, workflowType: 'new-project' | 'ad
       maxIterations: 1,
       sessionId,
     });
-    // Pass the interview wrapper prompt for the interview phase
-    const prompt = phase === 'interview' ? interviewPrompt : undefined;
+    // Pass the interview wrapper prompt for the interview phase,
+    // or context-loading prompts for plan/tasks phases (FR-042)
+    const prompt = phase === 'interview' ? interviewPrompt : buildPhasePrompt(phase);
     const result = await deps.runPhase(phase, projectDir, sessionId, prompt);
     if (result.exitCode !== 0) {
       return { outcome: 'failed', failedPhase: phase, completedPhases };
@@ -115,7 +146,7 @@ async function runWorkflow(projectDir: string, workflowType: 'new-project' | 'ad
       maxIterations: MAX_ANALYZE_ITERATIONS,
       sessionId,
     });
-    const result = await deps.runPhase('analyze', projectDir, sessionId);
+    const result = await deps.runPhase('analyze', projectDir, sessionId, buildPhasePrompt('analyze'));
     if (result.exitCode !== 0) {
       return { outcome: 'failed', failedPhase: 'analyze', completedPhases, analyzeIterations };
     }
