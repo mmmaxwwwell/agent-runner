@@ -179,3 +179,7 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **MockSigningBackend lives in `src/debug/` but tests in `src/test/`**: Gradle's `testDebugUnitTest` variant has access to both main and debug source sets, so `MockSigningBackend` is visible from `src/test/` without any special configuration.
 - **No heavy mocking needed**: Unlike `KeystoreSigningBackend` which requires mocking Android Keystore, KeyGenParameterSpec.Builder, and BiometricPrompt, `MockSigningBackend` uses standard Java crypto (`KeyPairGenerator`, `Signature`) which works natively in JVM tests. Only `android.util.Base64` and `android.util.Log` need mocking.
 - **ECDSA signatures are non-deterministic**: Each `Signature.sign()` call produces a different result due to random nonce, so tests can't compare signature bytes directly. Verify structure (DER-encoded, starts with 0x30) instead.
+
+### T034 — All Android unit tests green
+- **All 94 tests pass across 6 files with zero code changes**: SignRequestHandler (9), ServerConfig (14), KeyRegistry (24), KeystoreSigningBackend (23), MockSigningBackend (16), SshKeyFormatter (8). The multi-key architecture (T020–T033) was implemented correctly — no fix-validate loop iterations needed.
+- **Phase 9 checkpoint met on first run**: No validation failures, no phase-fix tasks needed.
