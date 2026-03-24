@@ -37,13 +37,29 @@ export function parseMessage(buf: Buffer): { type: number; payload: Buffer; tota
 
 /**
  * Buffers incoming data and emits complete SSH agent messages.
- * Stub — full implementation in T007.
+ * Handles partial reads across multiple feed() calls.
  */
 export class MessageAccumulator {
-  onMessage(_callback: (type: number, payload: Buffer) => void): void {
-    throw new Error('MessageAccumulator not yet implemented');
+  private buffer: Buffer = Buffer.alloc(0);
+  private callback: ((type: number, payload: Buffer) => void) | null = null;
+
+  onMessage(callback: (type: number, payload: Buffer) => void): void {
+    this.callback = callback;
   }
-  feed(_chunk: Buffer): void {
-    throw new Error('MessageAccumulator not yet implemented');
+
+  feed(chunk: Buffer): void {
+    this.buffer = this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
+    this.drain();
+  }
+
+  private drain(): void {
+    while (true) {
+      const msg = parseMessage(this.buffer);
+      if (!msg) break;
+      this.buffer = this.buffer.subarray(msg.totalLength);
+      if (this.callback) {
+        this.callback(msg.type, msg.payload);
+      }
+    }
   }
 }

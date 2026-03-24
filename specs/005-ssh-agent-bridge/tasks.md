@@ -39,7 +39,7 @@
 
 - [x] T005 Implement SSH string reader utility in src/services/ssh-agent-protocol.ts — `readSSHString(buf, offset)` returns `{ data: Buffer, bytesRead: number }`. Reads 4-byte big-endian uint32 length at offset, then extracts `length` bytes of data
 - [x] T006 Implement message framing in src/services/ssh-agent-protocol.ts — `parseMessage(buf)` returns `{ type: number, payload: Buffer, totalLength: number } | null`. Returns null if buffer doesn't contain a complete message (less than 4 + length bytes)
-- [ ] T007 Implement message accumulation buffer in src/services/ssh-agent-protocol.ts — `MessageAccumulator` class with `feed(chunk: Buffer)` method and `onMessage(callback)`. Buffers incoming data, emits complete SSH agent messages via callback. Handles partial reads across multiple `feed()` calls
+- [x] T007 Implement message accumulation buffer in src/services/ssh-agent-protocol.ts — `MessageAccumulator` class with `feed(chunk: Buffer)` method and `onMessage(callback)`. Buffers incoming data, emits complete SSH agent messages via callback. Handles partial reads across multiple `feed()` calls
 
 **Checkpoint**: Protocol parser can read, frame, and accumulate SSH agent binary messages
 
