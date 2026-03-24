@@ -1,0 +1,22 @@
+[
+  {
+    "id": "aaaaaaaa-1111-4000-a000-000000000001",
+    "name": "test-project-alpha",
+    "description": "A test project with active status",
+    "dir": "/tmp/agent-runner-test/projects/alpha",
+    "taskFile": "tasks.md",
+    "promptFile": "prompt.md",
+    "createdAt": "2026-01-15T10:00:00.000Z",
+    "status": "active"
+  },
+  {
+    "id": "aaaaaaaa-1111-4000-a000-000000000002",
+    "name": "test-project-beta",
+    "description": null,
+    "dir": "/tmp/agent-runner-test/projects/beta",
+    "taskFile": "tasks.md",
+    "promptFile": "",
+    "createdAt": "2026-02-20T14:30:00.000Z",
+    "status": "active"
+  }
+]

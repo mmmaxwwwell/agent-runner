@@ -1,0 +1,22 @@
+[
+  {
+    "id": "bbbbbbbb-2222-4000-b000-000000000001",
+    "name": "onboarding-project",
+    "description": null,
+    "dir": "/tmp/agent-runner-test/projects/onboarding",
+    "taskFile": "tasks.md",
+    "promptFile": "",
+    "createdAt": "2026-03-10T09:00:00.000Z",
+    "status": "onboarding"
+  },
+  {
+    "id": "bbbbbbbb-2222-4000-b000-000000000002",
+    "name": "existing-active-project",
+    "description": "Already onboarded and active",
+    "dir": "/tmp/agent-runner-test/projects/existing",
+    "taskFile": "tasks.md",
+    "promptFile": "prompt.md",
+    "createdAt": "2026-01-05T08:00:00.000Z",
+    "status": "active"
+  }
+]
