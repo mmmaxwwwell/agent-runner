@@ -75,6 +75,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The base64 encode/decode round-trip is tested explicitly: `responseData.toString('base64')` → `Buffer.from(base64Data, 'base64')` to match what T025's WebSocket handler will do.
 - Unknown requestId tests verify that `handleResponse`/`handleCancel` silently return without throwing (no pending request = no-op).
 
+### T026 — WebSocket disconnect edge case
+- `failAllPending()` reuses the same pattern as `destroy()` but without closing the server or unlinking the socket — the bridge stays alive for potential reconnects, it just fails current pending requests.
+- The trigger is in `session-stream.ts`'s `ws.on('close')` handler: when the last client in `sessionClients` for a session disconnects, `failAllPending()` is called on the bridge if one exists.
+
 ### T025 — WebSocket message handler wiring
 - The bridge registry (`activeBridges` map + `getActiveBridge()`) already exists in `src/routes/sessions.ts` from T015. No need to create a separate registry in `session-stream.ts` — just import it.
 - The `ws.on('message')` handler in `session-stream.ts` already parses JSON messages. SSH agent handlers slot in as `else if` branches alongside the existing `input` handler.

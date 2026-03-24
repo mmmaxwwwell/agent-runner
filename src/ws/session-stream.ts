@@ -353,6 +353,13 @@ export function handleSessionStream(ws: WebSocket, _req: IncomingMessage, sessio
       if (set.size === 0) {
         sessionClients.delete(sessionId);
         cleanupWatcher(sessionId);
+
+        // No WebSocket clients left — fail any pending SSH agent requests immediately
+        const bridge = getActiveBridge(sessionId);
+        if (bridge) {
+          bridge.failAllPending();
+          log.debug({ sessionId }, 'Failed pending SSH agent requests (no WebSocket clients)');
+        }
       }
     }
     clearInterval(heartbeatInterval);

@@ -33,6 +33,7 @@ export interface SSHAgentBridge {
   socketPath: string;
   handleResponse(requestId: string, data: Buffer): void;
   handleCancel(requestId: string): void;
+  failAllPending(): void;
   destroy(): Promise<void>;
 }
 
@@ -170,6 +171,18 @@ export async function createBridge(options: CreateBridgeOptions): Promise<SSHAge
       pendingRequests.delete(requestId);
       clearTimeout(pending.timeoutTimer);
       pending.clientSocket.write(FAILURE_RESPONSE);
+    },
+
+    failAllPending(): void {
+      for (const [id, pending] of pendingRequests) {
+        clearTimeout(pending.timeoutTimer);
+        try {
+          pending.clientSocket.write(FAILURE_RESPONSE);
+        } catch {
+          // Socket may already be closed
+        }
+        pendingRequests.delete(id);
+      }
     },
 
     async destroy(): Promise<void> {

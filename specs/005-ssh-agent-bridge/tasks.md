@@ -160,7 +160,7 @@
 
 **Purpose**: Edge case handling, cleanup, documentation
 
-- [ ] T026 [P] Add edge case handling for WebSocket disconnect during pending sign request — in ssh-agent-bridge.ts, if WebSocket client disconnects while a request is pending, fail the pending request with SSH_AGENT_FAILURE immediately (don't wait for timeout)
+- [x] T026 [P] Add edge case handling for WebSocket disconnect during pending sign request — in ssh-agent-bridge.ts, if WebSocket client disconnects while a request is pending, fail the pending request with SSH_AGENT_FAILURE immediately (don't wait for timeout)
 - [ ] T027 [P] Add edge case handling for malformed protocol data — in ssh-agent-protocol.ts, ensure `parseMessage()` and `parseSignRequest()` handle truncated/corrupt buffers without throwing. Return null/undefined for unparseable data, log warning
 - [ ] T028 Update UI_FLOW.md with SSH agent bridge WebSocket message types and bridge lifecycle documentation
 - [ ] T029 Run quickstart.md validation — execute manual testing commands from specs/005-ssh-agent-bridge/quickstart.md to verify Unix socket creation, SSH_AUTH_SOCK forwarding, and basic protocol handling
