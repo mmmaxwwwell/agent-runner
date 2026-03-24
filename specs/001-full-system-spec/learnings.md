@@ -209,3 +209,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **`\t` in single-quoted grep pattern**: `grep -E '\t...'` warns "stray \ before t" because `\t` isn't a recognized escape in POSIX extended regex for some grep versions. Use `$'\t...'` (ANSI-C quoting) to pass a literal tab character.
 - **Verified without device**: Server starts with test fixtures (health + projects endpoints work), both debug and test APKs build. The pipeline is correct — only needs a connected device/emulator to run the full end-to-end flow.
 - **Phase 10 checkpoint**: Requires a real Android device/emulator. All infrastructure components are verified independently but the integrated pipeline run awaits device availability.
+
+### T040 — WebViewDashboardTest
+- **`evaluateJavascript` returns JSON-encoded strings**: The callback value for strings is wrapped in quotes (e.g., `"\"hello\""`). Must use `removeSurrounding("\"")` to get the actual value. `null` values come through as the string `"null"`.
+- **No test-id attributes in PWA**: The Preact dashboard uses inline styles, not CSS classes or IDs. Project names use `style.fontWeight === 'bold'` on `<span>` elements. Must query by style attributes or text content.
+- **Preact event delegation**: Click handlers attached via JSX `onClick` are not visible as `element.onclick` attributes. Clicking the element or its parent still works due to Preact's event delegation through `addEventListener`.
+- **WebView in MainActivity**: The WebView is not exposed as a public field. Must traverse the view hierarchy via `window.decorView` → recursive `ViewGroup.getChildAt()` search to find the `WebView` instance for `evaluateJavascript` calls.
+- **ActivityScenario with intent extras**: Use `Intent.putExtra(ServerConfigActivity.EXTRA_SERVER_URL, url)` to bypass the ServerConfig check and avoid redirect to ServerConfigActivity. Also pre-save to SharedPreferences as a fallback.
