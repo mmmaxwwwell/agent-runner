@@ -24,10 +24,15 @@ export function readSSHString(buf: Buffer, offset: number): { data: Buffer; byte
  * Parse a single SSH agent message from a buffer.
  * Wire format: [4-byte big-endian length] [1-byte type] [payload...]
  * Returns null if the buffer doesn't contain a complete message.
- * Stub — full implementation in T006.
  */
-export function parseMessage(_buf: Buffer): { type: number; payload: Buffer; totalLength: number } | null {
-  throw new Error('parseMessage not yet implemented');
+export function parseMessage(buf: Buffer): { type: number; payload: Buffer; totalLength: number } | null {
+  if (buf.length < 4) return null;
+  const length = buf.readUInt32BE(0);
+  if (length === 0) return null;
+  if (buf.length < 4 + length) return null;
+  const type = buf[4];
+  const payload = Buffer.from(buf.subarray(5, 4 + length));
+  return { type, payload, totalLength: 4 + length };
 }
 
 /**
