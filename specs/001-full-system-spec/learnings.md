@@ -137,3 +137,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **RecyclerView with MaterialCardView items**: Used inner `KeyAdapter` and `KeyViewHolder` classes rather than a separate file to keep things simple. The adapter uses `notifyDataSetChanged()` since the key list is small.
 - **KeystoreSigningBackend.deleteKey() handles Keystore cleanup**: When removing an Android Keystore key, must call `keystoreBackend.deleteKey()` (not just `registry.removeKey()`) to also delete the key from the Android Keystore itself.
 - **JavaScript bridge `openKeyManagement()`**: Added to `MainActivity.AgentRunnerBridge` so the PWA can open the key management screen via `window.AgentRunner.openKeyManagement()`.
+
+### T026 — SignRequestDialog key picker
+- **`SignRequestDialog.MatchingKey` data class**: Wraps `KeyEntry` + `available: Boolean`. This is the bridge between the handler (which knows availability) and the dialog (which shows status). Used in both `SignRequestListener` and `SignRequestDialog.Callback`.
+- **RadioGroup for key picker**: Simple RadioGroup with programmatically added RadioButtons — adequate since key count is small (typically 1-3). Each button shows type, name, truncated fingerprint, and status.
+- **Auto-select behavior**: When 0 or 1 matching keys, no picker is shown. For 0 keys (legacy path with no `matchingKeys` provided), the dialog falls back to the original PIN-only behavior — ensures backward compatibility with `SignRequestHandler` which still calls `onShowSignDialog` without matching keys (T027/T028 will add that).
+- **`selectedKeyId` stored in handler**: `SignRequestHandler.onKeySelected(keyId)` stores the key ID but doesn't route to backends yet — T028 will use this to dispatch to the correct `SigningBackend`.
+- **PIN input conditional on key type**: Only shown for `YUBIKEY_PIV` when `pinRequired`. For `ANDROID_KEYSTORE`, biometric is handled by `KeystoreSigningBackend.sign()` internally. For `MOCK`, no user interaction needed.

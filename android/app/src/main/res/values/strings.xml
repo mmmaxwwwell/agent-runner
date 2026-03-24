@@ -19,6 +19,11 @@
     <string name="sign_request_signing">Signing…</string>
     <string name="sign_request_connect_yubikey">Connect Yubikey to sign</string>
     <string name="sign_request_queue_badge">Request %1$d of %2$d</string>
+    <string name="sign_request_select_key">Select signing key</string>
+    <string name="sign_request_key_ready">Ready</string>
+    <string name="sign_request_key_connect_yubikey">Connect YubiKey</string>
+    <string name="sign_request_key_unavailable">Unavailable</string>
+    <string name="sign_request_authenticate">Authenticate to sign</string>
 
     <!-- PIN -->
     <string name="pin_label">PIV PIN</string>

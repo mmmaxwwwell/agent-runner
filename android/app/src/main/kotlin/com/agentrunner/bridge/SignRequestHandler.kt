@@ -43,6 +43,9 @@ class SignRequestHandler(
     // Channel for receiving PIN from UI
     private val pinChannel = Channel<CharArray>(Channel.CONFLATED)
 
+    // Currently selected key ID from the key picker (set by UI, consumed by T028's backend routing)
+    private var selectedKeyId: String? = null
+
     /**
      * Queue an incoming sign request. If no request is currently being processed,
      * starts processing immediately.
@@ -58,6 +61,15 @@ class SignRequestHandler(
             val position = 1 // current request is always position 1
             listener.onQueueUpdated(position, total)
         }
+    }
+
+    /**
+     * Called when the user selects a key in the key picker.
+     * Stores the key ID for backend routing when the sign is performed.
+     */
+    fun onKeySelected(keyId: String) {
+        selectedKeyId = keyId
+        Log.d(TAG, "Key selected: $keyId")
     }
 
     /**

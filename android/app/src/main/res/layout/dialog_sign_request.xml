@@ -28,6 +28,23 @@
         android:layout_marginBottom="16dp"
         android:textAppearance="?attr/textAppearanceBodyMedium" />
 
+    <!-- Key picker section: visible when multiple keys can sign -->
+    <TextView
+        android:id="@+id/keyPickerLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="@string/sign_request_select_key"
+        android:textAppearance="?attr/textAppearanceLabelMedium"
+        android:visibility="gone" />
+
+    <RadioGroup
+        android:id="@+id/keyPickerGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone" />
+
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/pinInputLayout"
         android:layout_width="match_parent"

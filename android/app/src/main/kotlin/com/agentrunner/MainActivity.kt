@@ -336,9 +336,9 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
     // --- SignRequestListener implementation ---
 
-    override fun onShowSignDialog(request: SignRequest, pinRequired: Boolean, queuePosition: Int, queueTotal: Int) {
+    override fun onShowSignDialog(request: SignRequest, pinRequired: Boolean, queuePosition: Int, queueTotal: Int, matchingKeys: List<SignRequestDialog.MatchingKey>) {
         val dialog = SignRequestDialog.newInstance(request.context, pinRequired, queuePosition, queueTotal)
-        dialog.configure(this, yubikeyManager.status)
+        dialog.configure(this, yubikeyManager.status, matchingKeys)
         dialog.show(supportFragmentManager, SIGN_DIALOG_TAG)
         signDialog = dialog
     }
@@ -364,6 +364,10 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         signDialog?.showSignError(message)
     }
 
+    override fun onUpdateMatchingKeys(matchingKeys: List<SignRequestDialog.MatchingKey>) {
+        signDialog?.updateMatchingKeys(matchingKeys)
+    }
+
     // --- SignRequestDialog.Callback implementation ---
 
     override fun onPinSubmitted(pin: CharArray) {
@@ -372,6 +376,10 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
     override fun onSignCancelled() {
         signRequestHandler?.onCancel()
+    }
+
+    override fun onKeySelected(keyId: String) {
+        signRequestHandler?.onKeySelected(keyId)
     }
 
     private fun showErrorView(errorDetail: String? = null) {
