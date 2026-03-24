@@ -47,3 +47,7 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `recovery.ts` takes `agentFrameworkDir` as an optional third param (defaults to `join(dataDir, 'agent-framework')`). Server.ts passes `config.agentFrameworkDir`.
 - Fixed pre-existing TS5097 build error in `agent-framework.ts` stub (`.ts` → `.js` import extension).
 
+### T010 — ensureAgentFramework implementation
+- Used `git fetch` + `git merge --ff-only @{u}` instead of `git pull --ff-only` because `git pull` fails on repos cloned from empty bare repos (no ref to merge). The fetch+merge approach gracefully handles repos with no upstream branch configured.
+- Clone cleanup on failure uses `rmSync(agentFwDir, { recursive: true, force: true })` to avoid leaving partial clones.
+
