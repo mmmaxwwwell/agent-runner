@@ -228,7 +228,7 @@ mountPushRoutes(apiRoutes, config, pushService);
 mountVoiceRoutes(apiRoutes, config);
 
 // Resume interrupted sessions before accepting connections (FR-015)
-const recoveryResult = await resumeAll(config.dataDir, pushService);
+const recoveryResult = await resumeAll(config.dataDir, pushService, config.agentFrameworkDir);
 if (recoveryResult.resumed > 0 || recoveryResult.waitingRestored > 0 || recoveryResult.failed > 0) {
   log.info({
     resumed: recoveryResult.resumed,

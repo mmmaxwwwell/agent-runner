@@ -5,7 +5,7 @@ import type { Config } from '../lib/config.js';
 import { createLogger } from '../lib/logger.js';
 import { getProject } from '../models/project.js';
 import { createSession, getSession, listSessionsByProject, transitionState } from '../models/session.js';
-import { buildCommand, isAvailable as isSandboxAvailable } from '../services/sandbox.js';
+import { buildCommand, type SessionType } from '../services/sandbox.js';
 import { spawnProcess, killProcess, startTaskLoop } from '../services/process-manager.js';
 import { registerProcess, unregisterProcess, getActiveProcess } from '../services/process-registry.js';
 import { createSessionLogger, readLog } from '../services/session-logger.js';
@@ -13,6 +13,8 @@ import { parseTaskSummary } from '../services/task-parser.js';
 import { broadcastSessionState } from '../ws/session-stream.js';
 import { broadcastProjectUpdate } from '../ws/dashboard.js';
 import type { PushService } from '../services/push.js';
+
+const DEFAULT_TASK_RUN_PROMPT = 'Read the task list, find the next unchecked task, implement it, verify it passes, mark it complete, and commit.';
 
 const log = createLogger('sessions');
 
@@ -79,9 +81,14 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
 
     // Build sandbox command — may throw if sandbox unavailable and gates not satisfied
     const allowUnsandboxed = parsed.allowUnsandboxed === true;
+    const prompt = sessionType === 'task-run' ? DEFAULT_TASK_RUN_PROMPT : undefined;
     let sandboxCmd;
     try {
-      sandboxCmd = buildCommand(project.dir, [], allowUnsandboxed);
+      sandboxCmd = buildCommand(project.dir, sessionType as SessionType, {
+        agentFrameworkDir: cfg.agentFrameworkDir,
+        allowUnsandboxed,
+        prompt,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       // Check if this is an unsandboxed request without server gate
@@ -359,9 +366,13 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     });
 
     // Build sandbox command for re-spawn
+    const respawnPrompt = session.type === 'task-run' ? DEFAULT_TASK_RUN_PROMPT : undefined;
     let sandboxCmd;
     try {
-      sandboxCmd = buildCommand(project.dir, [], false);
+      sandboxCmd = buildCommand(project.dir, session.type as SessionType, {
+        agentFrameworkDir: cfg.agentFrameworkDir,
+        prompt: respawnPrompt,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       sendJson(res, 503, { error: message });

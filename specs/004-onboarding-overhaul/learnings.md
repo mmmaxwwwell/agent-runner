@@ -41,3 +41,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `BindPaths` uses space-separated paths in a single `--property=BindPaths=` arg. `BindReadOnlyPaths` is a separate property.
 - The pre-existing build error (`src/services/agent-framework.ts` TS5097) is from T006's stub — not related to sandbox changes. T010 will fix it when implementing the real service.
 
+### T009 — Migrating callers to new buildCommand signature
+- All src/ callers now use the new signature `(projectDir, sessionType, options)`. The legacy path remains in sandbox.ts for backward compat with test files (T035 will migrate those).
+- Task-run sessions need a prompt (new signature enforces it). Added `DEFAULT_TASK_RUN_PROMPT` constant in sessions.ts and recovery.ts for now. This will be replaced by the agent-framework skill prompt in later tasks (T014+).
+- `recovery.ts` takes `agentFrameworkDir` as an optional third param (defaults to `join(dataDir, 'agent-framework')`). Server.ts passes `config.agentFrameworkDir`.
+- Fixed pre-existing TS5097 build error in `agent-framework.ts` stub (`.ts` → `.js` import extension).
+

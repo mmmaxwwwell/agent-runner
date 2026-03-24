@@ -10,6 +10,8 @@ import type { PushService } from './push.js';
 
 const log = createLogger('recovery');
 
+const DEFAULT_TASK_RUN_PROMPT = 'Read the task list, find the next unchecked task, implement it, verify it passes, mark it complete, and commit.';
+
 export interface RecoveryResult {
   resumed: number;
   waitingRestored: number;
@@ -24,7 +26,7 @@ export interface RecoveryResult {
  * - "running" interview sessions → mark failed (context lost, can't resume)
  * - "waiting-for-input" sessions → leave as-is (user will provide input)
  */
-export async function resumeAll(dataDir: string, pushService?: PushService): Promise<RecoveryResult> {
+export async function resumeAll(dataDir: string, pushService?: PushService, agentFrameworkDir?: string): Promise<RecoveryResult> {
   const result: RecoveryResult = { resumed: 0, waitingRestored: 0, failed: 0 };
 
   const sessionsDir = join(dataDir, 'sessions');
@@ -77,7 +79,10 @@ export async function resumeAll(dataDir: string, pushService?: PushService): Pro
 
     let sandboxCmd;
     try {
-      sandboxCmd = buildCommand(project.dir, [], false);
+      sandboxCmd = buildCommand(project.dir, 'task-run', {
+        agentFrameworkDir: agentFrameworkDir ?? join(dataDir, 'agent-framework'),
+        prompt: DEFAULT_TASK_RUN_PROMPT,
+      });
     } catch (err) {
       log.error({ sessionId: session.id, err },
         'Cannot recover session: sandbox unavailable, marking failed');

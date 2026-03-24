@@ -222,7 +222,10 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
     // Check sandbox availability
     const allowUnsandboxed = parsed.allowUnsandboxed === true;
     try {
-      buildCommand(project.dir, [], allowUnsandboxed);
+      buildCommand(project.dir, 'interview', {
+        agentFrameworkDir: cfg.agentFrameworkDir,
+        allowUnsandboxed,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (!cfg.allowUnsandboxed && allowUnsandboxed) {
@@ -288,7 +291,10 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           createSession(cfg.dataDir, { projectId: project.id, type: 'interview' });
         }
 
-        const sandboxCmd = buildCommand(projectDir, [], allowUnsandboxed);
+        const sandboxCmd = buildCommand(projectDir, 'interview', {
+          agentFrameworkDir: cfg.agentFrameworkDir,
+          allowUnsandboxed,
+        });
         const logPath = join(cfg.dataDir, 'sessions', sessionId, 'output.jsonl');
         const logger = createSessionLogger(logPath);
         const handle = spawnProcess({
@@ -469,7 +475,10 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       return;
     }
     try {
-      buildCommand(targetDir, [], allowUnsandboxed);
+      buildCommand(targetDir, 'interview', {
+        agentFrameworkDir: cfg.agentFrameworkDir,
+        allowUnsandboxed,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       sendJson(res, 503, { error: message });
@@ -525,7 +534,10 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           createSession(cfg.dataDir, { projectId: placeholderProjectId, type: 'interview' });
         }
 
-        const sandboxCmd = buildCommand(projectDir, [], allowUnsandboxed);
+        const sandboxCmd = buildCommand(projectDir, 'interview', {
+          agentFrameworkDir: cfg.agentFrameworkDir,
+          allowUnsandboxed,
+        });
         const logPath = join(cfg.dataDir, 'sessions', sessionId, 'output.jsonl');
         const logger = createSessionLogger(logPath);
         const handle = spawnProcess({
