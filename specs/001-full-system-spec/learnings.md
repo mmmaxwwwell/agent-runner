@@ -36,3 +36,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - PWA assets (app.js, sw.js, manifest.json, index.html) all served from `public/` directory.
 - No code changes were needed — everything worked out of the box after T007's build fix.
 
+### T009 — API endpoint verification
+- `GET /api/health` returns `{ status, uptime, sandboxAvailable, cloudSttAvailable }` — matches contract exactly.
+- `GET /api/projects` returns `{ registered, discovered, discoveryError }` — structure matches contract.
+- Discovered items include extra `type: "discovered"` field not in the contract, and `hasSpecKit` is an object `{ spec, plan, tasks }` instead of a boolean. These are enhancements over the contract — contract tests in Phase 5 will validate compatibility.
+- No code changes needed — both endpoints work correctly out of the box.
+
