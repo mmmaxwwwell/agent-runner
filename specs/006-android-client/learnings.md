@@ -91,6 +91,14 @@ Each entry should include a timestamp and the task ID that produced the learning
 - SSH wire format uses big-endian uint32 length-prefixed strings throughout. `ByteArrayOutputStream` with extension functions keeps the encoding clean.
 - The object keeps the static-style API surface (`SshKeyFormatter.toSshPublicKeyBlob(cert)`) matching how YubikeyManager already calls it.
 
+### T016 — AgentWebSocket implementation
+- OkHttp WebSocket with `readTimeout(0)` is required — default timeout would close long-lived connections.
+- Server message format: `{"type":"ssh-agent-request","requestId":"...","messageType":11|13,"context":"...","data":"base64..."}`. Response: `{"type":"ssh-agent-response","requestId":"...","data":"base64..."}`. Cancel: `{"type":"ssh-agent-cancel","requestId":"..."}`.
+- URL scheme conversion: `http://` → `ws://`, `https://` → `wss://`. Path: `/ws/sessions/<sessionId>`.
+- Reconnect uses exponential backoff (1s → 30s max). `disconnect()` sets `intentionalDisconnect` flag and interrupts the reconnect thread to prevent zombie reconnections.
+- `onSignRequest` callback is invoked on OkHttp's background thread — callers (SignRequestHandler/MainActivity) need to handle thread safety.
+- Non-`ssh-agent-request` messages are silently ignored (server sends output, phase, state messages on the same endpoint).
+
 ### T014 — YubikeyManager implementation
 - Constructor now takes `(context: Context)` — T019 (MainActivity wiring) must pass `applicationContext` or activity context.
 - `YubikeyStatus` enum is in its own file `YubikeyStatus.kt` (not inline in YubikeyManager).
