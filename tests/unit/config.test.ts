@@ -186,7 +186,7 @@ describe('config', () => {
     assert.equal(saved.privateKey, config.vapidPrivateKey);
   });
 
-  it('should default dataDir to ~/.agent-runner when env not set', async () => {
+  it('should default dataDir to ~/.local/share/agent-runner when env not set', async () => {
     process.env['AGENT_RUNNER_PROJECTS_DIR'] = projectsDir;
     process.env['VAPID_PUBLIC_KEY'] = 'test-public-key';
     process.env['VAPID_PRIVATE_KEY'] = 'test-private-key';
@@ -197,7 +197,7 @@ describe('config', () => {
 
     const { homedir } = await import('node:os');
     const { resolve } = await import('node:path');
-    assert.equal(config.dataDir, resolve(homedir(), '.agent-runner'));
+    assert.equal(config.dataDir, resolve(homedir(), '.local', 'share', 'agent-runner'));
   });
 
   it('should treat ALLOW_UNSANDBOXED=false as false', async () => {

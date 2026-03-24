@@ -24,6 +24,7 @@ export interface Config {
   allowUnsandboxed: boolean;
   googleSttApiKey: string | null;
   diskWarnThresholdMb: number;
+  agentFrameworkDir: string;
 }
 
 function resolveDataDir(): string {
@@ -31,7 +32,7 @@ function resolveDataDir(): string {
   if (envVal) {
     return resolve(envVal.replace(/^~/, homedir()));
   }
-  return resolve(homedir(), '.agent-runner');
+  return resolve(homedir(), '.local', 'share', 'agent-runner');
 }
 
 function loadVapidKeysFromFile(dataDir: string): VapidKeys | null {
@@ -113,5 +114,6 @@ export function loadConfig(): Config {
     allowUnsandboxed: process.env['ALLOW_UNSANDBOXED'] === 'true',
     googleSttApiKey: process.env['GOOGLE_STT_API_KEY'] ?? null,
     diskWarnThresholdMb,
+    agentFrameworkDir: resolve(dataDir, 'agent-framework'),
   };
 }
