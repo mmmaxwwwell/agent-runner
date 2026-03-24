@@ -22,7 +22,7 @@
 
 **Purpose**: Build the test log reporter and fix tooling before fixing anything else. Without structured test output, the fix-validate loop can't work.
 
-- [ ] T001 Implement custom Node.js test reporter in `tests/helpers/test-reporter.ts`: consume native test runner events, write `summary.json` + `failures/<test-name>.log` to `test-logs/<type>/<timestamp>/`. Pass = one line. Fail = assertion details + stack trace + context per FR-111–FR-114
+- [x] T001 Implement custom Node.js test reporter in `tests/helpers/test-reporter.ts`: consume native test runner events, write `summary.json` + `failures/<test-name>.log` to `test-logs/<type>/<timestamp>/`. Pass = one line. Fail = assertion details + stack trace + context per FR-111–FR-114
 - [ ] T002 [P] Update `package.json` test scripts to use custom reporter: `npm test` passes `--test-reporter=./tests/helpers/test-reporter.ts`, add `test:unit`, `test:integration`, `test:contract` subscripts per FR-114
 - [ ] T003 [P] Create test fixture templates in `tests/fixtures/`: `projects-empty.json`, `projects-with-active.json`, `projects-with-onboarding.json`. Each is a valid `projects.json` for different test scenarios per FR-108
 - [ ] T004 [P] Implement test keypair generator in `tests/helpers/test-keypair.ts`: idempotently generate ECDSA P-256 keypair, store in `tests/fixtures/`, export in SSH authorized_keys format per FR-109
