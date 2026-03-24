@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { readSSHString, parseMessage, MessageAccumulator } from '../../src/services/ssh-agent-protocol.ts';
+import { readSSHString, parseMessage, MessageAccumulator, parseSignRequest } from '../../src/services/ssh-agent-protocol.ts';
 
 describe('readSSHString', () => {
   it('should read a string with 4-byte big-endian length prefix', () => {
@@ -249,5 +249,168 @@ describe('MessageAccumulator', () => {
     acc.feed(combined.subarray(split));
     assert.equal(received.length, 2); // msg2 emitted
     assert.equal(received[1].type, 5);
+  });
+});
+
+describe('parseSignRequest', () => {
+  // Helper: write an SSH string (4-byte BE length + data) into a buffer at offset
+  function writeSSHString(buf: Buffer, offset: number, data: Buffer): number {
+    buf.writeUInt32BE(data.length, offset);
+    data.copy(buf, offset + 4);
+    return 4 + data.length;
+  }
+
+  // Build a sign request payload: string key_blob, string data, uint32 flags
+  function buildSignRequestPayload(keyBlob: Buffer, data: Buffer, flags: number): Buffer {
+    const buf = Buffer.alloc(4 + keyBlob.length + 4 + data.length + 4);
+    let offset = 0;
+    offset += writeSSHString(buf, offset, keyBlob);
+    offset += writeSSHString(buf, offset, data);
+    buf.writeUInt32BE(flags, offset);
+    return buf;
+  }
+
+  // Build an SSH userauth data field:
+  // string session_id, byte 50, string username, string service, string "publickey",
+  // boolean TRUE, string algorithm, string key_blob
+  function buildUserauthData(opts: {
+    sessionId: Buffer;
+    username: string;
+    service: string;
+    algorithm: string;
+    keyBlob: Buffer;
+  }): Buffer {
+    const usernameBuf = Buffer.from(opts.username);
+    const serviceBuf = Buffer.from(opts.service);
+    const methodBuf = Buffer.from('publickey');
+    const algoBuf = Buffer.from(opts.algorithm);
+
+    const totalLen =
+      4 + opts.sessionId.length +   // session_id
+      1 +                             // byte 50
+      4 + usernameBuf.length +        // username
+      4 + serviceBuf.length +         // service
+      4 + methodBuf.length +          // "publickey"
+      1 +                             // boolean TRUE
+      4 + algoBuf.length +            // algorithm
+      4 + opts.keyBlob.length;        // key_blob
+
+    const buf = Buffer.alloc(totalLen);
+    let offset = 0;
+    offset += writeSSHString(buf, offset, opts.sessionId);
+    buf[offset] = 50; offset += 1; // SSH_MSG_USERAUTH_REQUEST
+    offset += writeSSHString(buf, offset, usernameBuf);
+    offset += writeSSHString(buf, offset, serviceBuf);
+    offset += writeSSHString(buf, offset, methodBuf);
+    buf[offset] = 1; offset += 1; // boolean TRUE
+    offset += writeSSHString(buf, offset, algoBuf);
+    writeSSHString(buf, offset, opts.keyBlob);
+
+    return buf;
+  }
+
+  it('should extract key blob, data, and flags from a sign request payload', () => {
+    const keyBlob = Buffer.from([0x01, 0x02, 0x03, 0x04]);
+    const data = Buffer.from([0xaa, 0xbb, 0xcc]);
+    const flags = 2; // SSH_AGENT_RSA_SHA2_256
+
+    const payload = buildSignRequestPayload(keyBlob, data, flags);
+    const result = parseSignRequest(payload);
+
+    assert.ok(result);
+    assert.deepEqual(result.keyBlob, keyBlob);
+    assert.deepEqual(result.data, data);
+    assert.equal(result.flags, flags);
+  });
+
+  it('should extract username and key algorithm from SSH userauth data', () => {
+    const keyBlob = Buffer.from([0x01, 0x02, 0x03]);
+    const sessionId = Buffer.from('fake-session-hash-value');
+    const userauthData = buildUserauthData({
+      sessionId,
+      username: 'git',
+      service: 'ssh-connection',
+      algorithm: 'ecdsa-sha2-nistp256',
+      keyBlob,
+    });
+    const flags = 0;
+
+    const payload = buildSignRequestPayload(keyBlob, userauthData, flags);
+    const result = parseSignRequest(payload);
+
+    assert.ok(result);
+    assert.equal(result.username, 'git');
+    assert.equal(result.keyAlgorithm, 'ecdsa-sha2-nistp256');
+    assert.deepEqual(result.keyBlob, keyBlob);
+    assert.deepEqual(result.data, userauthData);
+    assert.equal(result.flags, 0);
+  });
+
+  it('should return undefined username/keyAlgorithm when data is not SSH userauth format', () => {
+    const keyBlob = Buffer.from([0x05, 0x06]);
+    const data = Buffer.from('this is not userauth data');
+    const flags = 4;
+
+    const payload = buildSignRequestPayload(keyBlob, data, flags);
+    const result = parseSignRequest(payload);
+
+    assert.ok(result);
+    assert.deepEqual(result.keyBlob, keyBlob);
+    assert.deepEqual(result.data, data);
+    assert.equal(result.flags, flags);
+    assert.equal(result.username, undefined);
+    assert.equal(result.keyAlgorithm, undefined);
+  });
+
+  it('should return undefined username/keyAlgorithm when data byte 50 marker is missing', () => {
+    // Build a buffer that looks like it could be userauth but has wrong type byte
+    const keyBlob = Buffer.from([0x01]);
+    const sessionId = Buffer.from('session');
+    const buf = Buffer.alloc(4 + sessionId.length + 1);
+    buf.writeUInt32BE(sessionId.length, 0);
+    sessionId.copy(buf, 4);
+    buf[4 + sessionId.length] = 99; // wrong type byte, not 50
+
+    const payload = buildSignRequestPayload(keyBlob, buf, 0);
+    const result = parseSignRequest(payload);
+
+    assert.ok(result);
+    assert.equal(result.username, undefined);
+    assert.equal(result.keyAlgorithm, undefined);
+  });
+
+  it('should handle truncated userauth data gracefully', () => {
+    const keyBlob = Buffer.from([0x01]);
+    // Build a buffer that starts like userauth (session_id + byte 50) but is truncated
+    const sessionId = Buffer.from('sess');
+    const buf = Buffer.alloc(4 + sessionId.length + 1);
+    buf.writeUInt32BE(sessionId.length, 0);
+    sessionId.copy(buf, 4);
+    buf[4 + sessionId.length] = 50; // correct type byte, but no username follows
+
+    const payload = buildSignRequestPayload(keyBlob, buf, 0);
+    const result = parseSignRequest(payload);
+
+    assert.ok(result);
+    assert.deepEqual(result.keyBlob, keyBlob);
+    assert.equal(result.flags, 0);
+    assert.equal(result.username, undefined);
+    assert.equal(result.keyAlgorithm, undefined);
+  });
+
+  it('should return null for truncated payload — missing data field', () => {
+    // Only key blob, no data or flags
+    const keyBlob = Buffer.from([0x01, 0x02]);
+    const buf = Buffer.alloc(4 + keyBlob.length);
+    buf.writeUInt32BE(keyBlob.length, 0);
+    keyBlob.copy(buf, 4);
+
+    const result = parseSignRequest(buf);
+    assert.equal(result, null);
+  });
+
+  it('should return null for empty payload', () => {
+    const result = parseSignRequest(Buffer.alloc(0));
+    assert.equal(result, null);
   });
 });

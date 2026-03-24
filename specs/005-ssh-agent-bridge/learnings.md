@@ -27,3 +27,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Stub module at `src/services/ssh-agent-bridge.ts` exports types + a throwing `createBridge` — same pattern as T005's stubs. T013 will replace with real implementation.
 - `BridgeRequest` interface defined in stub: `{ requestId, messageType, context, data }` — tests for `onRequest` callback use this shape.
 
+### T009 — Sign request parsing test expectations
+- `parseSignRequest(payload)` returns `{ keyBlob: Buffer, data: Buffer, flags: number, username?: string, keyAlgorithm?: string } | null`. Returns null for truncated/empty payloads.
+- SSH userauth data format: `string session_id`, `byte 50` (SSH_MSG_USERAUTH_REQUEST), `string username`, `string service`, `string "publickey"`, `boolean TRUE`, `string algorithm`, `string key_blob`.
+- The byte 50 marker after session_id is the key indicator for userauth format. If missing or data is too short, username/keyAlgorithm should be undefined (not null, not error).
+- Stub added to `ssh-agent-protocol.ts` following same pattern as T005 — throws "not yet implemented". T011 will replace with real implementation.
+

@@ -36,6 +36,23 @@ export function parseMessage(buf: Buffer): { type: number; payload: Buffer; tota
 }
 
 /**
+ * Parse a SIGN_REQUEST (type 13) payload into its components.
+ * Payload format: string key_blob, string data, uint32 flags.
+ * Attempts to extract username and key algorithm from the data field
+ * if it is in SSH userauth format.
+ * Returns null if the payload is too short to parse.
+ */
+export function parseSignRequest(payload: Buffer): {
+  keyBlob: Buffer;
+  data: Buffer;
+  flags: number;
+  username?: string;
+  keyAlgorithm?: string;
+} | null {
+  throw new Error('parseSignRequest not yet implemented');
+}
+
+/**
  * Buffers incoming data and emits complete SSH agent messages.
  * Handles partial reads across multiple feed() calls.
  */
