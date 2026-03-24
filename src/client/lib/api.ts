@@ -51,11 +51,15 @@ export type ProjectsResponse = {
 
 export type OnboardRequest = {
   name: string;
-  path: string;
+  path?: string;
+  newProject?: boolean;
+  remoteUrl?: string;
+  createGithubRepo?: boolean;
 };
 
 export type OnboardResponse = {
   projectId: string;
+  sessionId: string;
   name: string;
   path: string;
   status: 'onboarding';
@@ -105,4 +109,10 @@ export function put<T>(path: string, body?: unknown): Promise<T> {
 
 export function del<T>(path: string): Promise<T> {
   return request<T>('DELETE', path);
+}
+
+// --- Project onboarding ---
+
+export function onboardProject(req: OnboardRequest): Promise<OnboardResponse> {
+  return post<OnboardResponse>('/projects/onboard', req);
 }

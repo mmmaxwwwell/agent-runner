@@ -459,6 +459,9 @@
   function put(path, body) {
     return request("PUT", path, body);
   }
+  function onboardProject(req) {
+    return post("/projects/onboard", req);
+  }
 
   // src/client/lib/ws.ts
   var MIN_RECONNECT_MS = 500;
@@ -788,7 +791,7 @@
         } else if (option === "create-github") {
           body.createGithubRepo = true;
         }
-        const resp = await post("/projects/onboard", body);
+        const resp = await onboardProject(body);
         onOnboarded(dir, resp);
       } catch (err) {
         setErrMsg(err instanceof Error ? err.message : "Onboard failed");
@@ -1510,7 +1513,7 @@
         } else if (option === "create-github") {
           body.createGithubRepo = true;
         }
-        await post("/projects/onboard", body);
+        await onboardProject(body);
         navigate("/");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to start project");

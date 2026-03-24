@@ -166,7 +166,7 @@
 ### Implementation for User Story 7
 
 - [x] T033 [US7] Simplify new-project form in src/client/components/new-project.tsx — remove description textarea and voice button for description. Keep only project name field and Go button. Update POST to use unified `/api/projects/onboard` with `newProject: true`. Include git remote setup options (same modal as onboard)
-- [ ] T034 [US7] Update client API types in src/client/lib/api.ts — update `OnboardResponse` to include `sessionId`. Add types for unified onboard request. Remove `startNewProject()` function, replace with unified `onboardProject()` that handles both discovered and new projects
+- [x] T034 [US7] Update client API types in src/client/lib/api.ts — update `OnboardResponse` to include `sessionId`. Add types for unified onboard request. Remove `startNewProject()` function, replace with unified `onboardProject()` that handles both discovered and new projects
 
 **Checkpoint**: UI is simplified. Both new project and onboard use same endpoint.
 

@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { post, type OnboardResponse } from '../lib/api.js';
+import { onboardProject, type OnboardRequest } from '../lib/api.js';
 import { navigate } from '../lib/router.js';
 
 type GitRemoteOption = 'skip' | 'remote-url' | 'create-github';
@@ -23,7 +23,7 @@ export function NewProject() {
     setError(null);
 
     try {
-      const body: Record<string, unknown> = {
+      const body: OnboardRequest = {
         name: name.trim(),
         newProject: true,
       };
@@ -32,7 +32,7 @@ export function NewProject() {
       } else if (option === 'create-github') {
         body.createGithubRepo = true;
       }
-      await post<OnboardResponse>('/projects/onboard', body);
+      await onboardProject(body);
       navigate('/');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to start project');

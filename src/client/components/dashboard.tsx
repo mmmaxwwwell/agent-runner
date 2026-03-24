@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'preact/hooks';
 import {
   get,
-  post,
+  onboardProject,
   type RegisteredProject,
   type DiscoveredDirectory,
   type ProjectsResponse,
+  type OnboardRequest,
   type OnboardResponse,
   type ActiveSession,
 } from '../lib/api.js';
@@ -182,13 +183,13 @@ function DiscoveredCard({ dir, onOnboarded }: { dir: DiscoveredDirectory; onOnbo
     setBusy(true);
     setErrMsg(null);
     try {
-      const body: Record<string, unknown> = { name: dir.name, path: dir.path };
+      const body: OnboardRequest = { name: dir.name, path: dir.path };
       if (option === 'remote-url' && remoteUrl) {
         body.remoteUrl = remoteUrl;
       } else if (option === 'create-github') {
         body.createGithubRepo = true;
       }
-      const resp = await post<OnboardResponse>('/projects/onboard', body);
+      const resp = await onboardProject(body);
       onOnboarded(dir, resp);
     } catch (err: unknown) {
       setErrMsg(err instanceof Error ? err.message : 'Onboard failed');
