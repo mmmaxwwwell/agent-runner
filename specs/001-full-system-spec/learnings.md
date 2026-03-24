@@ -112,4 +112,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 ### T021 — KeyRegistry
 - **`JSONObject.optString(key, null)` returns `Nothing?`**: Kotlin infers the null literal's type as `Nothing?`, causing type mismatch warnings when assigning to `String?`. Use `if (json.isNull(key)) null else json.getString(key)` instead.
 - **Duplicate detection by public key blob**: `KeyEntry.publicKey` is `ByteArray`, so equality checks must use `contentEquals()`, not `==`. The `KeyEntry.equals()` only checks `id`, so registry must explicitly check for duplicate public keys with `contentEquals()`.
+
+### T022 — YubikeySigningBackend
+- **Composition over replacement**: `YubikeySigningBackend` wraps `YubikeyManager` (composition) rather than replacing it. `YubikeyManager` retains Activity lifecycle methods (`startDiscovery`/`stopDiscovery`) and `LiveData<YubikeyStatus>` that don't belong in a `SigningBackend`. The backend adds `KeyRegistry` integration and adapts the interface.
+- **PIN not in SigningBackend.sign()**: The `SigningBackend.sign(keyId, data)` interface has no PIN parameter. `YubikeySigningBackend` adds `signWithPin(keyId, data, pin)` for when `hasCachedPin()` is false. `sign()` uses the cached PIN from `YubikeyManager`. `SignRequestHandler` (T028) will route to the appropriate method.
+- **Key registration on detection**: `onYubikeyConnected()` must be called by the Activity when status changes to connected. It reads slot 9a via `YubikeyManager.listKeys()`, checks for duplicates by public key blob, and registers new keys in `KeyRegistry`.
 - **`@Synchronized` on instance methods**: All mutating methods use `@Synchronized` for thread safety since multiple backends may register keys concurrently. Read methods are unsynchronized since `listKeys()` reads the whole file atomically.
