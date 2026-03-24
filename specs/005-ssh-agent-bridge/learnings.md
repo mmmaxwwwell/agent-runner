@@ -20,3 +20,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Added throwing stubs for `parseMessage` and `MessageAccumulator` so T005 tests pass. T006/T007 will replace these stubs with real implementations.
 - `readSSHString` uses `Buffer.from(data)` to copy the subarray — avoids returning a view into the original buffer that could be mutated.
 
+### T008 — Bridge lifecycle test patterns and stub approach
+- `createBridge()` is async (returns `Promise<SSHAgentBridge>`) — the socket server needs to be listening before tests proceed.
+- Tests use `mkdtemp` for isolated tmp dirs. Socket path is passed directly (not derived from dataDir/sessionId) to keep tests simple.
+- Added `timeoutMs` option to `CreateBridgeOptions` so tests can use a short timeout (100ms) instead of waiting 60s.
+- Stub module at `src/services/ssh-agent-bridge.ts` exports types + a throwing `createBridge` — same pattern as T005's stubs. T013 will replace with real implementation.
+- `BridgeRequest` interface defined in stub: `{ requestId, messageType, context, data }` — tests for `onRequest` callback use this shape.
+
