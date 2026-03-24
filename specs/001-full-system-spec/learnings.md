@@ -118,3 +118,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **PIN not in SigningBackend.sign()**: The `SigningBackend.sign(keyId, data)` interface has no PIN parameter. `YubikeySigningBackend` adds `signWithPin(keyId, data, pin)` for when `hasCachedPin()` is false. `sign()` uses the cached PIN from `YubikeyManager`. `SignRequestHandler` (T028) will route to the appropriate method.
 - **Key registration on detection**: `onYubikeyConnected()` must be called by the Activity when status changes to connected. It reads slot 9a via `YubikeyManager.listKeys()`, checks for duplicates by public key blob, and registers new keys in `KeyRegistry`.
 - **`@Synchronized` on instance methods**: All mutating methods use `@Synchronized` for thread safety since multiple backends may register keys concurrently. Read methods are unsynchronized since `listKeys()` reads the whole file atomically.
+
+### T023 — KeystoreSigningBackend
+- **BiometricPrompt + suspend bridging**: Use `suspendCancellableCoroutine` to bridge BiometricPrompt's callback API to coroutines. The `CryptoObject` wrapping an initialized `Signature` must be passed to `authenticate()`. The `onAuthenticationSucceeded` callback provides the authenticated Signature via `result.cryptoObject?.signature`.
+- **BiometricPrompt must run on main thread**: `prompt.authenticate()` must be called via `activity.runOnUiThread`. The executor for the callback should be `ContextCompat.getMainExecutor(activity)`.
+- **Android Keystore key aliases**: Prefixed with `agent-runner-` + UUID to avoid collision. The alias is stored in `KeyEntry.keystoreAlias` for later retrieval.
+- **`setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG)`**: The `0` timeout means per-use authentication (every sign requires biometric). This is the most secure option for SSH signing.
+- **SSH public key blob reuse**: `SshKeyFormatter.toSshPublicKeyBlob()` accepts `X509Certificate` which is exactly what `KeyStore.getCertificate(alias)` returns for Keystore-generated keys. No additional conversion needed.
+- **Added `androidx.biometric:biometric:1.1.0`** dependency to `build.gradle.kts`.
