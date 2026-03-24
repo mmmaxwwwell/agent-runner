@@ -31,7 +31,7 @@
 
 ### Tests for Foundational Phase
 
-- [ ] T002 [P] Write tests for SSH string reader utility in tests/unit/ssh-agent-protocol.test.ts — test reading 4-byte big-endian length + data from Buffer, test partial buffer handling, test multiple strings in sequence, test empty string
+- [x] T002 [P] Write tests for SSH string reader utility in tests/unit/ssh-agent-protocol.test.ts — test reading 4-byte big-endian length + data from Buffer, test partial buffer handling, test multiple strings in sequence, test empty string
 - [ ] T003 [P] Write tests for message framing in tests/unit/ssh-agent-protocol.test.ts — test extracting complete message from Buffer (4-byte length + type + payload), test partial message returns null, test multiple messages in one buffer, test zero-length edge case
 - [ ] T004 [P] Write tests for message accumulation buffer in tests/unit/ssh-agent-protocol.test.ts — test feeding partial data across multiple calls, test complete message callback fires when full message accumulated, test multiple messages accumulated in one chunk, test buffer reset after message extraction
 
