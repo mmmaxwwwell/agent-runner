@@ -124,7 +124,7 @@
 **Purpose**: Verify the refactored signing architecture works correctly
 
 - [x] T030 [US10] Make all existing Android unit tests pass: `SignRequestHandlerTest.kt`, `ServerConfigTest.kt`, `SshKeyFormatterTest.kt`. Update tests to work with new `SigningBackend` interface. Run `./gradlew testDebugUnitTest`, fix until green
-- [ ] T031 [P] [US10] Write unit tests for `KeyRegistry` in `android/app/src/test/.../KeyRegistryTest.kt`: CRUD operations, JSON serialization, SSH key format export, duplicate detection per FR-098
+- [x] T031 [P] [US10] Write unit tests for `KeyRegistry` in `android/app/src/test/.../KeyRegistryTest.kt`: CRUD operations, JSON serialization, SSH key format export, duplicate detection per FR-098
 - [ ] T032 [P] [US10] Write unit tests for `KeystoreSigningBackend` in `android/app/src/test/.../KeystoreSigningBackendTest.kt`: key generation, signing produces valid ECDSA P-256 SSH signatures, biometric gate behavior per FR-101–FR-102
 - [ ] T033 [P] [US10] Write unit tests for `MockSigningBackend` in `android/app/src/test/.../MockSigningBackendTest.kt`: idempotent keypair generation, deterministic signing, auto-register in KeyRegistry per FR-105
 - [ ] T034 [US10] Run `./gradlew testDebugUnitTest`, fix until all unit tests green

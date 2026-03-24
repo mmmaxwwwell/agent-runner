@@ -164,3 +164,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 ### T030 — Existing Android unit tests
 - **`advanceUntilIdle()` triggers `withTimeout` in TestScope**: The `withTimeout(60_000)` added in T028's legacy signing path causes `advanceUntilIdle()` to advance virtual time 60s, triggering timeout and prematurely completing sign requests. Use `runCurrent()` instead when the coroutine needs to stay suspended (e.g., waiting on a `CompletableDeferred` or `Channel.receive()`). Use `advanceUntilIdle()` only after unblocking the coroutine (e.g., completing the deferred, sending to the channel).
 - **All 31 existing tests pass**: 27 were already green; the 4 `SignRequestHandlerTest` failures (concurrent sign, wrong PIN, PIN cached, PIN blocked) were all caused by the same `advanceUntilIdle()` vs `withTimeout` interaction. No code changes to production source — only test timing fixes.
+
+### T031 — KeyRegistry unit tests
+- **`org.json` classes are stubs in Android unit tests**: Android's `org.json.JSONObject`/`JSONArray` throw `RuntimeException("not mocked")` in local JVM tests. Fix: add `testImplementation("org.json:json:20231013")` to `build.gradle.kts` — this provides the real JSON.org reference implementation, which shadows the Android stubs for unit tests.
+- **`android.util.Base64` must be mocked**: Use `mockkStatic(Base64::class)` and delegate to `java.util.Base64`. Use `withoutPadding()` consistently since we can't reliably check Android flag constants (they're 0 in stubs).
+- **KeyRegistry needs real file I/O in tests**: Mock only `Context.filesDir` to a temp directory. The JSON serialization/deserialization is tested through actual file read/write, which provides higher confidence than mocking the JSON layer.
