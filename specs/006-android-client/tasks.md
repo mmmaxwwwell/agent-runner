@@ -55,7 +55,7 @@
 
 - [x] T008 [US1] Configure WebView settings for full PWA compatibility in app/src/main/kotlin/com/agentrunner/MainActivity.kt — enable JavaScript, DOM storage, allow mixed content (for local dev HTTP), set user agent to include "AgentRunner-Android", handle SSL errors gracefully for dev, set WebChromeClient for console.log forwarding to Logcat
 - [x] T009 [US1] Add URL hash monitoring in MainActivity via WebViewClient.doUpdateVisitedHistory() — parse URL hash to detect session navigation (e.g., `#/sessions/<uuid>`). Store current sessionId. Log navigation changes for debugging
-- [ ] T010 [US1] Handle connectivity errors in WebView — override WebViewClient.onReceivedError() and onReceivedHttpError(). Show user-friendly error page with retry button and option to change server URL. Handle server unreachable scenario
+- [x] T010 [US1] Handle connectivity errors in WebView — override WebViewClient.onReceivedError() and onReceivedHttpError(). Show user-friendly error page with retry button and option to change server URL. Handle server unreachable scenario
 - [ ] T011 [US1] Add settings access from WebView — expose a way to return to ServerConfigActivity to change server URL (e.g., JavaScript bridge method `window.AgentRunner.openSettings()` or long-press app icon)
 
 **Checkpoint**: PWA works identically in WebView. Navigation detected. Errors handled.

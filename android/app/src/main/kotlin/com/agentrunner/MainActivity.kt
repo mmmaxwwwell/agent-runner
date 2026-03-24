@@ -4,19 +4,25 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.agentrunner.config.ServerConfig
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    private var errorView: View? = null
+    private var serverUrl: String? = null
     var currentSessionId: String? = null
         private set
 
@@ -29,7 +35,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         // Determine server URL: intent extra takes priority, then saved config
-        val serverUrl = intent.getStringExtra(ServerConfigActivity.EXTRA_SERVER_URL)
+        serverUrl = intent.getStringExtra(ServerConfigActivity.EXTRA_SERVER_URL)
             ?: ServerConfig.load(this)?.serverUrl
 
         if (serverUrl == null) {
@@ -38,8 +44,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        val container = FrameLayout(this)
+        setContentView(container)
+
         webView = WebView(this)
-        setContentView(webView)
+        container.addView(webView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
 
         webView.settings.apply {
             javaScriptEnabled = true
@@ -61,6 +73,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                hideErrorView()
+            }
+
             override fun onReceivedError(
                 view: WebView?,
                 request: WebResourceRequest?,
@@ -69,6 +86,22 @@ class MainActivity : AppCompatActivity() {
                 super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
                     Log.e(TAG, "WebView error: ${error?.description} (code ${error?.errorCode})")
+                    showErrorView(error?.description?.toString())
+                }
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                errorResponse: WebResourceResponse?
+            ) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                if (request?.isForMainFrame == true) {
+                    Log.e(TAG, "HTTP error: ${errorResponse?.statusCode} ${errorResponse?.reasonPhrase}")
+                    showErrorView(
+                        getString(R.string.error_webview_load) +
+                            " (${errorResponse?.statusCode} ${errorResponse?.reasonPhrase})"
+                    )
                 }
             }
         }
@@ -91,7 +124,38 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
         } else {
-            webView.loadUrl(serverUrl)
+            webView.loadUrl(serverUrl!!)
+        }
+    }
+
+    private fun showErrorView(errorDetail: String? = null) {
+        if (errorView != null) return
+
+        val container = webView.parent as? FrameLayout ?: return
+        val view = layoutInflater.inflate(R.layout.view_error, container, false)
+
+        if (errorDetail != null) {
+            view.findViewById<TextView>(R.id.errorMessage).text = errorDetail
+        }
+
+        view.findViewById<View>(R.id.retryButton).setOnClickListener {
+            hideErrorView()
+            serverUrl?.let { url -> webView.loadUrl(url) }
+        }
+
+        view.findViewById<View>(R.id.changeServerButton).setOnClickListener {
+            startActivity(Intent(this, ServerConfigActivity::class.java))
+            finish()
+        }
+
+        container.addView(view)
+        errorView = view
+    }
+
+    private fun hideErrorView() {
+        errorView?.let {
+            (it.parent as? FrameLayout)?.removeView(it)
+            errorView = null
         }
     }
 

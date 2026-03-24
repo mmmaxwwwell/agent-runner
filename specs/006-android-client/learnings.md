@@ -56,3 +56,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `WebChromeClient.onConsoleMessage()` forwards JS console output to Logcat under tag "AgentRunner", mapping console levels to Log levels.
 - `onReceivedError` is logged but only for main frame requests to avoid noise from subresource failures. T010 will add the user-facing error page with retry button.
 
+### T010 — WebView error handling
+- WebView is now wrapped in a `FrameLayout` container (instead of `setContentView(webView)` directly) to allow overlaying the error view. T019+ tasks that add overlays (e.g., Yubikey status, sign modal) should use `webView.parent as FrameLayout` to add views.
+- `serverUrl` was promoted from a local `val` to a class-level `var` so the retry button can reload it. Tasks that need the current server URL can access `serverUrl`.
+- `onReceivedHttpError` fires for all HTTP status codes >= 400. Only main frame errors trigger the error overlay.
+- `onPageFinished` hides the error view — this handles the case where a retry succeeds.
+- Error view layout is at `res/layout/view_error.xml`.
+
