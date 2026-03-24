@@ -13,3 +13,9 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Reporter path is relative to cwd: `--test-reporter=./tests/helpers/test-reporter.ts`
 - `TEST_TYPE` env var controls the output subdirectory (unit/integration/contract).
 
+### T004 — Test keypair generator
+- `tsx` is not on PATH in the nix shell; use `npx tsx` instead.
+- `import.meta.dirname` works in Node 22 with tsx — gives the directory of the current module file.
+- SSH authorized_keys format for ECDSA P-256: `ecdsa-sha2-nistp256 <base64(string("ecdsa-sha2-nistp256") + string("nistp256") + string(0x04||x||y))> comment`
+- Generated test keys are gitignored — each machine generates its own. The `ensureTestKeypair()` function is idempotent.
+
