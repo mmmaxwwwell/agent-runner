@@ -285,7 +285,7 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
           },
         });
       },
-      runPhase: async (phase: string, projectDir: string, sessionId: string): Promise<PhaseResult> => {
+      runPhase: async (phase: string, projectDir: string, sessionId: string, prompt?: string): Promise<PhaseResult> => {
         // For the first phase, the session is already created
         // For subsequent phases, create a new session
         if (sessionId !== firstSessionId) {
@@ -295,9 +295,12 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         // Ensure agent framework is up-to-date before each session (FR-004)
         ensureAgentFramework(cfg.dataDir);
 
+        // Pass through the prompt from the workflow (interview wrapper for interview phase,
+        // future prompts for plan/tasks/analyze phases per T027)
         const sandboxCmd = buildCommand(projectDir, 'interview', {
           agentFrameworkDir: cfg.agentFrameworkDir,
           allowUnsandboxed,
+          prompt,
         });
         const logPath = join(cfg.dataDir, 'sessions', sessionId, 'output.jsonl');
         const logger = createSessionLogger(logPath);

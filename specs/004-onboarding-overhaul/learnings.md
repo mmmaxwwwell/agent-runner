@@ -114,3 +114,7 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `VALID_TRANSITIONS` map enforces: `onboarding→active`, `onboarding→error`, `error→onboarding`. The `active` status is terminal — no transitions allowed from it.
 - The `"not affect other projects"` test was updated from `createProject` (active) to `registerForOnboarding` (onboarding) since active→error is no longer valid. Future tests that need to call `updateProjectStatus` must start from `registerForOnboarding` unless testing the rejection path.
 
+### T023 — Wiring prompt through runPhase callback
+- The `runPhase` callback in `projects.ts` uses `interview` session type for all phases (interview, plan, tasks, analyze). This is because `interview` type allows optional prompts, while `task-run` requires them. When T027 adds prompts for plan/tasks/analyze phases, the session type for those can switch to `task-run`.
+- The sandbox availability check call at route entry (line 226) intentionally doesn't pass a prompt — it's only checking sandbox availability, not launching a session.
+
