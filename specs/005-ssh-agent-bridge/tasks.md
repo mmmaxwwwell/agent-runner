@@ -150,7 +150,7 @@
 
 ### Implementation for User Story 6
 
-- [ ] T025 [US6] Add ssh-agent message handlers to src/ws/session-stream.ts — on incoming `ssh-agent-response` message: look up bridge for the session, call `bridge.handleResponse(requestId, Buffer.from(data, 'base64'))`. On `ssh-agent-cancel`: call `bridge.handleCancel(requestId)`. If no bridge exists for session, silently drop. Add bridge registry (Map<sessionId, SSHAgentBridge>) accessible from session-stream
+- [x] T025 [US6] Add ssh-agent message handlers to src/ws/session-stream.ts — on incoming `ssh-agent-response` message: look up bridge for the session, call `bridge.handleResponse(requestId, Buffer.from(data, 'base64'))`. On `ssh-agent-cancel`: call `bridge.handleCancel(requestId)`. If no bridge exists for session, silently drop. Add bridge registry (Map<sessionId, SSHAgentBridge>) accessible from session-stream
 
 **Checkpoint**: Full bidirectional flow works — server → client (request) and client → server (response/cancel)
 

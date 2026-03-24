@@ -75,6 +75,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The base64 encode/decode round-trip is tested explicitly: `responseData.toString('base64')` → `Buffer.from(base64Data, 'base64')` to match what T025's WebSocket handler will do.
 - Unknown requestId tests verify that `handleResponse`/`handleCancel` silently return without throwing (no pending request = no-op).
 
+### T025 — WebSocket message handler wiring
+- The bridge registry (`activeBridges` map + `getActiveBridge()`) already exists in `src/routes/sessions.ts` from T015. No need to create a separate registry in `session-stream.ts` — just import it.
+- The `ws.on('message')` handler in `session-stream.ts` already parses JSON messages. SSH agent handlers slot in as `else if` branches alongside the existing `input` handler.
+- Both `handleResponse` and `handleCancel` are no-ops when the requestId doesn't match (bridge silently drops), so no error handling needed for stale/unknown requests.
+
 ### T013 — Bridge implementation patterns
 - `createBridge` uses closure-based state (pendingRequests map, server) rather than a class — keeps the public interface minimal (just the SSHAgentBridge interface methods).
 - Stale socket removal uses `unlink` with ENOENT suppression before `server.listen()`.

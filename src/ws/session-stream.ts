@@ -6,6 +6,7 @@ import { createLogger } from '../lib/logger.js';
 import { readLog, type SessionLogEntry } from '../services/session-logger.js';
 import { getSession } from '../models/session.js';
 import { getActiveProcess } from '../services/process-registry.js';
+import { getActiveBridge } from '../routes/sessions.js';
 
 const log = createLogger('ws:session-stream');
 
@@ -307,7 +308,7 @@ export function handleSessionStream(ws: WebSocket, _req: IncomingMessage, sessio
   // Handle client→server messages (input for interview sessions)
   ws.on('message', (data) => {
     try {
-      const msg = JSON.parse(String(data)) as { type?: string; content?: string };
+      const msg = JSON.parse(String(data)) as { type?: string; content?: string; requestId?: string; data?: string };
       if (msg.type === 'input' && typeof msg.content === 'string') {
         const currentSession = getSession(dataDir, sessionId);
         if (!currentSession || currentSession.type !== 'interview' || currentSession.state !== 'running') {
@@ -320,6 +321,18 @@ export function handleSessionStream(ws: WebSocket, _req: IncomingMessage, sessio
           log.debug({ sessionId }, 'Forwarded input to process stdin');
         } else {
           log.warn({ sessionId }, 'No active process stdin to write to');
+        }
+      } else if (msg.type === 'ssh-agent-response' && typeof msg.requestId === 'string' && typeof msg.data === 'string') {
+        const bridge = getActiveBridge(sessionId);
+        if (bridge) {
+          bridge.handleResponse(msg.requestId, Buffer.from(msg.data, 'base64'));
+          log.debug({ sessionId, requestId: msg.requestId }, 'Routed ssh-agent-response to bridge');
+        }
+      } else if (msg.type === 'ssh-agent-cancel' && typeof msg.requestId === 'string') {
+        const bridge = getActiveBridge(sessionId);
+        if (bridge) {
+          bridge.handleCancel(msg.requestId);
+          log.debug({ sessionId, requestId: msg.requestId }, 'Routed ssh-agent-cancel to bridge');
         }
       }
     } catch {
