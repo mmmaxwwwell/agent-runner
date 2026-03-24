@@ -11,7 +11,7 @@ import {
   SSH_AGENTC_REQUEST_IDENTITIES,
   SSH_AGENTC_SIGN_REQUEST,
   parseSignRequest,
-} from './ssh-agent-protocol.ts';
+} from './ssh-agent-protocol.js';
 
 export interface BridgeRequest {
   requestId: string;
@@ -109,7 +109,7 @@ export async function createBridge(options: CreateBridgeOptions): Promise<SSHAge
       onRequest({ requestId, messageType: type, context, data });
     });
 
-    clientSocket.on('data', (chunk) => {
+    clientSocket.on('data', (chunk: Buffer) => {
       accumulator.feed(chunk);
     });
   });

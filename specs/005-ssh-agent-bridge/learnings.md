@@ -47,6 +47,13 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Important for T015/T016**: When sandboxed (`systemd-run`), env vars set via `spawn({ env })` only affect `systemd-run` itself, NOT the sandboxed child. For sandboxed processes, `SSH_AUTH_SOCK` must also be injected as `--setenv=SSH_AUTH_SOCK=<path>` in the args array. Additionally, the socket path must be added to `BindPaths` so the sandboxed process can access it.
 - Pre-existing build errors in `ssh-agent-bridge.ts` (TS5097 import extension, TS2345 Buffer type) — not related to T014.
 
+### T015 — Wiring bridge into session routes
+- Bridge lifecycle: created after `createSession()` (session dir must exist), destroyed on session end (completed/failed/stopped). Preserved during `waiting-for-input` so it persists across task loop respawns.
+- `getActiveBridge(sessionId)` is exported from `sessions.ts` for T025 (WebSocket message handlers) to look up bridges.
+- `injectSSHAuthSock` handles both sandboxed and unsandboxed: sets `env.SSH_AUTH_SOCK`, and for sandboxed also splices `--setenv=SSH_AUTH_SOCK=<path>` before the `nix` arg and appends socket path to `--property=BindPaths=`.
+- The input resume route (`POST /api/sessions/:id/input`) reuses the existing bridge if still alive, or creates a new one. This matters because the bridge socket server is independent of the child process.
+- Fixed pre-existing build errors in `ssh-agent-bridge.ts`: import extension `.ts` → `.js` (TS5097), and added explicit `Buffer` type annotation on socket data handler (TS2345).
+
 ### T013 — Bridge implementation patterns
 - `createBridge` uses closure-based state (pendingRequests map, server) rather than a class — keeps the public interface minimal (just the SSHAgentBridge interface methods).
 - Stale socket removal uses `unlink` with ENOENT suppression before `server.listen()`.

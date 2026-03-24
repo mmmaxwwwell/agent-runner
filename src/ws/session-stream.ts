@@ -86,6 +86,11 @@ export function broadcastPhaseTransition(sessionId: string, event: {
   broadcastToSession(sessionId, JSON.stringify({ type: 'phase', ...event }));
 }
 
+/** Broadcast an SSH agent request to all clients watching a session. */
+export function broadcastSSHAgentRequest(sessionId: string, request: { requestId: string; messageType: number; context: string; data: string }): void {
+  broadcastToSession(sessionId, JSON.stringify({ type: 'ssh-agent-request', ...request }));
+}
+
 /** Broadcast a single output entry to all clients watching a session. */
 export function broadcastSessionOutput(sessionId: string, entry: SessionLogEntry): void {
   broadcastToSession(sessionId, JSON.stringify({

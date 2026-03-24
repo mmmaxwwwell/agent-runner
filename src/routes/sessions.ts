@@ -5,19 +5,90 @@ import type { Config } from '../lib/config.js';
 import { createLogger } from '../lib/logger.js';
 import { getProject } from '../models/project.js';
 import { createSession, getSession, listSessionsByProject, transitionState } from '../models/session.js';
-import { buildCommand, type SessionType } from '../services/sandbox.js';
+import { buildCommand, type SessionType, type SandboxCommand } from '../services/sandbox.js';
 import { ensureAgentFramework } from '../services/agent-framework.js';
 import { spawnProcess, killProcess, startTaskLoop } from '../services/process-manager.js';
 import { registerProcess, unregisterProcess, getActiveProcess } from '../services/process-registry.js';
 import { createSessionLogger, readLog } from '../services/session-logger.js';
 import { parseTaskSummary } from '../services/task-parser.js';
-import { broadcastSessionState } from '../ws/session-stream.js';
+import { broadcastSessionState, broadcastSSHAgentRequest } from '../ws/session-stream.js';
 import { broadcastProjectUpdate } from '../ws/dashboard.js';
+import { detectSSHRemote, createBridge, type SSHAgentBridge } from '../services/ssh-agent-bridge.js';
 import type { PushService } from '../services/push.js';
 
 const DEFAULT_TASK_RUN_PROMPT = 'Read the task list, find the next unchecked task, implement it, verify it passes, mark it complete, and commit.';
 
 const log = createLogger('sessions');
+
+/** Active SSH agent bridges keyed by session ID. */
+const activeBridges = new Map<string, SSHAgentBridge>();
+
+/** Get the active SSH agent bridge for a session (used by WebSocket message handlers). */
+export function getActiveBridge(sessionId: string): SSHAgentBridge | undefined {
+  return activeBridges.get(sessionId);
+}
+
+/**
+ * Create an SSH agent bridge for a session if the project has an SSH remote.
+ * Returns the socket path if bridge was created, undefined otherwise.
+ */
+async function setupBridge(sessionId: string, projectDir: string, dataDir: string): Promise<string | undefined> {
+  const remote = detectSSHRemote(projectDir);
+  if (!remote) return undefined;
+
+  const socketPath = join(dataDir, 'sessions', sessionId, 'agent.sock');
+  try {
+    const bridge = await createBridge({
+      sessionId,
+      socketPath,
+      remoteContext: remote,
+      onRequest: (request) => {
+        broadcastSSHAgentRequest(sessionId, request);
+      },
+    });
+    activeBridges.set(sessionId, bridge);
+    log.info({ sessionId, socketPath, remote }, 'SSH agent bridge created');
+    return socketPath;
+  } catch (err) {
+    log.warn({ sessionId, err }, 'Failed to create SSH agent bridge');
+    return undefined;
+  }
+}
+
+/** Destroy and remove the SSH agent bridge for a session. */
+async function cleanupBridge(sessionId: string): Promise<void> {
+  const bridge = activeBridges.get(sessionId);
+  if (bridge) {
+    activeBridges.delete(sessionId);
+    try {
+      await bridge.destroy();
+    } catch (err) {
+      log.warn({ sessionId, err }, 'Error destroying SSH agent bridge');
+    }
+  }
+}
+
+/**
+ * Inject SSH_AUTH_SOCK into a SandboxCommand. For sandboxed processes,
+ * also adds --setenv and BindPaths so the socket is accessible inside the sandbox.
+ */
+function injectSSHAuthSock(sandboxCmd: SandboxCommand, socketPath: string): void {
+  sandboxCmd.env = { ...sandboxCmd.env, SSH_AUTH_SOCK: socketPath };
+
+  if (!sandboxCmd.unsandboxed) {
+    // Find where systemd-run flags end (the 'nix' command)
+    const nixIdx = sandboxCmd.args.indexOf('nix');
+    if (nixIdx >= 0) {
+      sandboxCmd.args.splice(nixIdx, 0, `--setenv=SSH_AUTH_SOCK=${socketPath}`);
+    }
+
+    // Add socket path to BindPaths so sandboxed process can access it
+    const bindPathIdx = sandboxCmd.args.findIndex(a => a.startsWith('--property=BindPaths='));
+    if (bindPathIdx >= 0) {
+      sandboxCmd.args[bindPathIdx] += ` ${socketPath}`;
+    }
+  }
+}
 
 type RouteHandler = (req: IncomingMessage, res: ServerResponse, params: Record<string, string>) => void | Promise<void>;
 
@@ -125,6 +196,12 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       log.warn({ sessionId: session.id, projectId: project.id }, 'Running session WITHOUT sandbox');
     }
 
+    // Set up SSH agent bridge if project has SSH remote
+    const bridgeSocketPath = await setupBridge(session.id, project.dir, cfg.dataDir);
+    if (bridgeSocketPath) {
+      injectSSHAuthSock(sandboxCmd, bridgeSocketPath);
+    }
+
     const logPath = join(cfg.dataDir, 'sessions', session.id, 'output.jsonl');
     const logger = createSessionLogger(logPath);
 
@@ -141,12 +218,17 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         taskFilePath,
         logger,
         dataDir: cfg.dataDir,
+        env: sandboxCmd.env,
         pushService,
       }).then((result) => {
         unregisterProcess(session.id);
+        if (result.outcome !== 'waiting-for-input') {
+          cleanupBridge(session.id).catch(err => log.warn({ err }, 'Bridge cleanup error'));
+        }
         log.info({ sessionId: session.id, outcome: result.outcome, spawnCount: result.spawnCount }, 'Task loop finished');
       }).catch((err) => {
         unregisterProcess(session.id);
+        cleanupBridge(session.id).catch(e => log.warn({ e }, 'Bridge cleanup error'));
         log.error({ sessionId: session.id, err }, 'Task loop error');
       });
 
@@ -184,6 +266,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         sessionId: session.id,
         logger,
         dataDir: cfg.dataDir,
+        env: sandboxCmd.env,
       });
 
       registerProcess(session.id, handle);
@@ -201,6 +284,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       // Handle process exit in background
       handle.waitForExit().then((result) => {
         unregisterProcess(session.id);
+        cleanupBridge(session.id).catch(err => log.warn({ err }, 'Bridge cleanup error'));
         const newState = result.exitCode === 0 ? 'completed' as const : 'failed' as const;
         transitionState(cfg.dataDir, session.id, newState, { exitCode: result.exitCode });
         broadcastSessionState(session.id, { state: newState });
@@ -222,6 +306,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         }
       }).catch(() => {
         unregisterProcess(session.id);
+        cleanupBridge(session.id).catch(() => {});
       });
 
       log.info({ sessionId: session.id, projectId: project.id, type: sessionType, pid: handle.pid }, 'Session started');
@@ -281,7 +366,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
   });
 
   // POST /api/sessions/:id/stop — stop a running session
-  apiRoutes.set('POST /api/sessions/:id/stop', (_req, res, params) => {
+  apiRoutes.set('POST /api/sessions/:id/stop', async (_req, res, params) => {
     const session = getSession(cfg.dataDir, params.id!);
     if (!session) {
       sendJson(res, 404, { error: 'Session not found' });
@@ -299,6 +384,9 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       killProcess(handle);
       unregisterProcess(session.id);
     }
+
+    // Clean up SSH agent bridge
+    await cleanupBridge(session.id);
 
     // Transition to failed with exitCode -1 (manual stop)
     const updated = transitionState(cfg.dataDir, session.id, 'failed', { exitCode: -1 });
@@ -389,6 +477,17 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       return;
     }
 
+    // Reuse existing bridge if available, otherwise set up a new one
+    const existingBridge = activeBridges.get(session.id);
+    if (existingBridge) {
+      injectSSHAuthSock(sandboxCmd, existingBridge.socketPath);
+    } else {
+      const bridgeSocketPath = await setupBridge(session.id, project.dir, cfg.dataDir);
+      if (bridgeSocketPath) {
+        injectSSHAuthSock(sandboxCmd, bridgeSocketPath);
+      }
+    }
+
     if (session.type === 'task-run') {
       const taskFilePath = join(project.dir, project.taskFile);
 
@@ -402,12 +501,17 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         taskFilePath,
         logger,
         dataDir: cfg.dataDir,
+        env: sandboxCmd.env,
         pushService,
       }).then((result) => {
         unregisterProcess(session.id);
+        if (result.outcome !== 'waiting-for-input') {
+          cleanupBridge(session.id).catch(err => log.warn({ err }, 'Bridge cleanup error'));
+        }
         log.info({ sessionId: session.id, outcome: result.outcome, spawnCount: result.spawnCount }, 'Task loop resumed after input');
       }).catch((err) => {
         unregisterProcess(session.id);
+        cleanupBridge(session.id).catch(e => log.warn({ e }, 'Bridge cleanup error'));
         log.error({ sessionId: session.id, err }, 'Task loop error after input');
       });
     } else {
@@ -418,6 +522,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         sessionId: session.id,
         logger,
         dataDir: cfg.dataDir,
+        env: sandboxCmd.env,
       });
 
       registerProcess(session.id, handle);
@@ -434,6 +539,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       // Handle process exit
       handle.waitForExit().then((result) => {
         unregisterProcess(session.id);
+        cleanupBridge(session.id).catch(err => log.warn({ err }, 'Bridge cleanup error'));
         const newState = result.exitCode === 0 ? 'completed' as const : 'failed' as const;
         transitionState(cfg.dataDir, session.id, newState, { exitCode: result.exitCode });
         broadcastSessionState(session.id, { state: newState });
@@ -455,6 +561,7 @@ export function mountSessionRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         }
       }).catch(() => {
         unregisterProcess(session.id);
+        cleanupBridge(session.id).catch(() => {});
       });
 
       updated.pid = handle.pid;
