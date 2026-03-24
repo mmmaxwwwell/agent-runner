@@ -112,7 +112,7 @@
 - [x] T025 [US10] Create `KeyManagementActivity.kt` in `android/app/src/main/java/.../`: list registered keys (name, type, fingerprint, last used), add Yubikey (detect + read), generate app key, remove/rename keys, export public key to clipboard per FR-099
 - [x] T026 [US10] Refactor `SignRequestDialog.kt` to support key picker: auto-select if one key matches, show picker if multiple, show key status indicators (ready/connect Yubikey/unavailable), PIN prompt for Yubikey, biometric prompt for app keys per FR-103, FR-076
 - [x] T027 [US10] Update `MainActivity.kt` to inject `SigningBackend` implementations based on build type (debug includes Mock, release does not). Update type 11 handler to query `KeyRegistry` for currently-available keys only per FR-100, FR-104
-- [ ] T028 [US10] Update `AgentWebSocket.kt` to use `SigningBackend` interface for sign requests: match requested key blob against `KeyRegistry`, route to correct backend, handle response/cancel per FR-069
+- [x] T028 [US10] Update `AgentWebSocket.kt` to use `SigningBackend` interface for sign requests: match requested key blob against `KeyRegistry`, route to correct backend, handle response/cancel per FR-069
 - [ ] T029 [US10] Run `./gradlew assembleDebug` and fix until clean build with new architecture
 
 **Checkpoint**: Android app builds with multi-key architecture, debug flavor has MockSigningBackend

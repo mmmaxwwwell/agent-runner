@@ -145,6 +145,12 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **`selectedKeyId` stored in handler**: `SignRequestHandler.onKeySelected(keyId)` stores the key ID but doesn't route to backends yet — T028 will use this to dispatch to the correct `SigningBackend`.
 - **PIN input conditional on key type**: Only shown for `YUBIKEY_PIV` when `pinRequired`. For `ANDROID_KEYSTORE`, biometric is handled by `KeystoreSigningBackend.sign()` internally. For `MOCK`, no user interaction needed.
 
+### T028 — Backend-routed sign requests
+- **SSH agent sign request data format**: The server sends base64(`type_byte(13) + string(key_blob) + string(data) + uint32(flags)`) where string = uint32(len) + bytes. Must parse this to extract the key blob for KeyRegistry lookup and the data-to-sign for the backend.
+- **Task title says `AgentWebSocket.kt` but changes are in `SignRequestHandler.kt`**: The WebSocket class just delivers messages; the sign routing logic lives in `SignRequestHandler`.
+- **`PinBlockedException` must propagate from `signWithPinLoopBackend`**: Unlike the legacy `signWithPinLoop` which handles cancellation itself, the new backend loop throws `PinBlockedException` up to `performSignWithBackend` which catches all non-IO/cancellation exceptions and sends cancel+error. This avoids duplicate `finishCurrent()` calls.
+- **`selectedKeyId` must be cleared in `finally` block**: After each sign attempt (success or failure), `selectedKeyId` is reset to `null` so the next request starts fresh with key blob matching.
+
 ### T027 — SigningBackend injection in MainActivity
 - **Reflection for debug-only class**: `MockSigningBackend` lives in `src/debug/` and isn't available in release builds. Used `Class.forName("com.agentrunner.signing.MockSigningBackend")` + reflection to instantiate it conditionally. `ClassNotFoundException` naturally skips it in release.
 - **Backward-compatible SignRequestHandler**: Added `keyRegistry` and `backends` as optional constructor parameters with defaults (`null` and `emptyList()`). When both are provided, `processListKeys` uses the new KeyRegistry+canSign path; otherwise falls back to direct `yubikey.listKeys()`. This keeps existing tests passing until T028/T030 update them.
