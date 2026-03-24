@@ -15,3 +15,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The `onMessage` callback receives `(type: number, payload: Buffer)` — type and payload already parsed.
 - Tests cover: single chunk, multi-part partial feeds, multiple messages in one chunk, buffer reset between messages, and cross-message split with leftover bytes.
 
+### T005 — Stub exports needed for shared test file
+- The test file `tests/unit/ssh-agent-protocol.test.ts` imports `readSSHString`, `parseMessage`, and `MessageAccumulator` in one import statement. Because the test runner loads the entire file before filtering by `--test-name-pattern`, ALL three exports must exist for ANY test suite to run.
+- Added throwing stubs for `parseMessage` and `MessageAccumulator` so T005 tests pass. T006/T007 will replace these stubs with real implementations.
+- `readSSHString` uses `Buffer.from(data)` to copy the subarray — avoids returning a view into the original buffer that could be mutated.
+
