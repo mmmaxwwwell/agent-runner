@@ -13,7 +13,7 @@ import { ensureAgentFramework } from '../services/agent-framework.js';
 import { spawnProcess } from '../services/process-manager.js';
 import { createSessionLogger } from '../services/session-logger.js';
 import { broadcastPhaseTransition } from '../ws/session-stream.js';
-import { broadcastProjectUpdate } from '../ws/dashboard.js';
+import { broadcastProjectUpdate, broadcastOnboardingStep } from '../ws/dashboard.js';
 import { runOnboardingPipeline, type OnboardingContext } from '../services/onboarding.js';
 import { randomUUID } from 'node:crypto';
 
@@ -534,6 +534,12 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       projectId,
       agentFrameworkDir: cfg.agentFrameworkDir,
       allowUnsandboxed: cfg.allowUnsandboxed,
+      onStepStart: (step) => {
+        broadcastOnboardingStep({ projectId, step, status: 'started' });
+      },
+      onStepComplete: (step, status, error) => {
+        broadcastOnboardingStep({ projectId, step, status, ...(error ? { error } : {}) });
+      },
     };
 
     // Fire pipeline async — it will skip register (already done) and handle remaining steps

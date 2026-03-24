@@ -22,6 +22,24 @@ function safeSend(ws: WebSocket, data: string): boolean {
   return true;
 }
 
+export interface OnboardingStepMessage {
+  type: 'onboarding-step';
+  projectId: string;
+  step: string;
+  status: 'started' | 'completed' | 'skipped' | 'error';
+  error?: string;
+}
+
+/**
+ * Broadcast an onboarding-step message to all connected dashboard clients.
+ */
+export function broadcastOnboardingStep(update: Omit<OnboardingStepMessage, 'type'>): void {
+  const message = JSON.stringify({ type: 'onboarding-step', ...update });
+  for (const ws of dashboardClients) {
+    safeSend(ws, message);
+  }
+}
+
 export interface ProjectUpdateMessage {
   type: 'project-update';
   projectId: string;

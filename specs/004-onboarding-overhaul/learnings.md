@@ -83,3 +83,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - 3 onboard-api tests (`should persist ... in projects.json`) fail due to a race condition: the async pipeline fails fast (install-specify → nix not available in test env) and sets status to "error" before tests read `projects.json`. In production this isn't an issue because pipeline steps take real time. T036 should update these tests to accept either "onboarding" or "error" status, or mock the pipeline.
 - `registerForOnboarding()` validates that the directory exists, so for `newProject: true` the directory must be created (`mkdirSync`) BEFORE calling `registerForOnboarding()`.
 
+### T016 — WebSocket onboarding-step broadcast
+- Enhanced `onStepComplete` callback signature to include an optional `error?: string` parameter so error messages can be broadcast to clients. The `onStepStart` callback didn't need changes.
+- The `broadcastOnboardingStep()` function follows the same pattern as `broadcastProjectUpdate()` — iterates `dashboardClients` with `safeSend()`.
+- Only the unified onboard endpoint in `projects.ts` wires the callbacks. If other callers of `runOnboardingPipeline()` need broadcasts, they must provide their own callbacks.
+

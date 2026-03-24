@@ -35,7 +35,7 @@ export interface OnboardingContext {
   agentFrameworkDir: string;
   allowUnsandboxed: boolean;
   onStepStart?: (step: OnboardingStepName) => void;
-  onStepComplete?: (step: OnboardingStepName, status: 'completed' | 'skipped' | 'error') => void;
+  onStepComplete?: (step: OnboardingStepName, status: 'completed' | 'skipped' | 'error', error?: string) => void;
 }
 
 export interface OnboardingResult {
@@ -195,7 +195,8 @@ export async function runOnboardingPipeline(ctx: OnboardingContext): Promise<Onb
       }
 
     } catch (err) {
-      ctx.onStepComplete?.(step.name, 'error');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      ctx.onStepComplete?.(step.name, 'error', errMsg);
 
       // Set project status to error if we have a projectId
       if (projectId) {
@@ -206,8 +207,7 @@ export async function runOnboardingPipeline(ctx: OnboardingContext): Promise<Onb
         }
       }
 
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`Onboarding step "${step.name}" failed: ${msg}`);
+      throw new Error(`Onboarding step "${step.name}" failed: ${errMsg}`);
     }
   }
 
