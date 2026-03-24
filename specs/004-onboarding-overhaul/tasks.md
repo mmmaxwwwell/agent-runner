@@ -83,7 +83,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Add new-project handling to onboarding pipeline in src/services/onboarding.ts — when `newProject: true`, validate name against `/^[a-zA-Z0-9._-]+$/`, create directory under `projectsDir`, then run same step pipeline. Check for name collision in registry and on disk
+- [x] T019 [US2] Add new-project handling to onboarding pipeline in src/services/onboarding.ts — when `newProject: true`, validate name against `/^[a-zA-Z0-9._-]+$/`, create directory under `projectsDir`, then run same step pipeline. Check for name collision in registry and on disk
 - [ ] T020 [US2] Create projects directory if missing — in the `create-directory` onboarding step, also ensure `cfg.projectsDir` (~/git) exists before creating the project subdirectory
 
 **Checkpoint**: Both discovered dirs and new projects use unified onboarding flow

@@ -34,6 +34,8 @@ export interface OnboardingContext {
   projectId?: string;
   agentFrameworkDir: string;
   allowUnsandboxed: boolean;
+  newProject?: boolean;
+  projectsDir?: string;
   onStepStart?: (step: OnboardingStepName) => void;
   onStepComplete?: (step: OnboardingStepName, status: 'completed' | 'skipped' | 'error', error?: string) => void;
 }
@@ -44,6 +46,57 @@ export interface OnboardingResult {
   name: string;
   path: string;
   status: 'onboarding';
+}
+
+const VALID_PROJECT_NAME = /^[a-zA-Z0-9._-]+$/;
+
+export class NewProjectValidationError extends Error {
+  constructor(message: string, public readonly code: 'invalid-name' | 'duplicate-name' | 'directory-exists') {
+    super(message);
+    this.name = 'NewProjectValidationError';
+  }
+}
+
+/**
+ * Validate a new project name against naming rules, registry collisions, and disk collisions.
+ * Returns the resolved projectDir. Throws NewProjectValidationError on failure.
+ */
+export function validateNewProjectName(
+  name: string,
+  dataDir: string,
+  projectsDir: string,
+): { projectDir: string; existingProject?: { id: string; dir: string; name: string; status: string } } {
+  if (!name || !VALID_PROJECT_NAME.test(name)) {
+    throw new NewProjectValidationError(
+      'Invalid project name: must contain only letters, numbers, dots, hyphens, underscores',
+      'invalid-name',
+    );
+  }
+
+  // Check duplicate name in registry
+  const existingProjects = listProjects(dataDir);
+  const existingByName = existingProjects.find(p => p.name === name);
+  if (existingByName) {
+    // Allow re-onboard if status is "onboarding" or "error"
+    if (existingByName.status === 'onboarding' || existingByName.status === 'error') {
+      return { projectDir: existingByName.dir, existingProject: existingByName };
+    }
+    throw new NewProjectValidationError(
+      `A project with name '${name}' already exists`,
+      'duplicate-name',
+    );
+  }
+
+  // Check for directory collision on disk
+  const targetDir = join(projectsDir, name);
+  if (existsSync(targetDir)) {
+    throw new NewProjectValidationError(
+      `A directory with name '${name}' already exists on disk`,
+      'directory-exists',
+    );
+  }
+
+  return { projectDir: targetDir };
 }
 
 // Mutable state passed between steps during pipeline execution
@@ -162,6 +215,14 @@ export function createOnboardingSteps(ctx: OnboardingContext): OnboardingStep[] 
 }
 
 export async function runOnboardingPipeline(ctx: OnboardingContext): Promise<OnboardingResult> {
+  // Validate new project name before running any steps
+  if (ctx.newProject) {
+    if (!ctx.projectsDir) {
+      throw new Error('projectsDir is required when newProject is true');
+    }
+    validateNewProjectName(ctx.projectName, ctx.dataDir, ctx.projectsDir);
+  }
+
   const steps = createOnboardingSteps(ctx);
 
   // Track projectId across steps (register may set it)

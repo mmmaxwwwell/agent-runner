@@ -93,6 +93,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - The 409 duplicate test must use a project in "active" status (registered via `POST /api/projects`). Projects in "onboarding" status allow re-onboarding (returns 200/201), so using a recently-onboarded project for the 409 test will fail.
 - The response shape assertion (`Object.keys(body).sort()`) verifies exactly 5 fields: `name`, `path`, `projectId`, `sessionId`, `status` — no extra fields allowed.
 
+### T019 — New-project validation in service layer
+- `validateNewProjectName()` is exported from `onboarding.ts` and used by both the route handler (for HTTP error mapping) and `runOnboardingPipeline()` (for service-layer defense). The route calls it synchronously before launching the async pipeline.
+- `NewProjectValidationError` has a `code` field (`'invalid-name' | 'duplicate-name' | 'directory-exists'`) that the route maps to HTTP 400 or 409 status codes.
+- The validation returns `existingProject` when re-onboarding is allowed (status "onboarding" or "error"), which the caller uses to reuse the existing project's dir/name.
+
 ### T017 — Project status transition validation
 - `VALID_TRANSITIONS` map enforces: `onboarding→active`, `onboarding→error`, `error→onboarding`. The `active` status is terminal — no transitions allowed from it.
 - The `"not affect other projects"` test was updated from `createProject` (active) to `registerForOnboarding` (onboarding) since active→error is no longer valid. Future tests that need to call `updateProjectStatus` must start from `registerForOnboarding` unless testing the rejection path.

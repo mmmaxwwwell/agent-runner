@@ -14,7 +14,7 @@ import { spawnProcess } from '../services/process-manager.js';
 import { createSessionLogger } from '../services/session-logger.js';
 import { broadcastPhaseTransition } from '../ws/session-stream.js';
 import { broadcastProjectUpdate, broadcastOnboardingStep } from '../ws/dashboard.js';
-import { runOnboardingPipeline, type OnboardingContext } from '../services/onboarding.js';
+import { runOnboardingPipeline, validateNewProjectName, NewProjectValidationError, type OnboardingContext } from '../services/onboarding.js';
 import { randomUUID } from 'node:crypto';
 
 const log = createLogger('server');
@@ -420,32 +420,18 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
         sendJson(res, 400, { error: 'Missing or empty name for new project' });
         return;
       }
-      if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
-        sendJson(res, 400, { error: 'Invalid project name: must contain only letters, numbers, dots, hyphens, underscores' });
-        return;
-      }
 
-      // Check duplicate name in registry
-      const existingProjects = listProjects(cfg.dataDir);
-      const existingByName = existingProjects.find(p => p.name === name);
-      if (existingByName) {
-        // Allow re-onboard if status is "onboarding" or "error"
-        if (existingByName.status === 'onboarding' || existingByName.status === 'error') {
-          projectDir = existingByName.dir;
-          projectName = existingByName.name;
-        } else {
-          sendJson(res, 409, { error: `A project with name '${name}' already exists` });
+      try {
+        const validation = validateNewProjectName(name, cfg.dataDir, cfg.projectsDir);
+        projectDir = validation.projectDir;
+        projectName = validation.existingProject ? validation.existingProject.name : name;
+      } catch (err) {
+        if (err instanceof NewProjectValidationError) {
+          const status = err.code === 'duplicate-name' || err.code === 'directory-exists' ? 409 : 400;
+          sendJson(res, status, { error: err.message });
           return;
         }
-      } else {
-        // Check for directory collision on disk
-        const targetDir = join(cfg.projectsDir, name);
-        if (existsSync(targetDir)) {
-          sendJson(res, 409, { error: `A directory with name '${name}' already exists on disk` });
-          return;
-        }
-        projectDir = targetDir;
-        projectName = name;
+        throw err;
       }
     } else {
       // Discovered directory: path is required
@@ -534,6 +520,8 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       projectId,
       agentFrameworkDir: cfg.agentFrameworkDir,
       allowUnsandboxed: cfg.allowUnsandboxed,
+      newProject: isNewProject,
+      projectsDir: cfg.projectsDir,
       onStepStart: (step) => {
         broadcastOnboardingStep({ projectId, step, status: 'started' });
       },
