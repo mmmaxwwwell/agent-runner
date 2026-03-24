@@ -163,3 +163,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - T024 had already implemented most of T025's requirements (`showNotification` with PendingIntent, `handleNotificationIntent`, `onNewIntent`), but had a bug: `handleNotificationIntent` was called in `onCreate` before WebView was initialized, so cold-start deep links silently failed.
 - Fix: store the hash in `pendingNavigateHash` field during `onCreate`, then use it when loading the initial URL.
 
+### T026 — Activity recreation handling
+- `configChanges` in manifest already handles rotation without activity recreation, so `onSaveInstanceState`/restore mainly covers low-memory kills and other config changes.
+- `serverUrl` is saved to instance state and restored before SharedPreferences fallback — this avoids a race where the user entered a URL via intent extra but hasn't persisted it yet.
+- `connectWebSocket` was extracted from `onSessionChanged` to allow reuse during restore (no "old session" to disconnect during fresh recreation).
+- `reconfigureSignDialog` looks up the dialog by fragment tag after restoration — the DialogFragment's `arguments` Bundle survives but `callback`/`yubikeyStatus` references (set via `configure()`) are lost in `onDestroyView`. Must call `configure()` again before the fragment's `onViewCreated` re-observes the LiveData.
+- `activityScope` is recreated with the new activity instance, so the restored `SignRequestHandler` gets a fresh scope. Any in-flight sign operations from the previous activity instance are lost (acceptable — server would have timed out anyway).
+

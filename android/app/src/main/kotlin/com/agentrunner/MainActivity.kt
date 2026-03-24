@@ -53,14 +53,17 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
     companion object {
         private const val TAG = "AgentRunner"
         private const val SIGN_DIALOG_TAG = "sign_request_dialog"
+        private const val STATE_SESSION_ID = "current_session_id"
+        private const val STATE_SERVER_URL = "server_url"
         private val SESSION_HASH_PATTERN = Regex("""#/sessions/([0-9a-fA-F\-]{36})""")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Determine server URL: intent extra takes priority, then saved config
+        // Determine server URL: intent extra takes priority, then saved instance state, then saved config
         serverUrl = intent.getStringExtra(ServerConfigActivity.EXTRA_SERVER_URL)
+            ?: savedInstanceState?.getString(STATE_SERVER_URL)
             ?: ServerConfig.load(this)?.serverUrl
 
         if (serverUrl == null) {
@@ -160,6 +163,15 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
+
+            // Restore session state and re-establish WebSocket connection
+            currentSessionId = savedInstanceState.getString(STATE_SESSION_ID)
+            if (currentSessionId != null && serverUrl != null) {
+                connectWebSocket(currentSessionId!!)
+            }
+
+            // Re-configure surviving SignRequestDialog (fragment survives, but callback/LiveData don't)
+            reconfigureSignDialog()
         } else {
             val hash = pendingNavigateHash
             pendingNavigateHash = null
@@ -280,15 +292,27 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
 
         // Connect to new session
         if (newSessionId != null && serverUrl != null) {
-            val ws = AgentWebSocket(serverUrl!!)
-            val handler = SignRequestHandler(yubikeyManager, ws, this, activityScope)
-            ws.onSignRequest = { request ->
-                runOnUiThread { handler.onSignRequest(request) }
-            }
-            agentWebSocket = ws
-            signRequestHandler = handler
-            ws.connect(newSessionId)
-            Log.d(TAG, "AgentWebSocket connected for session $newSessionId")
+            connectWebSocket(newSessionId)
+        }
+    }
+
+    private fun connectWebSocket(sessionId: String) {
+        val ws = AgentWebSocket(serverUrl!!)
+        val handler = SignRequestHandler(yubikeyManager, ws, this, activityScope)
+        ws.onSignRequest = { request ->
+            runOnUiThread { handler.onSignRequest(request) }
+        }
+        agentWebSocket = ws
+        signRequestHandler = handler
+        ws.connect(sessionId)
+        Log.d(TAG, "AgentWebSocket connected for session $sessionId")
+    }
+
+    private fun reconfigureSignDialog() {
+        val dialog = supportFragmentManager.findFragmentByTag(SIGN_DIALOG_TAG) as? SignRequestDialog
+        if (dialog != null) {
+            dialog.configure(this, yubikeyManager.status)
+            signDialog = dialog
         }
     }
 
@@ -364,6 +388,8 @@ class MainActivity : AppCompatActivity(), SignRequestListener, SignRequestDialog
         if (::webView.isInitialized) {
             webView.saveState(outState)
         }
+        outState.putString(STATE_SESSION_ID, currentSessionId)
+        outState.putString(STATE_SERVER_URL, serverUrl)
     }
 
     @Deprecated("Use onBackPressedDispatcher")
