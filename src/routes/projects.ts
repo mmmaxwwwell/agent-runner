@@ -530,6 +530,8 @@ export function mountProjectRoutes(apiRoutes: Map<string, RouteHandler>, cfg: Co
       allowUnsandboxed: cfg.allowUnsandboxed,
       newProject: isNewProject,
       projectsDir: cfg.projectsDir,
+      remoteUrl: parsed.remoteUrl,
+      createGithubRepo: parsed.createGithubRepo,
       onStepStart: (step) => {
         broadcastOnboardingStep({ projectId, step, status: 'started' });
       },

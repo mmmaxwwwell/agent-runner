@@ -149,6 +149,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - `handle.waitForExit().then(() => parser.stop())` is fire-and-forget — the promise is intentionally not awaited since the pipeline doesn't wait for the interview to finish.
 - The spec-kit workflow (`spec-kit.ts`) does NOT have transcript parser integration yet — it would need `dataDir` plumbed through to construct the output.jsonl path. This can be added when T027 updates the post-interview handoff.
 
+### T030 — Git remote setup options passthrough
+- The onboard endpoint already parsed and validated `remoteUrl`/`createGithubRepo` (mutual exclusivity check) since T015. T030 only needed to add the fields to `OnboardingContext` and pass them through.
+- Added `'git-remote'` to `OnboardingStepName` union type since the REST API contract lists it as a valid step name. T031 will use this when implementing the actual step.
+
 ### T028 — Explicit user trigger for planning transition
 - Added `POST /api/projects/:id/start-planning` endpoint that: validates project is in "onboarding" status, verifies no active session (interview must be complete), transitions to "active", and launches plan → tasks → analyze phases async.
 - Created `startPlanningPhases()` in `spec-kit.ts` to run only post-interview phases (plan → tasks → analyze) with the same analyze remediation loop pattern as `runWorkflow()`. This avoids re-running the interview phase.

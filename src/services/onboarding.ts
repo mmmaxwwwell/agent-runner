@@ -18,6 +18,7 @@ export type OnboardingStepName =
   | 'create-directory'
   | 'generate-flake'
   | 'git-init'
+  | 'git-remote'
   | 'install-specify'
   | 'specify-init'
   | 'launch-interview';
@@ -37,6 +38,8 @@ export interface OnboardingContext {
   allowUnsandboxed: boolean;
   newProject?: boolean;
   projectsDir?: string;
+  remoteUrl?: string;
+  createGithubRepo?: boolean;
   onStepStart?: (step: OnboardingStepName) => void;
   onStepComplete?: (step: OnboardingStepName, status: 'completed' | 'skipped' | 'error', error?: string) => void;
 }
