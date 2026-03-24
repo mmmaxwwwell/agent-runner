@@ -6,13 +6,15 @@ import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 
 import { listProjects, registerForOnboarding, updateProjectStatus } from '../models/project.js';
-import { createSession, listSessionsByProject } from '../models/session.js';
+import { createSession, listSessionsByProject, transitionState } from '../models/session.js';
 import { ensureFlakeNix } from './flake-generator.js';
 import { buildCommand } from './sandbox.js';
 import { spawnProcess } from './process-manager.js';
-import { registerProcess } from './process-registry.js';
+import { registerProcess, unregisterProcess } from './process-registry.js';
 import { createSessionLogger } from './session-logger.js';
 import { TranscriptParser } from './transcript-parser.js';
+import { broadcastSessionState } from '../ws/session-stream.js';
+import { broadcastProjectUpdate } from '../ws/dashboard.js';
 
 export type OnboardingStepName =
   | 'register'
@@ -269,8 +271,24 @@ export function createOnboardingSteps(ctx: OnboardingContext): OnboardingStep[] 
         const parser = new TranscriptParser(logPath, transcriptPath);
         parser.start();
 
-        // Stop the parser when the interview process exits
-        handle.waitForExit().then(() => parser.stop());
+        // Handle process exit: transition session state + stop parser
+        const resolvedProjectId = state.projectId ?? ctx.projectId;
+        handle.waitForExit().then((result) => {
+          parser.stop();
+          unregisterProcess(session.id);
+          const newState = result.exitCode === 0 ? 'completed' as const : 'failed' as const;
+          transitionState(ctx.dataDir, session.id, newState, { exitCode: result.exitCode });
+          broadcastSessionState(session.id, { state: newState });
+          broadcastProjectUpdate({
+            projectId: resolvedProjectId!,
+            activeSession: null,
+            taskSummary: null,
+            workflow: null,
+          });
+        }).catch(() => {
+          parser.stop();
+          unregisterProcess(session.id);
+        });
       },
     },
   ];
