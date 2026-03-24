@@ -139,7 +139,7 @@
 - [x] T027 [P] Handle Yubikey disconnect mid-signing — in YubikeyManager, detect USB onClosed during active sign operation. In SignRequestHandler, auto-cancel pending request and show error in modal. Handle NFC loss during signing similarly
 - [x] T028 [P] Handle multiple queued sign requests — in SignRequestHandler, ensure queue is processed FIFO. Show count badge on modal ("Request 1 of 3"). Cancel all pending on WebSocket disconnect
 - [x] T029 Handle WebSocket disconnect during sign modal — dismiss modal, show connection error toast, fail pending requests. On reconnect, pending sign requests are NOT replayed (server already timed out)
-- [ ] T030 Add ProGuard/R8 rules for Yubico SDK in app/proguard-rules.pro — ensure yubikit classes are not minified. Add keep rules for @JavascriptInterface methods
+- [x] T030 Add ProGuard/R8 rules for Yubico SDK in app/proguard-rules.pro — ensure yubikit classes are not minified. Add keep rules for @JavascriptInterface methods
 
 ---
 
@@ -202,3 +202,9 @@
 - PIN may be required for PIV slot 9a depending on PIN policy — handle PIN prompt in YubikeyManager
 - SSH wire format for ECDSA P-256 keys: string "ecdsa-sha2-nistp256" + string "nistp256" + string EC point (uncompressed)
 - The web app (PWA) is NOT modified — all native functionality is additive
+
+---
+
+## Phase: Review
+
+- [ ] REVIEW — Run code review on all changes from this feature branch

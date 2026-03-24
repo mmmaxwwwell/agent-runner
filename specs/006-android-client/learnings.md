@@ -189,3 +189,10 @@ Each entry should include a timestamp and the task ID that produced the learning
 - Reconnect safety: `cancelAll()` resets all handler state (queue, counters, current request), so when `scheduleReconnect()` fires and reconnects, the handler is clean. The server has already timed out old requests, so no replay occurs.
 - `cancelAll()` attempts `sendCancel()` on the dead socket — OkHttp `WebSocket.send()` returns false silently, no exception. Acceptable behavior, no special "dead socket" path needed.
 
+### T030 — ProGuard/R8 rules
+- `-keep class com.yubico.yubikit.** { *; }` keeps the entire Yubico SDK — needed because YubiKit uses reflection for USB/NFC transport and SmartCard connections.
+- `@JavascriptInterface` methods need a generic `-keepclassmembers` rule (not class-specific) so any future bridge classes are also covered.
+- OkHttp `-dontwarn` rules suppress warnings for optional TLS provider classes (Conscrypt, BouncyCastle, OpenJSSE) that may not be on the classpath.
+- No Gradle wrapper in the project means ProGuard rules can't be validated via CLI build. Rules are standard and well-documented — low risk.
+- This was the final task — a REVIEW phase was appended to tasks.md per the implementation agent protocol.
+
