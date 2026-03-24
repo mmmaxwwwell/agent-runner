@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
 
+export const AGENT_FRAMEWORK_REPO = 'https://github.com/mmmaxwwwell/agent-framework';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
 const LOG_LEVELS: ReadonlySet<string> = new Set(['debug', 'info', 'warn', 'error', 'fatal']);
