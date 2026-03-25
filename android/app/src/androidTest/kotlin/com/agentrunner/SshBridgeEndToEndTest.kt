@@ -56,7 +56,7 @@ class SshBridgeEndToEndTest {
     companion object {
         private const val TIMEOUT_MS = 15_000L
         private const val POLL_INTERVAL_MS = 300L
-        private const val TEST_SESSION_ID = "00000000-0000-0000-0000-e2ebridge0001"
+        private const val TEST_SESSION_ID = "00000000-0000-0000-0000-e2eb01de0001"
         private const val SIGN_DIALOG_TAG = "sign_request_dialog"
 
         // SSH agent message type constants

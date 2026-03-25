@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
  *
  * Prerequisites (handled by the orchestration script):
  * - agent-runner server running on host with test fixtures
- * - `adb reverse tcp:3000 tcp:3000` so localhost:3000 reaches the host server
+ * - `adb reverse tcp:<port> tcp:<port>` so localhost reaches the host server
  *
  * Per FR-068, FR-106.
  */
@@ -29,22 +29,29 @@ import java.util.concurrent.TimeUnit
 class WebViewDashboardTest {
 
     companion object {
-        private const val SERVER_URL = "http://localhost:3000"
+        private const val DEFAULT_PORT = 3001
         private const val LOAD_TIMEOUT_MS = 15_000L
         private const val POLL_INTERVAL_MS = 500L
     }
 
+    private lateinit var serverUrl: String
+
     @Before
     fun setUp() {
+        // Read port from instrumentation args (set by orchestration script), default to 3001
+        val args = InstrumentationRegistry.getArguments()
+        val port = args.getString("serverPort")?.toIntOrNull() ?: DEFAULT_PORT
+        serverUrl = "http://localhost:$port"
+
         // Pre-configure the server URL so MainActivity doesn't redirect to ServerConfigActivity
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        ServerConfig.save(context, ServerConfig(SERVER_URL))
+        ServerConfig.save(context, ServerConfig(serverUrl))
     }
 
     @Test
     fun appLaunchesAndWebViewLoads() {
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
-            .putExtra(ServerConfigActivity.EXTRA_SERVER_URL, SERVER_URL)
+            .putExtra(ServerConfigActivity.EXTRA_SERVER_URL, serverUrl)
 
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             // Wait for page to finish loading (check that #app has content beyond "Loading…")
@@ -58,7 +65,7 @@ class WebViewDashboardTest {
     @Test
     fun dashboardRendersProjectList() {
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
-            .putExtra(ServerConfigActivity.EXTRA_SERVER_URL, SERVER_URL)
+            .putExtra(ServerConfigActivity.EXTRA_SERVER_URL, serverUrl)
 
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             // Wait for project names to appear (test fixtures have projects)
@@ -89,7 +96,7 @@ class WebViewDashboardTest {
     @Test
     fun dashboardShowsRegisteredProjects() {
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
-            .putExtra(ServerConfigActivity.EXTRA_SERVER_URL, SERVER_URL)
+            .putExtra(ServerConfigActivity.EXTRA_SERVER_URL, serverUrl)
 
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             // Wait for the dashboard to render project cards
@@ -135,7 +142,7 @@ class WebViewDashboardTest {
     @Test
     fun navigationToProjectDetailWorks() {
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
-            .putExtra(ServerConfigActivity.EXTRA_SERVER_URL, SERVER_URL)
+            .putExtra(ServerConfigActivity.EXTRA_SERVER_URL, serverUrl)
 
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             // Wait for dashboard to load

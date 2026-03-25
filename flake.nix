@@ -18,9 +18,11 @@
       androidComposition = pkgs.androidenv.composeAndroidPackages {
         platformVersions = [ "34" ];
         buildToolsVersions = [ "34.0.0" ];
-        includeEmulator = false;
+        includeEmulator = true;
         includeSources = false;
-        includeSystemImages = false;
+        includeSystemImages = true;
+        systemImageTypes = [ "google_apis" ];
+        abiVersions = [ "x86_64" ];
       };
       androidSdk = androidComposition.androidsdk;
     in
@@ -48,6 +50,12 @@
           if [ ! -f android/gradlew ]; then
             echo "Generating Gradle wrapper in android/..."
             (cd android && gradle wrapper --gradle-version 8.5 --quiet 2>/dev/null || true)
+          fi
+
+          # Create Android AVD for integration tests if it doesn't exist
+          if ! avdmanager list avd 2>/dev/null | grep -q "test-avd"; then
+            echo "Creating Android AVD 'test-avd'..."
+            avdmanager create avd -n test-avd -k "system-images;android-34;google_apis;x86_64" -d pixel_6 --force 2>/dev/null || true
           fi
         '';
       };

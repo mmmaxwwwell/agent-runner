@@ -22,7 +22,10 @@
     "android:test": "cd android && ./gradlew testDebugUnitTest",
     "android:clean": "cd android && ./gradlew clean",
     "android:lint": "cd android && ./gradlew lintDebug",
-    "test:android:integration": "bash tests/android-integration/run.sh"
+    "test:android:integration": "bash tests/android-integration/run.sh",
+    "emulator": "emulator -avd test-avd -no-audio -no-boot-anim -gpu swiftshader_indirect",
+    "emulator:headless": "emulator -avd test-avd -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect",
+    "emulator:wait": "adb wait-for-device && adb shell 'while [ \"$(getprop sys.boot_completed)\" != \"1\" ]; do sleep 2; done' && echo 'Emulator ready'"
   },
   "license": "UNLICENSED",
   "private": true,

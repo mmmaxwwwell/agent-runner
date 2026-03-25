@@ -32,6 +32,7 @@ class KeyManagementActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "KeyManagement"
+        const val EXTRA_REQUIRE_BIOMETRIC = "require_biometric"
     }
 
     private lateinit var registry: KeyRegistry
@@ -54,7 +55,8 @@ class KeyManagementActivity : AppCompatActivity() {
         registry = KeyRegistry(applicationContext)
         yubikeyManager = YubikeyManager(applicationContext)
         yubikeyBackend = YubikeySigningBackend(yubikeyManager, registry)
-        keystoreBackend = KeystoreSigningBackend(this, registry)
+        val requireBiometric = intent.getBooleanExtra(EXTRA_REQUIRE_BIOMETRIC, true)
+        keystoreBackend = KeystoreSigningBackend(this, registry, requireBiometric = requireBiometric)
 
         keyList = findViewById(R.id.keyList)
         emptyState = findViewById(R.id.emptyState)

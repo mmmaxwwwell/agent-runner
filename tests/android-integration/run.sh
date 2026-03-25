@@ -21,7 +21,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ANDROID_DIR="$PROJECT_ROOT/android"
 FIXTURES_DIR="$PROJECT_ROOT/tests/fixtures"
 TEST_LOGS_DIR="$PROJECT_ROOT/test-logs/android-integration"
-PORT="${AGENT_RUNNER_PORT:-3000}"
+PORT="${AGENT_RUNNER_PORT:-3001}"
 
 # Temp data dir for isolated server state
 DATA_DIR=""
@@ -170,7 +170,8 @@ echo ""
 # Run via am instrument; capture exit code but don't fail immediately
 set +e
 adb shell am instrument -w \
-  -e class "com.agentrunner" \
+  -e package "com.agentrunner" \
+  -e serverPort "$PORT" \
   com.agentrunner.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee /tmp/android-instrument-output.txt
 INSTRUMENT_EXIT=$?
 set -e

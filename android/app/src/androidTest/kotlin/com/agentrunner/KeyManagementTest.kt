@@ -109,6 +109,7 @@ class KeyManagementTest {
     @Test
     fun generateAppKeyAddsKeyToList() {
         val intent = Intent(ApplicationProvider.getApplicationContext(), KeyManagementActivity::class.java)
+            .putExtra(KeyManagementActivity.EXTRA_REQUIRE_BIOMETRIC, false)
         ActivityScenario.launch<KeyManagementActivity>(intent).use { scenario ->
             // Click the "Generate App Key" button
             onView(withId(R.id.generateAppKeyButton)).perform(click())
