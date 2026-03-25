@@ -230,7 +230,7 @@ Server + Android app + multi-key signing + integration tests all passing.
 
 ## Phase: Review
 
-- [ ] REVIEW — Run code review on all changes from this feature branch
+- [x] REVIEW — Run code review on all changes from this feature branch
 
 ---
 
