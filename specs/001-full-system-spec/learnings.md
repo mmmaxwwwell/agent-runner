@@ -244,3 +244,8 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **Port conflict with dev server**: The integration test server defaulted to port 3000 which conflicts with a running dev server. Changed default to 3001. The port is passed to instrumented tests via `-e serverPort "$PORT"` argument to `am instrument`.
 - **WebViewDashboardTest reads serverPort from InstrumentationRegistry.getArguments()**: This allows the orchestration script to configure which port the test connects to, avoiding hardcoded port numbers.
 - **All 14 Android integration tests pass**: 4 KeyManagement + 3 SignRequestFlow + 3 SshBridgeEndToEnd + 4 WebViewDashboard. Phase 11 checkpoint met.
+
+### T045 — All Node.js tests pass together
+- **Parallel test files with real servers cause cross-test interference**: When `npm test` ran all test files in a single Node.js test runner invocation, integration and contract test files that start real servers (with `spawn('npx', ['tsx', 'src/server.ts'])`) would overwhelm resources — onboarding pipelines fire-and-forget `nix develop` and `specify` processes. Fetch calls to later servers would fail with "fetch failed" (connection refused/timeout).
+- **Fix: sequential groups + `--test-concurrency=1`**: Changed `npm test` to run `test:unit && test:integration && test:contract` sequentially. Added `--test-concurrency=1` to integration and contract scripts to prevent server-starting test files from running in parallel. Unit tests keep default concurrency (no servers, safe to parallelize).
+- **All 633 tests pass**: 367 unit + 172 integration + 94 contract. Zero failures.
