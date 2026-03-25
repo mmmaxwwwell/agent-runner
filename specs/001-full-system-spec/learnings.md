@@ -245,6 +245,11 @@ Each entry should include a timestamp and the task ID that produced the learning
 - **WebViewDashboardTest reads serverPort from InstrumentationRegistry.getArguments()**: This allows the orchestration script to configure which port the test connects to, avoiding hardcoded port numbers.
 - **All 14 Android integration tests pass**: 4 KeyManagement + 3 SignRequestFlow + 3 SshBridgeEndToEnd + 4 WebViewDashboard. Phase 11 checkpoint met.
 
+### T047 — UI_FLOW.md update for Android screens
+- **UI_FLOW.md was missing all Android-native screens**: ServerConfigActivity, KeyManagementActivity, SignRequestDialog, and the JavaScript bridge (`window.AgentRunner`) were not documented. The existing doc only covered PWA hash-route screens.
+- **Mermaid flowchart supports mixed web + native**: Added green-styled nodes for Android screens alongside existing blue (PWA) and orange (inline components) nodes. The sign request flow connects from the Session View screen to the SignRequestDialog modal.
+- **Android sign request sequence diagram complements SSH Agent Bridge diagram**: The existing SSH Agent Bridge diagram (server-side Unix socket → WebSocket) covers the host side. The new Android diagram covers the complementary client side (WebSocket → SignRequestHandler → SigningBackend → response).
+
 ### T045 — All Node.js tests pass together
 - **Parallel test files with real servers cause cross-test interference**: When `npm test` ran all test files in a single Node.js test runner invocation, integration and contract test files that start real servers (with `spawn('npx', ['tsx', 'src/server.ts'])`) would overwhelm resources — onboarding pipelines fire-and-forget `nix develop` and `specify` processes. Fetch calls to later servers would fail with "fetch failed" (connection refused/timeout).
 - **Fix: sequential groups + `--test-concurrency=1`**: Changed `npm test` to run `test:unit && test:integration && test:contract` sequentially. Added `--test-concurrency=1` to integration and contract scripts to prevent server-starting test files from running in parallel. Unit tests keep default concurrency (no servers, safe to parallelize).

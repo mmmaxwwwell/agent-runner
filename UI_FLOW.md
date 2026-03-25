@@ -65,11 +65,29 @@ flowchart TD
     PROJ -- "Start → 400 / 409 / 503" --> PROJ
     SESS -- "Input → 400 / 404" --> SESS
 
+    %% ===== ANDROID NATIVE SCREENS =====
+    SCONF["ServerConfigActivity\n(Android native)"]
+    KEYMGMT["KeyManagementActivity\n(Android native)"]
+    SIGNDLG["SignRequestDialog\n(Android modal)"]
+
+    %% ===== ANDROID NAVIGATION =====
+    SCONF -- "Enter URL, tap Connect\nSave to SharedPreferences" --> DASH
+    DASH -- "window.AgentRunner.openSettings()" --> SCONF
+    DASH -- "window.AgentRunner.openKeyManagement()" --> KEYMGMT
+    KEYMGMT -- "Back (toolbar)" --> DASH
+
+    %% ===== ANDROID SSH SIGN FLOW =====
+    SESS -- "WS ssh-agent-request\n(Android only)" --> SIGNDLG
+    SIGNDLG -- "User signs (PIN/biometric/auto)\nWS ssh-agent-response" --> SESS
+    SIGNDLG -- "User cancels\nWS ssh-agent-cancel" --> SESS
+
     %% ===== STYLING =====
     classDef screen fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
     classDef inline fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef android fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     class DASH,NEW,PROJ,SESS,FEAT,SETT screen
     class GITMODAL_DASH,GITMODAL_NEW,SKCHAT_FEAT inline
+    class SCONF,KEYMGMT,SIGNDLG android
 ```
 
 ### Legend
@@ -81,6 +99,7 @@ flowchart TD
 | Double-line arrow (`==>`) | WebSocket connection (persistent) |
 | Blue boxes | Top-level screens (hash routes) |
 | Orange boxes | Inline components (no route change) |
+| Green boxes | Android native screens (Activities/Dialogs) |
 
 ### Session State Machine
 
@@ -455,6 +474,132 @@ stateDiagram-v2
 
 ---
 
+## Android Native Screens
+
+### Server Config (`ServerConfigActivity`)
+
+**Component**: `android/app/src/main/kotlin/com/agentrunner/ServerConfigActivity.kt`
+
+**On Load**:
+- Pre-populates saved server URL from SharedPreferences (if previously configured)
+
+**User Actions**:
+| Element | Action | Result |
+|---------|--------|--------|
+| Server URL text input | Type | Sets server URL |
+| "Connect" button | Click | Validates URL, saves to SharedPreferences, launches `MainActivity` with `EXTRA_SERVER_URL` |
+
+**Field Validations**:
+- Server URL: required, non-empty, must be valid HTTP/HTTPS URL
+- Error cleared on text change
+
+**Navigation Out**:
+- `MainActivity` — on successful connect (clears task stack via `FLAG_ACTIVITY_CLEAR_TOP`)
+
+**Error States**:
+- Empty URL — inline error on TextInputLayout
+- Invalid URL format — inline error on TextInputLayout
+
+---
+
+### Key Management (`KeyManagementActivity`)
+
+**Component**: `android/app/src/main/kotlin/com/agentrunner/KeyManagementActivity.kt`
+
+**On Load**:
+- Reads all keys from `KeyRegistry` and displays in RecyclerView
+- Starts Yubikey USB/NFC discovery (auto-registers detected Yubikey keys)
+
+**User Actions**:
+| Element | Action | Result |
+|---------|--------|--------|
+| "Add Yubikey" button | Click | Reads slot 9a from connected Yubikey, registers key in `KeyRegistry` |
+| "Generate App Key" button | Click | AlertDialog for key name → generates ECDSA P-256 keypair in Android Keystore, registers in `KeyRegistry` |
+| "Export" button (per key) | Click | Copies SSH public key (`ecdsa-sha2-nistp256 ...`) to clipboard |
+| "Rename" button (per key) | Click | AlertDialog with name input → updates key name in `KeyRegistry` |
+| "Remove" button (per key) | Click | Confirmation AlertDialog → removes from `KeyRegistry` (and Android Keystore if app key) |
+| Back (toolbar) | Click | Returns to `MainActivity` |
+
+**Field Validations**:
+- Key name (generate): required, non-empty
+- Key name (rename): required, non-empty
+
+**Key List Item Display**:
+- Key name (bold)
+- Key type (`Yubikey PIV` / `App Key` / `Mock`)
+- Fingerprint (truncated SHA-256)
+- Last used timestamp
+
+**Error States**:
+- No Yubikey connected — "Add Yubikey" shows error toast
+- Duplicate key (same public key blob) — rejected by `KeyRegistry`
+- Keystore generation failure — error toast
+
+---
+
+### Sign Request Dialog (`SignRequestDialog`)
+
+**Component**: `android/app/src/main/kotlin/com/agentrunner/bridge/SignRequestDialog.kt`
+
+**Trigger**: Server sends `ssh-agent-request` message over WebSocket `/ws/sessions/:id`
+
+**Display**:
+- Operation context (e.g., "Sign request for git push to origin")
+- Queue badge ("Request 1 of 3") when multiple requests pending
+
+**User Actions**:
+| Element | Action | Result |
+|---------|--------|--------|
+| Key picker (RadioGroup) | Select | Selects which key to use for signing (shown only when multiple keys match) |
+| PIN input + "Sign" button | Submit | Sends PIN to `YubikeySigningBackend.signWithPin()` → signature sent via WebSocket |
+| Biometric prompt | Authenticate | `KeystoreSigningBackend.sign()` uses Android BiometricPrompt → signature sent via WebSocket |
+| "Cancel" button | Click | Sends `ssh-agent-cancel` → `SSH_AGENT_FAILURE` returned to agent |
+
+**Key Picker Behavior**:
+- 0 matching keys: legacy PIN-only mode (backward compatibility)
+- 1 matching key: auto-selected, no picker shown
+- Multiple matching keys: RadioGroup with status indicators per key
+
+**Key Status Indicators**:
+- "Ready" — key available for signing
+- "Connect Yubikey" — Yubikey-backed key but no Yubikey connected
+- "Unavailable" — key cannot sign (missing backend, missing alias)
+
+**PIN Input**:
+- Only shown for `YUBIKEY_PIV` keys when `pinRequired`
+- Enter key submits PIN
+- Wrong PIN: error message, input cleared, retry allowed
+- PIN blocked (3 wrong attempts): shows blocked state, auto-dismisses after 3s
+
+**Modal Behavior**:
+- Non-cancellable via back press (`isCancelable = false`)
+- Non-dismissible on outside touch
+- User must explicitly tap "Cancel" to dismiss
+
+**Error States**:
+- Signing failure — error message displayed, auto-dismisses after 3s
+- Yubikey disconnected during signing — request cancelled automatically
+- 60s timeout — `SSH_AGENT_FAILURE` sent automatically
+
+---
+
+### JavaScript Bridge (`window.AgentRunner`)
+
+**Component**: Inner class `AgentRunnerBridge` in `android/app/src/main/kotlin/com/agentrunner/MainActivity.kt`
+
+Available only when the PWA runs inside the Android WebView (user agent contains `AgentRunner-Android`).
+
+| Method | Returns | Purpose |
+|--------|---------|---------|
+| `openSettings()` | void | Launches `ServerConfigActivity` |
+| `openKeyManagement()` | void | Launches `KeyManagementActivity` |
+| `getYubikeyStatus()` | string | Returns `"connected_usb"`, `"connected_nfc"`, `"disconnected"`, or `"error"` |
+| `getYubikeySerial()` | string | Returns empty string (serial shown in native overlay instead) |
+
+**Detection**: PWA can check `typeof window.AgentRunner !== 'undefined'` to detect Android native context and show Android-specific UI elements (e.g., "Manage Keys" button).
+
+---
+
 ## API Sequence Diagrams
 
 ### Unified Onboarding (New Project or Discovered Directory)
@@ -794,6 +939,55 @@ sequenceDiagram
 
 ---
 
+### Android Sign Request Flow
+
+```mermaid
+sequenceDiagram
+    participant A as Agent (Sandboxed)
+    participant B as SSH Agent Bridge
+    participant S as Server
+    participant WS as WebSocket
+    participant AW as AgentWebSocket (Android)
+    participant SH as SignRequestHandler
+    participant D as SignRequestDialog
+    participant SB as SigningBackend
+
+    A->>B: SSH agent sign request (type 13)
+    B->>S: onRequest({ requestId, data, context })
+    S->>WS: ssh-agent-request message
+    WS-->>AW: { type: "ssh-agent-request", requestId, data, context }
+    AW->>SH: onSignRequest(request)
+    SH->>SH: Parse key blob from request data
+    SH->>SH: Match key blob against KeyRegistry
+
+    alt Single matching key
+        SH->>SH: Auto-select key
+    else Multiple matching keys
+        SH->>D: Show key picker (MatchingKey[])
+        D-->>SH: onKeySelected(keyId)
+    end
+
+    alt Yubikey key selected
+        SH->>D: Show PIN input
+        D-->>SH: onPinSubmitted(pin)
+        SH->>SB: YubikeySigningBackend.signWithPin(keyId, data, pin)
+    else App key selected
+        SH->>SB: KeystoreSigningBackend.sign(keyId, data)
+        SB->>SB: BiometricPrompt → user authenticates
+    else Mock key (debug)
+        SH->>SB: MockSigningBackend.sign(keyId, data)
+    end
+
+    SB-->>SH: signature bytes
+    SH->>AW: sendResponse(requestId, signature)
+    AW->>WS: ssh-agent-response
+    WS->>S: Route to bridge
+    S->>B: handleResponse(requestId, response)
+    B->>A: SSH agent sign response (type 14)
+```
+
+---
+
 ## Generated Files Reference
 
 Files generated during the onboarding and interview process:
@@ -822,6 +1016,10 @@ Every input field in the application, with client-side and server-side validatio
 | SpecKitChat | Type a message... | Yes | Send disabled when empty | Trim before WebSocket send | N/A (WebSocket, no HTTP error) |
 | Settings | Log level (dropdown) | Yes | Predefined options: debug, info, warn, error, fatal | Must be one of the LOG_LEVELS set | 400: "Invalid level. Must be one of: debug, info, warn, error, fatal" |
 | Settings | Voice backend (radio) | No | "browser" disabled if Web Speech unavailable; "cloud" disabled if `!health.cloudSttAvailable` | N/A (localStorage only) | N/A |
+| Server Config (Android) | Server URL | Yes | Non-empty, valid HTTP/HTTPS URL | N/A (client-side only) | Inline error on TextInputLayout |
+| Key Management (Android) | Key name (generate) | Yes | Non-empty | N/A (client-side only) | AlertDialog validation |
+| Key Management (Android) | Key name (rename) | Yes | Non-empty | N/A (client-side only) | AlertDialog validation |
+| Sign Request (Android) | PIN | Yes (Yubikey) | Non-empty | Verified by Yubikey PIV applet | Wrong PIN → retry; PIN blocked → auto-dismiss |
 
 ### Server-Side Implicit Validations
 

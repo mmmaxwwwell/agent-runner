@@ -167,7 +167,7 @@
 
 - [x] T045 [P] Run `nix develop -c npm test` and verify ALL Node.js tests pass (unit + integration + contract) with exit code 0 per FR-096
 - [x] T046 [P] Run `nix develop -c npm run build` and verify clean build with no TypeScript errors
-- [ ] T047 [P] Verify `UI_FLOW.md` reflects all current screens, routes, and flows including key management per FR-080–FR-081
+- [x] T047 [P] Verify `UI_FLOW.md` reflects all current screens, routes, and flows including key management per FR-080–FR-081
 - [ ] T048 Run full system validation: start server, onboard a project, run tasks, trigger SSH bridge flow with Android app connected, verify the complete lifecycle works end-to-end
 
 ---
