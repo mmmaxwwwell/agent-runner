@@ -168,7 +168,7 @@
 - [x] T045 [P] Run `nix develop -c npm test` and verify ALL Node.js tests pass (unit + integration + contract) with exit code 0 per FR-096
 - [x] T046 [P] Run `nix develop -c npm run build` and verify clean build with no TypeScript errors
 - [x] T047 [P] Verify `UI_FLOW.md` reflects all current screens, routes, and flows including key management per FR-080–FR-081
-- [ ] T048 Run full system validation: start server, onboard a project, run tasks, trigger SSH bridge flow with Android app connected, verify the complete lifecycle works end-to-end
+- [x] T048 Run full system validation: start server, onboard a project, run tasks, trigger SSH bridge flow with Android app connected, verify the complete lifecycle works end-to-end
 
 ---
 
@@ -225,6 +225,12 @@ Server works, all Node.js tests pass, all user flows validated end-to-end. Andro
 ### Full System (Phases 1–12)
 
 Server + Android app + multi-key signing + integration tests all passing.
+
+---
+
+## Phase: Review
+
+- [ ] REVIEW — Run code review on all changes from this feature branch
 
 ---
 
